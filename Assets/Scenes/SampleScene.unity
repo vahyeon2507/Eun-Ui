@@ -131,11 +131,13 @@ GameObject:
   - component: {fileID: 313790839}
   - component: {fileID: 313790841}
   - component: {fileID: 313790842}
+  - component: {fileID: 313790845}
   - component: {fileID: 313790843}
+  - component: {fileID: 313790847}
   - component: {fileID: 313790844}
   m_Layer: 0
   m_Name: 'Player '
-  m_TagString: Untagged
+  m_TagString: Player
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -302,7 +304,7 @@ BoxCollider2D:
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.5}
-    oldSize: {x: 0.95, y: 1.8}
+    oldSize: {x: 1.2, y: 1.8}
     newSize: {x: 0.19, y: 0.36}
     adaptiveTilingThreshold: 0.5
     drawMode: 0
@@ -332,6 +334,45 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
+--- !u!114 &313790845
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 313790837}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7dfc66168e9649543af5b6c808321cff, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  maxHealth: 5
+  currentHealth: 0
+  iFrameDuration: 0.8
+  flashInterval: 0.1
+  healthBar: {fileID: 0}
+  animator: {fileID: 0}
+  disableOnDeath: {fileID: 0}
+--- !u!114 &313790847
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 313790837}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6595de8451c986f4ea6cc678c78077b4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  damage: 1
+  targetTag: Boss
+  destroyOnHit: 0
+  singleUse: 0
+  allowMultipleHitsPerTarget: 0
+  allowCenterSafe: 0
+  centerSafeRadius: 0.5
+  knockbackForce: 0
 --- !u!1 &519420028
 GameObject:
   m_ObjectHideFlags: 0
@@ -763,10 +804,11 @@ GameObject:
   - component: {fileID: 1989468349}
   - component: {fileID: 1989468351}
   - component: {fileID: 1989468350}
+  - component: {fileID: 1989468353}
   - component: {fileID: 1989468352}
   m_Layer: 0
   m_Name: Boss_Jangsanbeom
-  m_TagString: Untagged
+  m_TagString: Boss
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -987,6 +1029,26 @@ MonoBehaviour:
   faceTarget: 1
   animator: {fileID: 0}
   speedParamName: Speed
+--- !u!114 &1989468353
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1989468345}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6595de8451c986f4ea6cc678c78077b4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  damage: 1
+  targetTag: Boss
+  destroyOnHit: 0
+  singleUse: 0
+  allowMultipleHitsPerTarget: 0
+  allowCenterSafe: 0
+  centerSafeRadius: 0.5
+  knockbackForce: 0
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

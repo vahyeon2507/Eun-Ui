@@ -806,6 +806,7 @@ GameObject:
   - component: {fileID: 1989468350}
   - component: {fileID: 1989468353}
   - component: {fileID: 1989468352}
+  - component: {fileID: 1989468354}
   m_Layer: 0
   m_Name: Boss_Jangsanbeom
   m_TagString: Boss
@@ -1049,6 +1050,26 @@ MonoBehaviour:
   allowCenterSafe: 0
   centerSafeRadius: 0.5
   knockbackForce: 0
+--- !u!114 &1989468354
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1989468345}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fce40a1a43ea0324c979d5a6a559c983, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  maxHp: 20
+  currentHp: 0
+  invulnTime: 0.25
+  staggerTime: 0.15
+  hitMoveDistance: 0.3
+  spriteRenderer: {fileID: 0}
+  animator: {fileID: 0}
+  hitEffectPrefab: {fileID: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

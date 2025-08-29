@@ -81,12 +81,49 @@ public class PlayerController : MonoBehaviour
     }
 
     // 애니메이션 이벤트에서 호출될 공격 로직
-    public void PerformAttack()
+    void PerformAttack()
     {
-        Collider2D[] hitEnemies = Physics2D.OverlapCircleAll(attackPoint.position, attackRange, enemyLayer);
-        foreach (Collider2D enemy in hitEnemies)
+        if (attackPoint == null)
         {
-            enemy.GetComponent<Enemy>()?.TakeDamage(attackDamage);
+            Debug.LogWarning("PerformAttack: attackPoint is null!");
+            return;
+        }
+
+        Vector2 attackPos = attackPoint.position;
+        Collider2D[] hits = Physics2D.OverlapCircleAll(attackPos, attackRange, enemyLayer);
+
+        if (hits.Length == 0)
+        {
+            // 히트가 아예 없었음 — 디버그용
+            Debug.Log("PerformAttack: hit nothing.");
+        }
+
+        foreach (Collider2D c in hits)
+        {
+            if (c == null) continue;
+
+            // IDamageable 가능한 대상을 부모/자식까지 찾아서 호출
+            IDamageable dmg = c.GetComponent<IDamageable>()
+                            ?? c.GetComponentInParent<IDamageable>()
+                            ?? c.GetComponentInChildren<IDamageable>();
+
+            if (dmg != null)
+            {
+                // 위치 기반으로 방향 계산 (플레이어에서 적으로 향하는 방향)
+                Vector2 dir = (c.transform.position - transform.position).normalized;
+
+                // 간단하게 데미지와 히트 방향 전달 (인터페이스 확장 버전 필요시)
+                dmg.TakeDamage(attackDamage);
+
+                // 피해 시 시각 이펙트(선택) — 이펙트가 있으면 Instantiate
+                // Instantiate(hitEffectPrefab, c.transform.position, Quaternion.identity);
+
+                Debug.Log($"PerformAttack: hit {c.name}");
+            }
+            else
+            {
+                Debug.LogWarning($"PerformAttack: {c.name} has no IDamageable component.");
+            }
         }
     }
 

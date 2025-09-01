@@ -1,317 +1,440 @@
-// JangsanbeomBoss_Fallback_Modified.cs
+// JangsanbeomBoss_Updated.cs
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
-public class JangsanbeomBoss_Fallback_Modified : MonoBehaviour
+public class JangsanbeomBoss : MonoBehaviour
 {
-    public enum JangsanState { Idle, ClawSwipe, BodySlam, DecoySplit, Cooldown }
-
     [Header("Basic")]
-    public Animator animator;
+    public Transform player;
     public SpriteRenderer spriteRenderer;
-    public bool useAnimatorFallback = true;
+    public Animator animator;
+    public float followSpeed = 2f;
+    public float followMinDistanceX = 1.2f;
+    public float aggroRange = 12f;
 
-    [Header("References")]
-    public Transform player;                    // 반드시 연결 (자동검색도 시도함)
-    private Rigidbody2D rb;
-
-    [Header("Prefabs & Points")]
+    [Header("Prefabs & Layers")]
     public GameObject telegraphPrefab;
-    public GameObject hitboxPrefab;
+    public GameObject hitboxPrefab;       // 반드시 네 Hitbox 스크립트가 붙어 있어야 함
     public GameObject decoyPrefab;
-    public Transform[] decoySpawnPoints;
+    public List<Transform> decoySpawnPoints = new List<Transform>();
+
+    [Header("Hitbox target settings")]
+    public LayerMask hitboxTargetLayer;   // 히트박스가 목표로 삼을 레이어 (Inspector에서 설정)
+    public string hitboxTargetTag = "Player"; // 기본 타겟 태그 (Hitbox.targetTag)
 
     [Header("Timings")]
     public float idleDelay = 1f;
-    public float telegraphTime = 1f;
+    public float telegraphTime = 0.8f;
     public float cooldownTime = 1f;
 
     [Header("Claw Settings")]
-    public float clawOffsetX = 1.5f;            // 기본 offset (X축 기준)
-    public Vector2 clawWideSize = new Vector2(3f, 1f);
-    public Vector2 clawShortSize = new Vector2(1.5f, 1f);
-    public float wideDashDistance = 0.6f;      // 넓은 공격의 돌진거리
-    public float shortDashDistance = 0.8f;     // 좁은(연속) 공격의 각각 돌진거리
-    public float dashMoveDuration = 0.06f;     // dash 할 때 한 프레임 대체 시간 (FixedUpdate 한틱으로 움직이기)
+    public Vector2 clawWideSize = new Vector2(6f, 1.5f);
+    public Vector2 clawShortSize = new Vector2(3f, 1.5f);
+    public float clawOffsetX = 1.5f;
+    public float wideDashDistance = 0.6f;
+    public float shortDashDistance = 2.0f;
+    public float dashMoveDuration = 0.06f;
+    public int clawDamage = 2;
 
     [Header("BodySlam Settings")]
-    public Vector2 bodySlamSize = new Vector2(4f, 2f);
+    public Vector2 bodySlamSize = new Vector2(3f, 2f);
     public float bodySlamOffsetX = 2f;
+    public int bodySlamDamage = 3;
 
-    private JangsanState currentState = JangsanState.Idle;
-    private Coroutine bossLoopCoroutine;
+    [Header("Decoy Settings")]
+    public int decoyCount = 2;
+    public float decoyLifetime = 4f;
+    public Color fakeColor = Color.gray;
+    public Color realColor = Color.white;
 
-    void Awake()
+    // internals
+    bool busy = false;
+    bool facingRight = true;
+// --- Paste inside your JangsanbeomBoss class ---
+
+[Header("AI Behavior")]
+public bool autoStartAI = true;            // 씬 시작 시 자동으로 AI 루틴 시작할지
+public float aiCheckInterval = 0.5f;       // 플레이어 거리를 체크하는 간격
+public float aiMinDelayBetweenActions = 0.6f;
+public float aiMaxDelayBetweenActions = 1.8f;
+
+private Coroutine aiCoroutine = null;
+
+void OnEnable()
+{
+    if (autoStartAI)
     {
-        if (spriteRenderer == null) spriteRenderer = GetComponent<SpriteRenderer>();
-        rb = GetComponent<Rigidbody2D>();
-        if (rb == null) rb = gameObject.AddComponent<Rigidbody2D>();
-
-        // 보스는 절대 플레이어에 의해 밀리지 않음
-        rb.bodyType = RigidbodyType2D.Kinematic;
-        rb.gravityScale = 0f;
-        rb.freezeRotation = true;
-
-        // 자동으로 플레이어 찾기 (태그 "Player" 사용)
-        if (player == null)
-        {
-            var pgo = GameObject.FindWithTag("Player");
-            if (pgo != null) player = pgo.transform;
-        }
-
-        bossLoopCoroutine = StartCoroutine(BossLoop());
+        // delay 한 프레임 후에 시작 (Start() 이후 안정적으로 참조들이 들어온 상태에서)
+        StartCoroutine(StartAIWithDelayOneFrame());
     }
+}
 
-    IEnumerator BossLoop()
+IEnumerator StartAIWithDelayOneFrame()
+{
+    yield return null;
+    TryStartAI();
+}
+
+void TryStartAI()
+{
+    if (aiCoroutine == null)
     {
-        while (true)
+        aiCoroutine = StartCoroutine(AIBehavior());
+        Debug.Log("[Boss] AIBehavior started.");
+    }
+}
+
+void StopAI()
+{
+    if (aiCoroutine != null)
+    {
+        StopCoroutine(aiCoroutine);
+        aiCoroutine = null;
+        Debug.Log("[Boss] AIBehavior stopped.");
+    }
+}
+
+IEnumerator AIBehavior()
+{
+    while (true)
+    {
+        // 플레이어가 존재하고 엔트리 범위 안에 있으면 행동
+        if (player != null)
         {
-            switch (currentState)
+            float dist = Vector2.Distance(new Vector2(player.position.x, 0f), new Vector2(transform.position.x, 0f));
+            if (dist <= aggroRange)
             {
-                case JangsanState.Idle:
-                    yield return new WaitForSeconds(idleDelay);
-                    ChooseNextAttack();
-                    break;
-
-                case JangsanState.ClawSwipe:
-                    yield return ClawSwipeRoutine(Random.value < 0.5f);
-                    currentState = JangsanState.Cooldown;
-                    break;
-
-                case JangsanState.BodySlam:
-                    yield return BodySlamRoutine();
-                    currentState = JangsanState.Cooldown;
-                    break;
-
-                case JangsanState.DecoySplit:
-                    yield return DecoySplitRoutine();
-                    currentState = JangsanState.Cooldown;
-                    break;
-
-                case JangsanState.Cooldown:
-                    yield return new WaitForSeconds(cooldownTime);
-                    currentState = JangsanState.Idle;
-                    break;
+                // 플레이어가 가까이 있으면 패턴 실행 (busy면 기다림)
+                if (!busy)
+                {
+                    // 랜덤으로 혹은 규칙으로 선택
+                    int choice = Random.Range(0, 100);
+                    if (choice < 50)
+                    {
+                        Debug.Log("[Boss AI] Chosen: Claw (maybe triple)");
+                        bool triple = (Random.value > 0.6f); // 40% 확률로 3연타
+                        StartClaw(triple);
+                    }
+                    else if (choice < 80)
+                    {
+                        Debug.Log("[Boss AI] Chosen: BodySlam");
+                        StartBodySlam();
+                    }
+                    else
+                    {
+                        Debug.Log("[Boss AI] Chosen: Decoy");
+                        StartDecoy();
+                    }
+                }
             }
-            yield return null;
         }
+        // 행동 간 랜덤 대기
+        float wait = Random.Range(aiMinDelayBetweenActions, aiMaxDelayBetweenActions);
+        yield return new WaitForSeconds(aiCheckInterval + wait);
+    }
+}
+
+// --- Test helpers so you can manually kick actions from Inspector (Play Mode) ---
+[ContextMenu("TEST: StartClaw_Single")]
+public void DEBUG_StartClawSingle() { StartClaw(false); Debug.Log("[DEBUG] StartClaw(false) called"); }
+
+[ContextMenu("TEST: StartClaw_Triple")]
+public void DEBUG_StartClawTriple() { StartClaw(true); Debug.Log("[DEBUG] StartClaw(true) called"); }
+
+[ContextMenu("TEST: StartBodySlam")]
+public void DEBUG_StartBodySlam() { StartBodySlam(); Debug.Log("[DEBUG] StartBodySlam() called"); }
+
+[ContextMenu("TEST: StartDecoy")]
+public void DEBUG_StartDecoy() { StartDecoy(); Debug.Log("[DEBUG] StartDecoy() called"); }
+
+    void Start()
+    {
+        if (player == null) Debug.LogWarning("[Boss] Player reference not set!");
+        if (spriteRenderer == null) spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+        if (animator == null) animator = GetComponent<Animator>();
+
+        // optional: 물리 푸시 방지 (통제된 transform 이동)
+        var rb = GetComponent<Rigidbody2D>();
+        if (rb != null)
+        {
+            rb.bodyType = RigidbodyType2D.Kinematic;
+            // rb.simulated = false; // 필요시 사용
+        }
+
+        if (hitboxPrefab == null) Debug.LogWarning("[Boss] Hitbox prefab not assigned.");
     }
 
-    void ChooseNextAttack()
+    void Update()
     {
-        int r = Random.Range(0, 3);
-        if (r == 0) currentState = JangsanState.ClawSwipe;
-        else if (r == 1) currentState = JangsanState.BodySlam;
-        else currentState = JangsanState.DecoySplit;
+        if (player == null) return;
+
+        float dx = player.position.x - transform.position.x;
+        if (!busy && Mathf.Abs(dx) > followMinDistanceX && Mathf.Abs(dx) < aggroRange)
+        {
+            float step = followSpeed * Time.deltaTime;
+            Vector3 newPos = transform.position;
+            newPos.x = Mathf.MoveTowards(transform.position.x, player.position.x - Mathf.Sign(dx) * followMinDistanceX, step);
+            transform.position = newPos;
+        }
+
+        if (player.position.x > transform.position.x && !facingRight) Flip();
+        if (player.position.x < transform.position.x && facingRight) Flip();
     }
 
-    #region ClawSwipe
-    IEnumerator ClawSwipeRoutine(bool isWide)
+    void Flip()
     {
-        if (player == null) Debug.LogWarning("[Boss] player reference not set; default to right.");
+        facingRight = !facingRight;
+        if (spriteRenderer != null) spriteRenderer.flipX = !spriteRenderer.flipX;
+        Vector3 s = transform.localScale; s.x *= -1f; transform.localScale = s;
+    }
 
-        int dir = GetPlayerDir(); // +1 or -1
-        PlayAnimSafe("Telegraph_Claw");
-        ShowTelegraph(clawOffsetX * dir, isWide ? clawWideSize.x : clawShortSize.x, telegraphTime);
+    // -------------------------
+    // Patterns public triggers
+    // -------------------------
+    public void StartClaw(bool triple = false)
+    {
+        if (!busy) StartCoroutine(ClawRoutine(triple));
+    }
 
+    public void StartBodySlam()
+    {
+        if (!busy) StartCoroutine(BodySlamRoutine());
+    }
+
+    public void StartDecoy()
+    {
+        if (!busy) StartCoroutine(DecoyRoutine());
+    }
+
+    // -------------------------
+    // Pattern implementations
+    // -------------------------
+    IEnumerator ClawRoutine(bool triple)
+    {
+        busy = true;
+        animator?.SetTrigger("ClawTelegraph");
+
+        SpawnTelegraph(GetClawPos(), triple ? clawWideSize : clawShortSize, telegraphTime);
         yield return new WaitForSeconds(telegraphTime);
 
-        if (isWide)
+        if (!triple)
         {
-            PlayAnimSafe("Claw_Wide");
-            CreateHitboxSafe(clawOffsetX * dir, clawWideSize, 0.35f);
-            // 한 번의 소폭 돌진
-            yield return DashHorizontal(dir, wideDashDistance);
-            yield return new WaitForSeconds(0.25f);
+            SpawnAndMaybeDashClaw(false, 0);
+            yield return new WaitForSeconds(cooldownTime);
         }
         else
         {
-            // 3회 연속: 매 공격마다 예고->타격->돌진
+            animator?.SetTrigger("ClawExecute");
             for (int i = 0; i < 3; i++)
             {
-                PlayAnimSafe("Claw_Narrow");
-                ShowTelegraph(clawOffsetX * dir, clawShortSize.x, 0.25f);
+                SpawnAndMaybeDashClaw(true, i);
                 yield return new WaitForSeconds(0.25f);
-                CreateHitboxSafe(clawOffsetX * dir, clawShortSize, 0.2f);
+            }
+            yield return new WaitForSeconds(cooldownTime);
+        }
 
-                // 각 공격마다 짧은 돌진 실행
-                yield return DashHorizontal(dir, shortDashDistance);
+        busy = false;
+    }
 
-                // 약간의 후딜
-                yield return new WaitForSeconds(0.15f);
+    void SpawnAndMaybeDashClaw(bool triple, int index)
+    {
+        Vector2 size = triple ? clawShortSize : clawWideSize;
+        float dashDist = triple ? shortDashDistance : wideDashDistance;
+        Vector2 pos = GetClawPos();
+
+        // spawn hitbox: set only the fields that exist on Hitbox.cs
+        GameObject hb = SpawnHitbox(pos, size, 0.15f, clawDamage, hitboxTargetTag, singleUse: true, targetLayer: hitboxTargetLayer);
+
+        Vector3 dashTarget = transform.position + Vector3.right * (facingRight ? dashDist : -dashDist);
+        StartCoroutine(QuickMoveTo(dashTarget, dashMoveDuration));
+    }
+
+    IEnumerator BodySlamRoutine()
+    {
+        busy = true;
+        animator?.SetTrigger("BodySlamTelegraph");
+
+        Vector2 pos = GetBodySlamPos();
+        SpawnTelegraph(pos, bodySlamSize, telegraphTime);
+
+        yield return new WaitForSeconds(telegraphTime);
+
+        GameObject hb = SpawnHitbox(pos, bodySlamSize, 0.4f, bodySlamDamage, hitboxTargetTag, singleUse: true, targetLayer: hitboxTargetLayer);
+
+        yield return new WaitForSeconds(cooldownTime);
+        busy = false;
+    }
+
+    IEnumerator DecoyRoutine()
+    {
+        busy = true;
+        animator?.SetTrigger("DecoyTelegraph");
+        yield return new WaitForSeconds(0.4f);
+
+        List<GameObject> spawned = new List<GameObject>();
+        if (decoySpawnPoints.Count > 0)
+        {
+            for (int i = 0; i < decoyCount && i < decoySpawnPoints.Count; i++)
+            {
+                var dp = decoySpawnPoints[i];
+                if (dp == null) continue;
+                GameObject d = Instantiate(decoyPrefab, dp.position, Quaternion.identity);
+                SetupDecoyVisual(d, i == 0 ? realColor : fakeColor);
+                spawned.Add(d);
+            }
+        }
+        else
+        {
+            for (int i = 0; i < decoyCount; i++)
+            {
+                Vector3 p = transform.position + new Vector3((i + 1) * 1.2f * (i % 2 == 0 ? 1 : -1), 0f, 0f);
+                GameObject d = Instantiate(decoyPrefab, p, Quaternion.identity);
+                SetupDecoyVisual(d, fakeColor);
+                spawned.Add(d);
+            }
+        }
+
+        yield return new WaitForSeconds(decoyLifetime);
+        foreach (var d in spawned) if (d != null) Destroy(d);
+        yield return new WaitForSeconds(cooldownTime);
+        busy = false;
+    }
+
+    void SetupDecoyVisual(GameObject d, Color c)
+    {
+        if (d == null) return;
+        var sr = d.GetComponent<SpriteRenderer>();
+        if (sr != null) sr.color = c;
+
+        // Try to call DecoyController.Setup(Color) if component exists
+        var decCtrl = d.GetComponent<MonoBehaviour>(); // safe check
+        if (decCtrl != null)
+        {
+            var t = decCtrl.GetType();
+            var m = t.GetMethod("Setup", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+            if (m != null)
+            {
+                var parms = m.GetParameters();
+                if (parms.Length == 1 && parms[0].ParameterType == typeof(Color))
+                {
+                    m.Invoke(decCtrl, new object[] { c });
+                }
+                else if (parms.Length == 0)
+                {
+                    m.Invoke(decCtrl, null);
+                }
             }
         }
     }
-    #endregion
 
-    #region BodySlam
-    IEnumerator BodySlamRoutine()
-    {
-        int dir = GetPlayerDir();
-        PlayAnimSafe("Telegraph_BodySlam");
-        // body slam은 앞쪽 방향 기준으로 고정된 직선 예고 (Y 무시)
-        ShowTelegraph(bodySlamOffsetX * dir + (bodySlamSize.x / 2f) * dir, bodySlamSize.x, telegraphTime + 0.2f);
-
-        yield return new WaitForSeconds(telegraphTime + 0.2f);
-
-        PlayAnimSafe("BodySlam");
-        CreateSlamHitboxSafe(bodySlamOffsetX * dir, bodySlamSize, 0.5f);
-        yield return new WaitForSeconds(0.5f);
-    }
-    #endregion
-
-    #region DecoySplit
-    IEnumerator DecoySplitRoutine()
-    {
-        PlayAnimSafe("Decoy_Cast");
-        ShowTelegraph(0f, 1f, 0.5f);
-        yield return new WaitForSeconds(0.6f);
-
-        if (decoyPrefab == null || decoySpawnPoints == null || decoySpawnPoints.Length == 0)
-        {
-            Debug.LogWarning("[Boss] decoyPrefab or spawn points not configured.");
-            yield break;
-        }
-
-        int realIndex = Random.Range(0, decoySpawnPoints.Length);
-        for (int i = 0; i < decoySpawnPoints.Length; i++)
-        {
-            var go = Instantiate(decoyPrefab, decoySpawnPoints[i].position, Quaternion.identity);
-            var dc = go.GetComponent<DecoyController>();
-            if (dc != null)
-                dc.Setup(i == realIndex);
-            else
-                Debug.LogWarning("Decoy prefab missing DecoyController component.");
-        }
-
-        yield return new WaitForSeconds(2f);
-    }
-    #endregion
-
-    #region Utilities
-    int GetPlayerDir()
-    {
-        if (player == null) return 1;
-        float dx = player.position.x - transform.position.x;
-        return dx >= 0f ? 1 : -1;
-    }
-
-    IEnumerator DashHorizontal(int dir, float distance)
-    {
-        if (rb == null) yield break;
-        Vector2 start = rb.position;
-        Vector2 target = start + new Vector2(dir * distance, 0f);
-
-        // MovePosition once then wait a physics tick for stability
-        rb.MovePosition(target);
-        yield return new WaitForFixedUpdate(); // 물리엔진이 적용된 후에 다음 동작
-    }
-
-    void PlayAnimSafe(string stateName)
-    {
-        if (animator != null && animator.runtimeAnimatorController != null)
-        {
-            animator.Play(stateName);
-        }
-        else if (useAnimatorFallback)
-        {
-            if (spriteRenderer != null) StartCoroutine(FallbackFlashRoutine());
-            else Debug.Log("[Boss] (fallback) would play: " + stateName);
-        }
-    }
-
-    IEnumerator FallbackFlashRoutine()
-    {
-        if (spriteRenderer == null) yield break;
-        Color original = spriteRenderer.color;
-        spriteRenderer.color = Color.red;
-        Vector3 origScale = transform.localScale;
-        transform.localScale = origScale * 1.05f;
-        yield return new WaitForSeconds(0.12f);
-        spriteRenderer.color = original;
-        transform.localScale = origScale;
-    }
-
-    void ShowTelegraph(float centerOffsetX, float width, float duration)
+    // -------------------------
+    // Spawn telegraph & hitbox (Hitbox API compatible)
+    // -------------------------
+    GameObject SpawnTelegraph(Vector2 center, Vector2 size, float duration)
     {
         if (telegraphPrefab == null)
         {
             Debug.LogWarning("[Boss] telegraphPrefab not assigned.");
-            return;
+            return null;
         }
 
-        Vector3 pos = transform.position + Vector3.right * centerOffsetX;
-        var tg = Instantiate(telegraphPrefab, pos, Quaternion.identity);
-        tg.transform.localScale = new Vector3(width, 1f, 1f);
-        var dd = tg.GetComponent<DestroyAfter>();
-        if (dd != null) dd.lifetime = duration;
-        else Destroy(tg, duration);
+        GameObject t = Instantiate(telegraphPrefab, center, Quaternion.identity);
+        t.transform.localScale = new Vector3(size.x, size.y, 1f);
+        Destroy(t, duration + 0.05f);
+        return t;
     }
 
-    void CreateHitboxSafe(float offsetX, Vector2 size, float life)
+    // 타겟 레이어를 LayerMask로 전달하여 Hitbox.targetLayerMask에 셋팅
+    GameObject SpawnHitbox(Vector2 center, Vector2 size, float lifetime, int damage, string targetTag = "Player", bool singleUse = true, LayerMask? targetLayer = null)
     {
         if (hitboxPrefab == null)
         {
             Debug.LogWarning("[Boss] hitboxPrefab not assigned.");
-            return;
+            return null;
         }
-        Vector3 pos = transform.position + Vector3.right * offsetX;
-        var hb = Instantiate(hitboxPrefab, pos, Quaternion.identity);
 
-        // collider direct set if available
-        BoxCollider2D bc = hb.GetComponent<BoxCollider2D>();
-        if (bc != null)
+        GameObject hb = Instantiate(hitboxPrefab, center, Quaternion.identity);
+        hb.transform.localScale = new Vector3(size.x, size.y, 1f);
+
+        // layer는 프리팹 기본값을 쓰거나, 원하면 hb.layer를 바꿀 수 있음 (대부분 불필요)
+        // hb.layer = LayerMaskToLayerIndex(yourChosenLayer) // 필요시 구현
+
+        var col = hb.GetComponent<Collider2D>();
+        if (col != null && !col.isTrigger)
         {
-            bc.isTrigger = true;
-            bc.size = size;
-            bc.offset = Vector2.zero;
+            col.isTrigger = true;
+            Debug.Log("[Boss] set hitbox collider isTrigger=true for reliable detection.");
+        }
+        else if (col == null)
+        {
+            Debug.LogWarning("[Boss] spawned hitbox has no Collider2D - hit detection won't work.");
+        }
+
+        // Hitbox 컴포넌트에 존재하는 멤버들만 안전하게 세팅
+        var hbComp = hb.GetComponent<Hitbox>();
+        if (hbComp != null)
+        {
+            // 필수/기본 필드
+            hbComp.owner = this.gameObject;
+            hbComp.targetTag = targetTag;
+            hbComp.damage = damage;
+            hbComp.singleUse = singleUse;
+
+            // target 레이어마스크가 설정되어 있으면 적용
+            if (targetLayer.HasValue)
+            {
+                try
+                {
+                    hbComp.targetLayerMask = targetLayer.Value;
+                }
+                catch
+                {
+                    // Hitbox API가 달라질 경우 대비: 그냥 무시
+                }
+            }
         }
         else
         {
-            hb.transform.localScale = new Vector3(size.x, size.y, 1f);
+            Debug.LogWarning("[Boss] spawned hitbox prefab has no Hitbox component. Add Hitbox script or update code.");
         }
 
-        var hscript = hb.GetComponent<Hitbox>();
-        if (hscript != null) hscript.damage = 1;
-
-        Destroy(hb, life);
+        if (lifetime > 0f) Destroy(hb, lifetime + 0.05f);
+        return hb;
     }
 
-    void CreateSlamHitboxSafe(float offsetX, Vector2 size, float life)
+    IEnumerator QuickMoveTo(Vector3 target, float duration)
     {
-        if (hitboxPrefab == null)
+        float start = Time.time;
+        Vector3 startPos = transform.position;
+        while (Time.time < start + duration)
         {
-            Debug.LogWarning("[Boss] hitboxPrefab not assigned.");
-            return;
+            float t = (Time.time - start) / duration;
+            transform.position = Vector3.Lerp(startPos, target, t);
+            yield return null;
         }
-        Vector3 pos = transform.position + Vector3.right * offsetX;
-        var hb = Instantiate(hitboxPrefab, pos, Quaternion.identity);
-
-        BoxCollider2D bc = hb.GetComponent<BoxCollider2D>();
-        if (bc != null)
-        {
-            bc.isTrigger = true;
-            bc.size = size;
-            bc.offset = Vector2.zero;
-        }
-        else
-        {
-            hb.transform.localScale = new Vector3(size.x, size.y, 1f);
-        }
-
-        var hscript = hb.GetComponent<Hitbox>();
-        if (hscript != null)
-        {
-            hscript.damage = 2;
-            hscript.allowCenterSafe = true;
-            hscript.centerSafeRadius = 1.0f;
-        }
-        Destroy(hb, life);
+        transform.position = target;
     }
-    #endregion
 
-    // debug public API
-    public void ForceAttack_Claw(bool wide) { currentState = JangsanState.ClawSwipe; StartCoroutine(ClawSwipeRoutine(wide)); }
-    public void ForceAttack_BodySlam() { currentState = JangsanState.BodySlam; StartCoroutine(BodySlamRoutine()); }
-    public void ForceAttack_Decoy() { currentState = JangsanState.DecoySplit; StartCoroutine(DecoySplitRoutine()); }
+    Vector2 GetClawPos()
+    {
+        float dir = facingRight ? 1f : -1f;
+        return (Vector2)transform.position + new Vector2(clawOffsetX * dir, 0f);
+    }
+
+    Vector2 GetBodySlamPos()
+    {
+        float dir = facingRight ? 1f : -1f;
+        return (Vector2)transform.position + new Vector2(bodySlamOffsetX * dir, 0f);
+    }
+
+    void OnDrawGizmosSelected()
+    {
+        Gizmos.color = Color.magenta;
+        Gizmos.DrawWireCube(GetClawPos(), clawWideSize);
+        Gizmos.color = Color.red;
+        Gizmos.DrawWireCube(GetBodySlamPos(), bodySlamSize);
+        Gizmos.color = Color.yellow;
+        Gizmos.DrawWireSphere(transform.position, aggroRange);
+    }
 }

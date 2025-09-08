@@ -5463,30 +5463,43 @@ MonoBehaviour:
   animator: {fileID: 1989468348}
   spriteRenderer: {fileID: 1989468349}
   rb: {fileID: 1989468351}
-  telegraphPrefab: {fileID: 2868501417162959009, guid: 0eb363b3d906bac45a56eee55ea85343, type: 3}
   hitboxPrefab: {fileID: 5080248838195864692, guid: 3434453123e67464ba0d22ae061ed382, type: 3}
-  decoyPrefab: {fileID: 0}
   followSpeed: 2
   followMinDistanceX: 1.2
   aggroRange: 12
-  telegraphTime: 1
-  cooldownTime: 1
-  clawOffsetX: 1.5
-  clawSize: {x: 3, y: 1.5}
-  clawDamage: 2
-  hitboxLifetime: 0.12
-  enableFakeClaw: 1
-  fakeChance: 0.25
-  fakeSprite: {fileID: 0}
-  fakeSpriteDuration: 0.18
-  fakeOrigin: {fileID: 0}
+  attacks:
+  - name: Claw_Execute
+    offset: {x: -2, y: -4}
+    size: {x: 3, y: 1.5}
+    angle: 0
+    damage: 2
+    lifetime: 0
+    telegraphPrefab: {fileID: 0}
+    telegraphTime: 0
+    defaultFake: 0
+    fakeSprite: {fileID: 0}
+    fakeSpriteDuration: 0
+    originOverride: {fileID: 0}
+  - name: Claw_Fake
+    offset: {x: 1.5, y: 0}
+    size: {x: 3, y: 1.5}
+    angle: 0
+    damage: 2
+    lifetime: 0
+    telegraphPrefab: {fileID: 0}
+    telegraphTime: 0
+    defaultFake: 0
+    fakeSprite: {fileID: 0}
+    fakeSpriteDuration: 0
+    originOverride: {fileID: 0}
   hitboxTargetLayer:
     serializedVersion: 2
     m_Bits: 128
   hitboxTargetTag: Player
-  trig_ClawExecute: ClawExecute
-  trig_ClawFakeExecute: ClawFakeExecute
   useAnimationEvents: 1
+  cooldownTime: 1
+  drawGizmos: 1
+  facingRight: 1
 --- !u!4 &1989468347
 Transform:
   m_ObjectHideFlags: 0

@@ -1,6 +1,22 @@
 using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
+
+[System.Serializable]
+public class AttackData
+{
+    public string name = "Attack";
+    public Vector2 offset = new Vector2(1.5f, 0f);
+    public Vector2 size = new Vector2(3f, 1.5f);
+    public float angle = 0f;
+    public int damage = 2;
+    public float lifetime = 0.12f;
+    public GameObject telegraphPrefab = null;
+    public float telegraphTime = 0.8f;
+    public bool defaultFake = false;
+    public Sprite fakeSprite = null;
+    public float fakeSpriteDuration = 0.18f;
+    public Transform originOverride = null;
+}
 
 public class JangsanbeomBoss : MonoBehaviour
 {
@@ -8,47 +24,29 @@ public class JangsanbeomBoss : MonoBehaviour
     public Transform player;
     public Animator animator;
     public SpriteRenderer spriteRenderer;
-    public Rigidbody2D rb; // will be set to Kinematic to avoid being pushed
+    public Rigidbody2D rb;
 
     [Header("Prefabs & visuals")]
-    public GameObject telegraphPrefab;   // telegraph visual (spawn & destroy after telegraphTime)
-    public GameObject hitboxPrefab;      // prefab must have Collider2D + Hitbox component
-    public GameObject decoyPrefab;       // optional
+    public GameObject hitboxPrefab;      // must have Collider2D + Hitbox
 
     [Header("AI / Movement")]
     public float followSpeed = 2f;
-    public float followMinDistanceX = 1.2f; // keep this X distance from player
+    public float followMinDistanceX = 1.2f;
     public float aggroRange = 12f;
 
-    [Header("Claw settings")]
-    public float telegraphTime = 0.8f;   // not used in NoTelegraph mode, kept for inspector
-    public float cooldownTime = 1.0f;
-    public float clawOffsetX = 1.5f;
-    public Vector2 clawSize = new Vector2(3f, 1.5f);
-    public int clawDamage = 2;
-    public float hitboxLifetime = 0.12f;
+    [Header("Attacks")]
+    public AttackData[] attacks = new AttackData[1];
 
-    [Header("Fake claw")]
-    public bool enableFakeClaw = true;
-    [Range(0f, 1f)] public float fakeChance = 0.25f;
-    public Sprite fakeSprite;            // optional visual swap for fake
-    public float fakeSpriteDuration = 0.18f;
-    public Transform fakeOrigin;         // optional: where fake telegraph appears
-
-    [Header("Hit target settings")]
-    public LayerMask hitboxTargetLayer;  // assign Player layer in inspector
-    public string hitboxTargetTag = "Player"; // default
-
-    [Header("Animator parameter names")]
-    public string trig_ClawExecute = "ClawExecute";
-    public string trig_ClawFakeExecute = "ClawFakeExecute";
-
-    [Header("Behavior options")]
-    public bool useAnimationEvents = true; // true = OnClawHitFrame is called from animation event
+    [Header("General")]
+    public LayerMask hitboxTargetLayer = 0;
+    public string hitboxTargetTag = "Player";
+    public bool useAnimationEvents = true;
+    public float cooldownTime = 1f;
+    public bool drawGizmos = true;
 
     // internals
     bool busy = false;
-    bool facingRight = true;
+    public bool facingRight = true; // made public so editor can use it reliably
     Coroutine aiCoroutine;
 
     void Reset()
@@ -73,49 +71,48 @@ public class JangsanbeomBoss : MonoBehaviour
 
     void Start()
     {
-        Debug.Log("[Boss] Start() called on " + name);
         if (player == null) Debug.LogWarning("[Boss] player reference not set!");
         if (hitboxPrefab == null) Debug.LogWarning("[Boss] hitboxPrefab not assigned!");
-        if (telegraphPrefab == null) Debug.Log("[Boss] telegraphPrefab not assigned (telegraph visuals skipped).");
-        if (animator == null) Debug.LogWarning("[Boss] animator not assigned! Animator needs controller with ClawExecute param.");
+        if (attacks == null || attacks.Length == 0) Debug.LogWarning("[Boss] No attacks defined!");
+        if (animator == null) Debug.LogWarning("[Boss] Animator not assigned!");
+        if (animator != null && animator.runtimeAnimatorController == null) Debug.LogWarning("[Boss] Animator has no Controller assigned (None).");
 
         if (aiCoroutine == null) aiCoroutine = StartCoroutine(AIBehavior());
     }
 
     void Update()
     {
+        // debug keys: K = force play animation (attempt trigger then Play), L = spawn real hit (no anim), ; = log anim state
+        if (Input.GetKeyDown(KeyCode.K))
+        {
+            Debug.Log("[Boss DEBUG] K pressed: force-play animation for attack 0");
+            ForcePlayAttackAnimation(0);
+        }
         if (Input.GetKeyDown(KeyCode.L))
         {
-            Debug.Log("[Boss DEBUG] Forcing FAKE claw (L pressed)");
-            StartClaw(false);            // AI처럼 호출하되 forceReal = false -> fakeChance 적용
+            Debug.Log("[Boss DEBUG] L pressed: spawn REAL hit for attack 0 (no anim)");
+            SpawnRealHit(GetAttackWorldPos(attacks[0]), attacks[0]);
         }
-        if (Input.GetKeyDown(KeyCode.Semicolon)) // ; 키
+        if (Input.GetKeyDown(KeyCode.Semicolon))
         {
             if (animator != null)
             {
                 var st = animator.GetCurrentAnimatorStateInfo(0);
-                Debug.Log($"[Boss DEBUG] Animator state = {st.fullPathHash} / normalizedTime={st.normalizedTime}");
+                Debug.Log($"[Boss DEBUG] Animator state info: fullPathHash={st.fullPathHash}, normalizedTime={st.normalizedTime}, isName:0-> {animator.GetCurrentAnimatorStateInfo(0).IsName(animator.GetCurrentAnimatorClipInfo(0).Length > 0 ? animator.GetCurrentAnimatorClipInfo(0)[0].clip.name : "")}");
             }
             else Debug.Log("[Boss DEBUG] animator == null");
-        }
-
-
-
-        // DEBUG: Force a claw for quick testing
-        if (Input.GetKeyDown(KeyCode.K))
-        {
-            Debug.Log("[Boss] Debug: forcing claw (K pressed)");
-            StartClaw(true);
         }
 
         if (player == null) return;
 
         float dx = player.position.x - transform.position.x;
-        if (!busy && Mathf.Abs(dx) > followMinDistanceX && Mathf.Abs(dx) < aggroRange)
+        float absdx = Mathf.Abs(dx);
+        if (!busy && absdx > followMinDistanceX && absdx < aggroRange)
         {
             float step = followSpeed * Time.deltaTime;
+            float targetX = player.position.x - Mathf.Sign(dx) * followMinDistanceX;
             Vector3 newPos = transform.position;
-            newPos.x = Mathf.MoveTowards(transform.position.x, player.position.x - Mathf.Sign(dx) * followMinDistanceX, step);
+            newPos.x = Mathf.MoveTowards(transform.position.x, targetX, step);
             transform.position = newPos;
         }
 
@@ -126,142 +123,166 @@ public class JangsanbeomBoss : MonoBehaviour
     void FlipTo(bool faceRight)
     {
         facingRight = faceRight;
-        if (spriteRenderer != null)
-            spriteRenderer.flipX = !faceRight;
+        if (spriteRenderer != null) spriteRenderer.flipX = !faceRight;
         Vector3 s = transform.localScale; s.x = Mathf.Abs(s.x) * (faceRight ? 1f : -1f); transform.localScale = s;
     }
 
-    // ---------- 핵심 수정: StartClaw가 실제로 루틴을 시작하도록 함 ----------
-    public void StartClaw(bool forceReal = false)
+    // --- Attack API ---
+    public void StartAttack(int attackIndex, bool forceReal = false)
     {
         if (busy)
         {
-            Debug.Log("[Boss] StartClaw aborted: busy");
+            Debug.Log($"[Boss] StartAttack({attackIndex}) aborted: busy");
             return;
         }
-        Debug.Log("[Boss] StartClaw called. forceReal=" + forceReal);
-        StartCoroutine(ClawRoutine_NoTelegraph(forceReal));
-    }
-
-    IEnumerator ClawRoutine_NoTelegraph(bool forceReal)
-    {
-        busy = true;
-
-        bool isFake = false;
-        if (!forceReal && enableFakeClaw)
-            isFake = Random.value < fakeChance;
-
-        // Execute 트리거 바로 날림 (텔레그래프 없음)
-        if (animator != null)
+        if (attacks == null || attackIndex < 0 || attackIndex >= attacks.Length)
         {
-            if (isFake) animator.SetTrigger(trig_ClawFakeExecute);
-            else animator.SetTrigger(trig_ClawExecute);
-            Debug.Log("[Boss] Animator trigger set: " + (isFake ? trig_ClawFakeExecute : trig_ClawExecute));
+            Debug.LogWarning("[Boss] invalid attack index");
+            return;
         }
 
+        AttackData ad = attacks[attackIndex];
+        bool willBeFake = ad.defaultFake && !forceReal;
+        StartCoroutine(AttackRoutine(attackIndex, willBeFake));
+    }
+
+    IEnumerator AttackRoutine(int idx, bool isFake)
+    {
+        busy = true;
+        AttackData ad = attacks[idx];
+
+        // telegraph visual
+        if (ad.telegraphPrefab != null)
+        {
+            Vector2 tpos = (ad.originOverride != null) ? (Vector2)ad.originOverride.position : GetAttackWorldPos(ad);
+            GameObject t = Instantiate(ad.telegraphPrefab, tpos, Quaternion.identity);
+            Destroy(t, Mathf.Max(0.05f, ad.telegraphTime));
+        }
+
+        // Try to trigger animator: prefer Trigger param named: ad.name + "Execute"
+        string triggerName = ad.name + "Execute";
+        bool triggered = TrySetTrigger(triggerName);
+
+        if (!triggered)
+        {
+            // If trigger not present, try to Play state with same name fallback.
+            bool played = TryPlayState(ad.name + "Execute");
+            if (!played)
+            {
+                Debug.LogWarning($"[Boss] Neither Trigger '{triggerName}' exists nor state '{ad.name + "Execute"}' playable. Animator won't change state.");
+            }
+        }
+        else
+        {
+            Debug.Log($"[Boss] Animator.SetTrigger called: {triggerName} (attack {ad.name}, fake={isFake})");
+        }
+
+        // fallback if animation events not used
         if (!useAnimationEvents)
         {
             if (isFake)
             {
-                if (fakeSprite != null && spriteRenderer != null)
-                    StartCoroutine(TemporarilyShow(fakeSprite, fakeSpriteDuration));
+                if (ad.fakeSprite != null && spriteRenderer != null) StartCoroutine(TemporarilyShow(ad.fakeSprite, ad.fakeSpriteDuration));
                 yield return new WaitForSeconds(0.06f);
-                SpawnFakeHit(GetFakePos(), clawSize);
+                SpawnFakeHit(GetAttackWorldPos(ad), ad);
             }
             else
             {
                 yield return new WaitForSeconds(0.08f);
-                SpawnRealHit(GetClawPos(), clawSize);
+                SpawnRealHit(GetAttackWorldPos(ad), ad);
             }
         }
 
         yield return new WaitForSeconds(cooldownTime);
         busy = false;
-        Debug.Log("[Boss] ClawRoutine finished, busy=false");
     }
 
-    // Animation event entrypoints
-    public void OnClawHitFrame()
+    // --- Animation event entry points ---
+    // Int-param variants (preferred for multiple attacks)
+    public void OnAttackHitFrame(int attackIndex)
     {
-        Debug.Log("[Boss] OnClawHitFrame called (animation event). Spawning real hit.");
-        SpawnRealHit(GetClawPos(), clawSize);
+        if (attacks == null || attackIndex < 0 || attackIndex >= attacks.Length) return;
+        AttackData ad = attacks[attackIndex];
+        SpawnRealHit(GetAttackWorldPos(ad), ad);
     }
-
-    public void OnClawFakeHitFrame()
+    public void OnAttackFakeHitFrame(int attackIndex)
     {
-        Debug.Log("[Boss] OnClawFakeHitFrame called (animation event). Spawning fake hit.");
-        if (fakeSprite != null && spriteRenderer != null)
-            StartCoroutine(TemporarilyShow(fakeSprite, fakeSpriteDuration));
-        SpawnFakeHit(GetFakePos(), clawSize);
+        if (attacks == null || attackIndex < 0 || attackIndex >= attacks.Length) return;
+        AttackData ad = attacks[attackIndex];
+        if (ad.fakeSprite != null && spriteRenderer != null) StartCoroutine(TemporarilyShow(ad.fakeSprite, ad.fakeSpriteDuration));
+        SpawnFakeHit(GetAttackWorldPos(ad), ad);
     }
 
-    // Hit spawning utilities
-    void SpawnRealHit(Vector2 center, Vector2 size)
+    // No-param overloads for convenience (if your animation event was set without int)
+    public void OnAttackHitFrame()
+    {
+        if (attacks != null && attacks.Length > 0) OnAttackHitFrame(0);
+    }
+    public void OnAttackFakeHitFrame()
+    {
+        if (attacks != null && attacks.Length > 0) OnAttackFakeHitFrame(0);
+    }
+
+    // --- Helpers: spawn hitbox prefab ---
+    GameObject SpawnHitboxPrefab(Vector2 center, Vector2 size, float angleDeg, int damage, string targetTag, LayerMask layerMask, float lifetime)
     {
         if (hitboxPrefab == null)
         {
-            Debug.LogWarning("[Boss] hitboxPrefab is null - can't spawn real hit.");
-            return;
+            Debug.LogWarning("[Boss] hitboxPrefab null - cannot spawn hit");
+            return null;
         }
 
-        GameObject hb = Instantiate(hitboxPrefab, center, Quaternion.identity);
-        hb.transform.localScale = new Vector3(size.x, size.y, 1f);
-
-        Collider2D col = hb.GetComponent<Collider2D>();
-        if (col != null) col.isTrigger = true;
-
-        Hitbox hbComp = hb.GetComponent<Hitbox>();
-        if (hbComp != null)
+        GameObject hb = Instantiate(hitboxPrefab, center, Quaternion.Euler(0f, 0f, angleDeg));
+        BoxCollider2D box = hb.GetComponent<BoxCollider2D>();
+        if (box != null)
         {
-            hbComp.owner = this.gameObject;
-            hbComp.damage = clawDamage;
-            hbComp.targetTag = hitboxTargetTag;
-            hbComp.targetLayerMask = hitboxTargetLayer;
-            hbComp.singleUse = true;
+            box.isTrigger = true;
+            box.offset = Vector2.zero;
+            box.size = size;
         }
         else
         {
-            Debug.LogWarning("[Boss] spawned hitbox prefab has no Hitbox component.");
+            hb.transform.localScale = new Vector3(size.x, size.y, 1f);
+            Collider2D col = hb.GetComponent<Collider2D>();
+            if (col != null) col.isTrigger = true;
         }
-
-        if (hitboxLifetime > 0f) Destroy(hb, hitboxLifetime + 0.05f);
-        Debug.Log("[Boss] Spawned real hit at " + center);
-    }
-
-    void SpawnFakeHit(Vector2 center, Vector2 size)
-    {
-        if (hitboxPrefab == null) return;
-        GameObject hb = Instantiate(hitboxPrefab, center, Quaternion.identity);
-        hb.transform.localScale = new Vector3(size.x, size.y, 1f);
-
-        Collider2D col = hb.GetComponent<Collider2D>();
-        if (col != null) col.isTrigger = true;
 
         Hitbox hbComp = hb.GetComponent<Hitbox>();
         if (hbComp != null)
         {
             hbComp.owner = this.gameObject;
-            hbComp.damage = 0;
-            hbComp.targetTag = "";
-            hbComp.targetLayerMask = 0;
+            hbComp.damage = damage;
+            hbComp.targetTag = targetTag;
+            hbComp.targetLayerMask = layerMask;
             hbComp.singleUse = true;
+            hbComp.destroyOnHit = false;
+        }
+        else
+        {
+            Debug.LogWarning("[Boss] spawned hitbox prefab missing Hitbox component");
         }
 
-        if (hitboxLifetime > 0f) Destroy(hb, hitboxLifetime + 0.05f);
-        Debug.Log("[Boss] Spawned fake hit (harmless) at " + center);
+        if (lifetime > 0f) Destroy(hb, lifetime + 0.05f);
+        return hb;
     }
 
-    Vector2 GetClawPos()
+    void SpawnRealHit(Vector2 center, AttackData ad)
     {
-        float dir = facingRight ? 1f : -1f;
-        return (Vector2)transform.position + new Vector2(clawOffsetX * dir, 0f);
+        SpawnHitboxPrefab(center, ad.size, ad.angle, ad.damage, hitboxTargetTag, hitboxTargetLayer, ad.lifetime);
+        Debug.Log($"[Boss] Spawned REAL {ad.name} at {center}, size {ad.size}");
+    }
+    void SpawnFakeHit(Vector2 center, AttackData ad)
+    {
+        GameObject hb = SpawnHitboxPrefab(center, ad.size, ad.angle, 0, "", 0, ad.lifetime);
+        if (hb != null) Debug.Log($"[Boss] Spawned FAKE {ad.name} at {center}");
     }
 
-    Vector2 GetFakePos()
+    Vector2 GetAttackWorldPos(AttackData ad)
     {
-        if (fakeOrigin != null) return fakeOrigin.position;
+        if (ad.originOverride != null) return ad.originOverride.position;
         float dir = facingRight ? 1f : -1f;
-        return (Vector2)transform.position + new Vector2(clawOffsetX * dir, 0f);
+        Vector2 offs = new Vector2(ad.offset.x * dir, ad.offset.y);
+        return (Vector2)transform.position + offs;
     }
 
     IEnumerator TemporarilyShow(Sprite s, float dur)
@@ -275,19 +296,18 @@ public class JangsanbeomBoss : MonoBehaviour
 
     IEnumerator AIBehavior()
     {
-        Debug.Log("[Boss] AIBehavior started");
         while (true)
         {
-            if (!busy && player != null)
+            if (!busy && player != null && attacks != null && attacks.Length > 0)
             {
                 float d = Mathf.Abs(player.position.x - transform.position.x);
                 if (d <= aggroRange)
                 {
-                    int val = Random.Range(0, 100);
-                    if (val < 60)
+                    int choice = Random.Range(0, 100);
+                    if (choice < 60)
                     {
-                        Debug.Log("[Boss] AI choose to claw (val=" + val + ")");
-                        StartClaw(false);
+                        int idx = Random.Range(0, attacks.Length);
+                        StartAttack(idx, false);
                     }
                 }
             }
@@ -295,10 +315,64 @@ public class JangsanbeomBoss : MonoBehaviour
         }
     }
 
+    // --- Animator utility methods ---
+    bool TrySetTrigger(string triggerName)
+    {
+        if (animator == null) return false;
+        // check param exists
+        foreach (var p in animator.parameters)
+        {
+            if (p.name == triggerName && p.type == AnimatorControllerParameterType.Trigger)
+            {
+                animator.SetTrigger(triggerName);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Try to Play an animator state (stateName) in Base Layer 0
+    bool TryPlayState(string stateName)
+    {
+        if (animator == null) return false;
+        // try direct Play (stateName must match state's name in animator)
+        try
+        {
+            animator.Play(stateName, 0, 0f);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    // explicit force-play utility used by debug key
+    public void ForcePlayAttackAnimation(int attackIndex)
+    {
+        if (attacks == null || attackIndex < 0 || attackIndex >= attacks.Length) return;
+        string stateName = attacks[attackIndex].name + "Execute";
+        if (!TrySetTrigger(stateName))
+        {
+            if (!TryPlayState(stateName))
+            {
+                Debug.LogWarning($"[Boss] ForcePlay: couldn't trigger or play state '{stateName}'. Check Animator params or state names.");
+            }
+        }
+    }
+
     void OnDrawGizmosSelected()
     {
-        Gizmos.color = Color.red;
-        Vector2 p = GetClawPos();
-        Gizmos.DrawWireCube(p, new Vector3(clawSize.x, clawSize.y, 0.1f));
+        if (!drawGizmos || attacks == null) return;
+        for (int i = 0; i < attacks.Length; i++)
+        {
+            AttackData a = attacks[i];
+            Vector2 c = Application.isPlaying ? GetAttackWorldPos(a) : (Vector2)transform.position + a.offset;
+            Gizmos.color = Color.Lerp(Color.red, Color.yellow, i / (float)Mathf.Max(1, attacks.Length - 1));
+            Gizmos.DrawWireCube(c, new Vector3(a.size.x, a.size.y, 0.01f));
+#if UNITY_EDITOR
+            UnityEditor.Handles.Label(c + Vector2.up * 0.25f, $"{a.name} ({i})");
+#endif
+        }
     }
 }

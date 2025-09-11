@@ -1,139 +1,121 @@
-// File: Assets/Editor/JangsanbeomBossEditor.cs
-// MUST be placed in an Editor folder (e.g. Assets/Editor/)
 using UnityEngine;
 using UnityEditor;
 
+// custom editor for JangsanbeomBoss
 [CustomEditor(typeof(JangsanbeomBoss))]
 public class JangsanbeomBossEditor : Editor
 {
+    SerializedProperty playerProp;
+    SerializedProperty animatorProp;
+    SerializedProperty spriteRendererProp;
+    SerializedProperty rbProp;
+
+    SerializedProperty telegraphPrefabProp;
+    SerializedProperty hitboxPrefabProp;
+    SerializedProperty decoyPrefabProp;
+
+    SerializedProperty followSpeedProp;
+    SerializedProperty followMinDistanceXProp;
+    SerializedProperty aggroRangeProp;
+
+    SerializedProperty enableFakeClawProp;
+    SerializedProperty fakeChanceProp;
+    SerializedProperty fakeSpriteProp;
+    SerializedProperty fakeSpriteDurationProp;
+    SerializedProperty fakeOriginProp;
+
+    SerializedProperty hitboxTargetLayerProp;
+    SerializedProperty hitboxTargetTagProp;
+
+    SerializedProperty trigClawExecuteProp;
+    SerializedProperty trigClawFakeExecuteProp;
+
+    // the list we care most about
     SerializedProperty attacksProp;
-    SerializedProperty drawGizmosProp;
-    JangsanbeomBoss boss;
 
     void OnEnable()
     {
-        boss = (JangsanbeomBoss)target;
+        playerProp = serializedObject.FindProperty("player");
+        animatorProp = serializedObject.FindProperty("animator");
+        spriteRendererProp = serializedObject.FindProperty("spriteRenderer");
+        rbProp = serializedObject.FindProperty("rb");
+
+        telegraphPrefabProp = serializedObject.FindProperty("telegraphPrefab");
+        hitboxPrefabProp = serializedObject.FindProperty("hitboxPrefab");
+        decoyPrefabProp = serializedObject.FindProperty("decoyPrefab");
+
+        followSpeedProp = serializedObject.FindProperty("followSpeed");
+        followMinDistanceXProp = serializedObject.FindProperty("followMinDistanceX");
+        aggroRangeProp = serializedObject.FindProperty("aggroRange");
+
+        enableFakeClawProp = serializedObject.FindProperty("enableFakeClaw");
+        fakeChanceProp = serializedObject.FindProperty("fakeChance");
+        fakeSpriteProp = serializedObject.FindProperty("fakeSprite");
+        fakeSpriteDurationProp = serializedObject.FindProperty("fakeSpriteDuration");
+        fakeOriginProp = serializedObject.FindProperty("fakeOrigin");
+
+        hitboxTargetLayerProp = serializedObject.FindProperty("hitboxTargetLayer");
+        hitboxTargetTagProp = serializedObject.FindProperty("hitboxTargetTag");
+
+        trigClawExecuteProp = serializedObject.FindProperty("trig_ClawExecute");
+        trigClawFakeExecuteProp = serializedObject.FindProperty("trig_ClawFakeExecute");
+
         attacksProp = serializedObject.FindProperty("attacks");
-        drawGizmosProp = serializedObject.FindProperty("drawGizmos");
     }
 
     public override void OnInspectorGUI()
     {
         serializedObject.Update();
 
-        EditorGUILayout.PropertyField(serializedObject.FindProperty("player"));
-        EditorGUILayout.PropertyField(serializedObject.FindProperty("animator"));
-        EditorGUILayout.PropertyField(serializedObject.FindProperty("spriteRenderer"));
-        EditorGUILayout.PropertyField(serializedObject.FindProperty("rb"));
-        EditorGUILayout.PropertyField(serializedObject.FindProperty("hitboxPrefab"));
+        EditorGUILayout.LabelField("Refs", EditorStyles.boldLabel);
+        EditorGUILayout.PropertyField(playerProp);
+        EditorGUILayout.PropertyField(animatorProp);
+        EditorGUILayout.PropertyField(spriteRendererProp);
+        EditorGUILayout.PropertyField(rbProp);
 
         EditorGUILayout.Space();
-        EditorGUILayout.PropertyField(serializedObject.FindProperty("followSpeed"));
-        EditorGUILayout.PropertyField(serializedObject.FindProperty("followMinDistanceX"));
-        EditorGUILayout.PropertyField(serializedObject.FindProperty("aggroRange"));
+        EditorGUILayout.LabelField("Prefabs & Visuals", EditorStyles.boldLabel);
+        EditorGUILayout.PropertyField(telegraphPrefabProp);
+        EditorGUILayout.PropertyField(hitboxPrefabProp);
+        EditorGUILayout.PropertyField(decoyPrefabProp);
 
         EditorGUILayout.Space();
-        EditorGUILayout.PropertyField(attacksProp, new GUIContent("Attacks"), true); // show array with foldouts
+        EditorGUILayout.LabelField("AI / Movement", EditorStyles.boldLabel);
+        EditorGUILayout.PropertyField(followSpeedProp);
+        EditorGUILayout.PropertyField(followMinDistanceXProp);
+        EditorGUILayout.PropertyField(aggroRangeProp);
 
         EditorGUILayout.Space();
-        EditorGUILayout.PropertyField(serializedObject.FindProperty("hitboxTargetLayer"));
-        EditorGUILayout.PropertyField(serializedObject.FindProperty("hitboxTargetTag"));
-        EditorGUILayout.PropertyField(serializedObject.FindProperty("useAnimationEvents"));
-        EditorGUILayout.PropertyField(serializedObject.FindProperty("cooldownTime"));
-        EditorGUILayout.PropertyField(drawGizmosProp);
+        EditorGUILayout.LabelField("Fake Claw", EditorStyles.boldLabel);
+        EditorGUILayout.PropertyField(enableFakeClawProp);
+        EditorGUILayout.PropertyField(fakeChanceProp);
+        EditorGUILayout.PropertyField(fakeSpriteProp);
+        EditorGUILayout.PropertyField(fakeSpriteDurationProp);
+        EditorGUILayout.PropertyField(fakeOriginProp);
 
         EditorGUILayout.Space();
-        if (GUILayout.Button("Add Attack"))
+        EditorGUILayout.LabelField("Hit Target", EditorStyles.boldLabel);
+        EditorGUILayout.PropertyField(hitboxTargetLayerProp);
+        EditorGUILayout.PropertyField(hitboxTargetTagProp);
+
+        EditorGUILayout.Space();
+        EditorGUILayout.LabelField("Animator Param Names", EditorStyles.boldLabel);
+        EditorGUILayout.PropertyField(trigClawExecuteProp, new GUIContent("ClawExecute Trigger"));
+        EditorGUILayout.PropertyField(trigClawFakeExecuteProp, new GUIContent("ClawFakeExecute Trigger"));
+
+        EditorGUILayout.Space();
+        EditorGUILayout.LabelField("Attacks (configurable)", EditorStyles.boldLabel);
+
+        // draw the attacks list with foldout items
+        if (attacksProp != null)
         {
-            attacksProp.arraySize++;
-            var el = attacksProp.GetArrayElementAtIndex(attacksProp.arraySize - 1);
-            el.FindPropertyRelative("name").stringValue = "Attack " + (attacksProp.arraySize - 1);
-            el.FindPropertyRelative("offset").vector2Value = new Vector2(1.5f, 0f);
-            el.FindPropertyRelative("size").vector2Value = new Vector2(3f, 1.5f);
-            el.FindPropertyRelative("damage").intValue = 2;
-            serializedObject.ApplyModifiedProperties();
+            EditorGUILayout.PropertyField(attacksProp, new GUIContent("Attacks"), true);
         }
-        if (GUILayout.Button("Remove Last Attack"))
+        else
         {
-            if (attacksProp.arraySize > 0) attacksProp.arraySize--;
+            EditorGUILayout.HelpBox("attacks property not found. Make sure JangsanbeomBoss has public List<AttackData> attacks.", MessageType.Warning);
         }
 
         serializedObject.ApplyModifiedProperties();
-    }
-
-    // Scene GUI: draw and allow handle editing for each attack
-    void OnSceneGUI()
-    {
-        if (boss == null || boss.attacks == null) return;
-
-        Transform t = boss.transform;
-        for (int i = 0; i < boss.attacks.Length; i++)
-        {
-            AttackData a = boss.attacks[i];
-            // compute world center
-            Vector3 worldCenter = t.position + new Vector3(a.offset.x * (boss.transform.localScale.x >= 0 ? (boss.facingRight ? 1f : -1f) : 1f), a.offset.y, 0f);
-            // Note: facingRight is private; use sign of localScale or handle flipping visually. We'll compute dir as (sprite flip considered)
-            float dir = boss.transform.localScale.x >= 0 ? (boss.transform.localScale.x > 0 ? 1f : -1f) : 1f;
-            dir = boss.transform.localScale.x > 0 ? (boss.facingRight ? 1f : -1f) : (boss.facingRight ? 1f : -1f);
-
-            // Draw wire box
-            Handles.color = Color.Lerp(Color.red, Color.yellow, i / (float)Mathf.Max(1, boss.attacks.Length - 1));
-            // Use rotation
-            Quaternion rot = Quaternion.Euler(0f, 0f, a.angle);
-            Matrix4x4 prev = Handles.matrix;
-            Handles.matrix = Matrix4x4.TRS(worldCenter, rot, Vector3.one);
-
-            // Draw the box outline
-            Vector3 size = new Vector3(a.size.x, a.size.y, 0.01f);
-            Handles.DrawWireCube(Vector3.zero, size);
-
-            Handles.matrix = prev;
-
-            // Position handle (move offset)
-            EditorGUI.BeginChangeCheck();
-            var fmh_94_71_638929780432378229 = Quaternion.identity; Vector3 newWorldPos = Handles.FreeMoveHandle(worldCenter, 0.1f, Vector3.zero, Handles.CircleHandleCap);
-            if (EditorGUI.EndChangeCheck())
-            {
-                Undo.RecordObject(boss, "Move Attack Offset");
-                Vector3 local = boss.transform.InverseTransformPoint(newWorldPos);
-                // adjust x by facing sign
-                float sign = boss.facingRight ? 1f : -1f;
-                a.offset = new Vector2(local.x * sign, local.y);
-                EditorUtility.SetDirty(boss);
-            }
-
-            // Size handles (two drag handles to change width & height)
-            EditorGUI.BeginChangeCheck();
-            // right handle
-            Vector3 rightHandleWorld = worldCenter + rot * new Vector3(a.size.x * 0.5f, 0f, 0f);
-            var fmh_109_73_638929780432395897 = Quaternion.identity; Vector3 newRight = Handles.FreeMoveHandle(rightHandleWorld, 0.08f, Vector3.zero, Handles.RectangleHandleCap);
-            if (EditorGUI.EndChangeCheck())
-            {
-                Undo.RecordObject(boss, "Resize Attack Width");
-                // compute new width based on moved handle distance to center in local space
-                Vector3 localRight = Quaternion.Inverse(rot) * (newRight - worldCenter);
-                a.size = new Vector2(Mathf.Abs(localRight.x) * 2f, a.size.y);
-                EditorUtility.SetDirty(boss);
-            }
-
-            EditorGUI.BeginChangeCheck();
-            // top handle
-            Vector3 topHandleWorld = worldCenter + rot * new Vector3(0f, a.size.y * 0.5f, 0f);
-            var fmh_122_69_638929780432401791 = Quaternion.identity; Vector3 newTop = Handles.FreeMoveHandle(topHandleWorld, 0.08f, Vector3.zero, Handles.RectangleHandleCap);
-            if (EditorGUI.EndChangeCheck())
-            {
-                Undo.RecordObject(boss, "Resize Attack Height");
-                Vector3 localTop = Quaternion.Inverse(rot) * (newTop - worldCenter);
-                a.size = new Vector2(a.size.x, Mathf.Abs(localTop.y) * 2f);
-                EditorUtility.SetDirty(boss);
-            }
-
-            // label with index/name
-            Handles.Label(worldCenter + Vector3.up * (a.size.y * 0.5f + 0.15f), $"{a.name} ({i})");
-
-            // small instruction: show attack index for animation events
-            Handles.Label(worldCenter + Vector3.down * (a.size.y * 0.5f + 0.15f), $"Index: {i}");
-
-        } // end for
     }
 }

@@ -691,9 +691,9 @@ GameObject:
   m_Component:
   - component: {fileID: 157878495}
   - component: {fileID: 157878494}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Grid
-  m_TagString: Untagged
+  m_TagString: Ground
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -935,7 +935,7 @@ GameObject:
   - component: {fileID: 247501139}
   - component: {fileID: 247501138}
   - component: {fileID: 247501137}
-  m_Layer: 5
+  m_Layer: 3
   m_Name: PlayerCanvas
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1145,7 +1145,7 @@ SpriteRenderer:
   m_LightmapParameters: {fileID: 0}
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 10
   m_Sprite: {fileID: 1513325230005337910, guid: c6bc68404b7e9594a981ed0584642423, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
@@ -1174,7 +1174,7 @@ MonoBehaviour:
   groundCheck: {fileID: 1448545671}
   groundLayer:
     serializedVersion: 2
-    m_Bits: 8
+    m_Bits: 0
   attackPoint: {fileID: 1488310641}
   attackRange: 0.5
   enemyLayer:
@@ -1182,13 +1182,13 @@ MonoBehaviour:
     m_Bits: 64
   attackDamage: 1
   attackCooldown: 0.5
+  dashKey: 304
   dashSpeed: 12
   dashDuration: 0.15
   dashCooldown: 0.8
   parryKey: 99
   parryWindow: 0.2
   parryCooldown: 1
-  reflectTargetTag: Boss
 --- !u!50 &313790842
 Rigidbody2D:
   serializedVersion: 5
@@ -2057,7 +2057,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 467941079}
-  m_Layer: 5
+  m_Layer: 3
   m_Name: Handle Slide Area
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -2424,7 +2424,7 @@ Transform:
   m_GameObject: {fileID: 569183107}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.3489, y: -5.3579, z: 0}
+  m_LocalPosition: {x: -0.3489, y: -3.108, z: 0}
   m_LocalScale: {x: 24.142029, y: 2.0372632, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2572,7 +2572,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 572080682}
-  m_Layer: 5
+  m_Layer: 3
   m_Name: Fill Area
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -3714,7 +3714,7 @@ GameObject:
   - component: {fileID: 685317236}
   - component: {fileID: 685317238}
   - component: {fileID: 685317237}
-  m_Layer: 5
+  m_Layer: 3
   m_Name: Fill
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -4244,7 +4244,7 @@ GameObject:
   - component: {fileID: 980224087}
   - component: {fileID: 980224089}
   - component: {fileID: 980224088}
-  m_Layer: 5
+  m_Layer: 3
   m_Name: HealthBarBackground
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -4607,7 +4607,7 @@ GameObject:
   - component: {fileID: 1073721186}
   - component: {fileID: 1073721188}
   - component: {fileID: 1073721187}
-  m_Layer: 5
+  m_Layer: 3
   m_Name: Handle
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -5575,7 +5575,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1521987064}
   - component: {fileID: 1521987065}
-  m_Layer: 5
+  m_Layer: 3
   m_Name: HealthBar
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -5666,7 +5666,7 @@ GameObject:
   - component: {fileID: 1616868781}
   - component: {fileID: 1616868783}
   - component: {fileID: 1616868782}
-  m_Layer: 5
+  m_Layer: 3
   m_Name: Background
   m_TagString: Untagged
   m_Icon: {fileID: 0}

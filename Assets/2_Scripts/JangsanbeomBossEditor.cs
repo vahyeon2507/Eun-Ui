@@ -1,7 +1,6 @@
 using UnityEngine;
 using UnityEditor;
 
-// custom editor for JangsanbeomBoss
 [CustomEditor(typeof(JangsanbeomBoss))]
 public class JangsanbeomBossEditor : Editor
 {
@@ -29,12 +28,17 @@ public class JangsanbeomBossEditor : Editor
 
     SerializedProperty trigClawExecuteProp;
     SerializedProperty trigClawFakeExecuteProp;
+    SerializedProperty trigClawTelegraphProp;
+    SerializedProperty trigClawFakeTelegraphProp;
+
+    SerializedProperty animFacingParamProp;
 
     // the list we care most about
     SerializedProperty attacksProp;
 
     void OnEnable()
     {
+        // 안전하게 FindProperty 시도 (프로퍼티가 없으면 null 허용)
         playerProp = serializedObject.FindProperty("player");
         animatorProp = serializedObject.FindProperty("animator");
         spriteRendererProp = serializedObject.FindProperty("spriteRenderer");
@@ -59,6 +63,10 @@ public class JangsanbeomBossEditor : Editor
 
         trigClawExecuteProp = serializedObject.FindProperty("trig_ClawExecute");
         trigClawFakeExecuteProp = serializedObject.FindProperty("trig_ClawFakeExecute");
+        trigClawTelegraphProp = serializedObject.FindProperty("trig_ClawTelegraph");
+        trigClawFakeTelegraphProp = serializedObject.FindProperty("trig_ClawFakeTelegraph");
+
+        animFacingParamProp = serializedObject.FindProperty("animFacingParam");
 
         attacksProp = serializedObject.FindProperty("attacks");
     }
@@ -67,55 +75,88 @@ public class JangsanbeomBossEditor : Editor
     {
         serializedObject.Update();
 
+        // Refs
         EditorGUILayout.LabelField("Refs", EditorStyles.boldLabel);
-        EditorGUILayout.PropertyField(playerProp);
-        EditorGUILayout.PropertyField(animatorProp);
-        EditorGUILayout.PropertyField(spriteRendererProp);
-        EditorGUILayout.PropertyField(rbProp);
+        SafePropertyField(playerProp);
+        SafePropertyField(animatorProp);
+        SafePropertyField(spriteRendererProp);
+        SafePropertyField(rbProp);
 
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("Prefabs & Visuals", EditorStyles.boldLabel);
-        EditorGUILayout.PropertyField(telegraphPrefabProp);
-        EditorGUILayout.PropertyField(hitboxPrefabProp);
-        EditorGUILayout.PropertyField(decoyPrefabProp);
+        SafePropertyField(telegraphPrefabProp);
+        SafePropertyField(hitboxPrefabProp);
+        SafePropertyField(decoyPrefabProp);
 
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("AI / Movement", EditorStyles.boldLabel);
-        EditorGUILayout.PropertyField(followSpeedProp);
-        EditorGUILayout.PropertyField(followMinDistanceXProp);
-        EditorGUILayout.PropertyField(aggroRangeProp);
+        SafePropertyField(followSpeedProp);
+        SafePropertyField(followMinDistanceXProp);
+        SafePropertyField(aggroRangeProp);
 
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("Fake Claw", EditorStyles.boldLabel);
-        EditorGUILayout.PropertyField(enableFakeClawProp);
-        EditorGUILayout.PropertyField(fakeChanceProp);
-        EditorGUILayout.PropertyField(fakeSpriteProp);
-        EditorGUILayout.PropertyField(fakeSpriteDurationProp);
-        EditorGUILayout.PropertyField(fakeOriginProp);
+        SafePropertyField(enableFakeClawProp);
+        SafePropertyField(fakeChanceProp);
+        SafePropertyField(fakeSpriteProp);
+        SafePropertyField(fakeSpriteDurationProp);
+        SafePropertyField(fakeOriginProp);
 
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("Hit Target", EditorStyles.boldLabel);
-        EditorGUILayout.PropertyField(hitboxTargetLayerProp);
-        EditorGUILayout.PropertyField(hitboxTargetTagProp);
+        SafePropertyField(hitboxTargetLayerProp);
+        SafePropertyField(hitboxTargetTagProp);
 
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("Animator Param Names", EditorStyles.boldLabel);
-        EditorGUILayout.PropertyField(trigClawExecuteProp, new GUIContent("ClawExecute Trigger"));
-        EditorGUILayout.PropertyField(trigClawFakeExecuteProp, new GUIContent("ClawFakeExecute Trigger"));
+        SafePropertyField(trigClawTelegraphProp, new GUIContent("ClawTelegraph Trigger"));
+        SafePropertyField(trigClawExecuteProp, new GUIContent("ClawExecute Trigger"));
+        SafePropertyField(trigClawFakeTelegraphProp, new GUIContent("ClawFakeTelegraph Trigger"));
+        SafePropertyField(trigClawFakeExecuteProp, new GUIContent("ClawFakeExecute Trigger"));
+        SafePropertyField(animFacingParamProp, new GUIContent("Facing param (animator)"));
 
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("Attacks (configurable)", EditorStyles.boldLabel);
 
-        // draw the attacks list with foldout items
         if (attacksProp != null)
         {
+            // draw the property with foldout + children
             EditorGUILayout.PropertyField(attacksProp, new GUIContent("Attacks"), true);
+
+            // small help text
+            EditorGUILayout.HelpBox("Each Attack entry (AttackData) can define Offset/Size/Damage/etc. Use Expand (triangle) to edit.", MessageType.Info);
         }
         else
         {
-            EditorGUILayout.HelpBox("attacks property not found. Make sure JangsanbeomBoss has public List<AttackData> attacks.", MessageType.Warning);
+            EditorGUILayout.HelpBox("attacks property not found. Make sure JangsanbeomBoss has a public List<AttackData> attacks field and AttackData is [System.Serializable].", MessageType.Warning);
+        }
+
+        // show runtime debug values and quick actions when in Play mode
+        if (Application.isPlaying)
+        {
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Runtime (Play Mode)", EditorStyles.boldLabel);
+            JangsanbeomBoss boss = (JangsanbeomBoss)target;
+            if (boss != null)
+            {
+                EditorGUILayout.LabelField("busy", boss.busy.ToString());
+                EditorGUILayout.LabelField("facingRight", boss.facingRight.ToString());
+                if (GUILayout.Button("Force flip (editor)")) { boss.FlipTo(!boss.facingRight); EditorUtility.SetDirty(boss); }
+            }
         }
 
         serializedObject.ApplyModifiedProperties();
+    }
+
+    // Helper: only draw property if not null
+    void SafePropertyField(SerializedProperty prop, GUIContent label = null)
+    {
+        if (prop == null)
+        {
+            if (label != null) EditorGUILayout.LabelField(label.text, "<missing>");
+            return;
+        }
+        if (label != null) EditorGUILayout.PropertyField(prop, label);
+        else EditorGUILayout.PropertyField(prop);
     }
 }

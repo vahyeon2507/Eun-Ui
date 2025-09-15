@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-// JangsanbeomBoss - editor-friendly edition
+// JangsanbeomBoss - editor-friendly edition (with robust flip handling)
 [DisallowMultipleComponent]
 public class JangsanbeomBoss : MonoBehaviour
 {
@@ -82,6 +82,9 @@ public class JangsanbeomBoss : MonoBehaviour
 
     Coroutine aiCoroutine;
 
+    // store original (non-flipped) local scale so we can restore it
+    Vector3 originalLocalScale;
+
     void Reset()
     {
         spriteRenderer = GetComponentInChildren<SpriteRenderer>();
@@ -100,6 +103,13 @@ public class JangsanbeomBoss : MonoBehaviour
             rb.bodyType = RigidbodyType2D.Kinematic;
             rb.simulated = true;
         }
+
+        // Record original local scale but force X to positive absolute value.
+        // We will NOT rely on scale.x sign for facing; use spriteRenderer.flipX instead.
+        originalLocalScale = transform.localScale;
+        originalLocalScale.x = Mathf.Abs(originalLocalScale.x);
+        // immediately ensure transform uses original non-flipped scale
+        transform.localScale = originalLocalScale;
     }
 
     void Start()
@@ -125,15 +135,41 @@ public class JangsanbeomBoss : MonoBehaviour
             transform.position = newPos;
         }
 
+        // IMPORTANT: use face direction based on player pos; do NOT use transform.localScale sign
         if (player.position.x > transform.position.x && !facingRight) FlipTo(true);
         else if (player.position.x < transform.position.x && facingRight) FlipTo(false);
     }
 
-    void FlipTo(bool faceRight)
+    // LateUpdate ensures any animator/other systems that touch scale get overridden back.
+    void LateUpdate()
+    {
+        // Always ensure transform.localScale stays the original non-flipped scale.
+        if (transform.localScale.x != originalLocalScale.x)
+        {
+            Vector3 s = transform.localScale;
+            s.x = originalLocalScale.x;
+            transform.localScale = s;
+        }
+    }
+
+    public void FlipTo(bool faceRight)
     {
         facingRight = faceRight;
-        if (spriteRenderer != null) spriteRenderer.flipX = !faceRight;
-        Vector3 s = transform.localScale; s.x = Mathf.Abs(s.x) * (faceRight ? 1f : -1f); transform.localScale = s;
+
+        // Ensure spriteRenderer exists
+        if (spriteRenderer == null)
+            spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+
+        if (spriteRenderer != null)
+        {
+            // We invert spriteRenderer.flipX to match previous behavior:
+            // if faceRight == true, we don't want the sprite flipped horizontally in many pixel-art setups.
+            // The correct mapping depends on your art; keep as before: flipX = !faceRight
+            spriteRenderer.flipX = !faceRight;
+        }
+
+        // Keep transform scale fixed to original (non-negative) so children (hitbox gizmos, colliders) don't get mirrored.
+        transform.localScale = originalLocalScale;
     }
 
     // public entrypoint: choose an attack by index, or default if index invalid
@@ -194,10 +230,14 @@ public class JangsanbeomBoss : MonoBehaviour
             }
         }
 
-        yield return new WaitForSeconds(atk.TelegraphTime > 0f ? atk.TelegraphTime : 0f);
-        yield return new WaitForSeconds(Mathf.Max(0f, 0.01f)); // small buffer
-        yield return new WaitForSeconds(0.0f);
-        yield return new WaitForSeconds(Mathf.Max(0f, 0f)); // yep
+        // telegraph time (if any) should be controlled by animation/animator in typical workflows,
+        // but we keep honoring atk.TelegraphTime here as a fallback
+        if (atk.TelegraphTime > 0f)
+            yield return new WaitForSeconds(atk.TelegraphTime);
+
+        // small buffer
+        yield return new WaitForSeconds(0.01f);
+
         busy = false;
     }
 
@@ -403,5 +443,11 @@ public class JangsanbeomBoss : MonoBehaviour
                 Gizmos.DrawWireCube(pos, size);
             }
         }
+    }
+
+    // Debug helper: force flip from inspector or other script
+    public void ForceFlip(bool faceRight)
+    {
+        FlipTo(faceRight);
     }
 }

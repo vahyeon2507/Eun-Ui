@@ -1,162 +1,213 @@
-using UnityEngine;
-using UnityEditor;
+//#if UNITY_EDITOR
+//using UnityEngine;
+//using UnityEditor;
 
-[CustomEditor(typeof(JangsanbeomBoss))]
-public class JangsanbeomBossEditor : Editor
-{
-    SerializedProperty playerProp;
-    SerializedProperty animatorProp;
-    SerializedProperty spriteRendererProp;
-    SerializedProperty rbProp;
+//[CustomEditor(typeof(JangsanbeomBoss)), CanEditMultipleObjects]
+//public class JangsanbeomBossEditor : Editor
+//{
+//    // Refs
+//    SerializedProperty playerProp, animatorProp, spriteRendererProp, rbProp;
 
-    SerializedProperty telegraphPrefabProp;
-    SerializedProperty hitboxPrefabProp;
-    SerializedProperty decoyPrefabProp;
+//    // Prefabs & visuals
+//    SerializedProperty telegraphPrefabProp, hitboxPrefabProp, decoyPrefabProp;
 
-    SerializedProperty followSpeedProp;
-    SerializedProperty followMinDistanceXProp;
-    SerializedProperty aggroRangeProp;
+//    // AI / Movement
+//    SerializedProperty followSpeedProp, followMinDistanceXProp, aggroRangeProp;
 
-    SerializedProperty enableFakeClawProp;
-    SerializedProperty fakeChanceProp;
-    SerializedProperty fakeSpriteProp;
-    SerializedProperty fakeSpriteDurationProp;
-    SerializedProperty fakeOriginProp;
+//    // Default claw
+//    SerializedProperty defaultClawOffsetXProp, defaultClawSizeProp, defaultClawDamageProp, defaultHitboxLifetimeProp;
 
-    SerializedProperty hitboxTargetLayerProp;
-    SerializedProperty hitboxTargetTagProp;
+//    // Fake claw
+//    SerializedProperty enableFakeClawProp, fakeChanceProp, fakeSpriteProp, fakeSpriteDurationProp, fakeOriginProp;
 
-    SerializedProperty trigClawExecuteProp;
-    SerializedProperty trigClawFakeExecuteProp;
-    SerializedProperty trigClawTelegraphProp;
-    SerializedProperty trigClawFakeTelegraphProp;
+//    // Hit target
+//    SerializedProperty hitboxTargetLayerProp, hitboxTargetTagProp;
 
-    SerializedProperty animFacingParamProp;
+//    // Animator params
+//    SerializedProperty trigClawTelegraphProp, trigClawExecuteProp, trigClawFakeTelegraphProp, trigClawFakeExecuteProp;
 
-    // the list we care most about
-    SerializedProperty attacksProp;
+//    // Behavior options
+//    SerializedProperty useAnimationEventsProp;
 
-    void OnEnable()
-    {
-        // 안전하게 FindProperty 시도 (프로퍼티가 없으면 null 허용)
-        playerProp = serializedObject.FindProperty("player");
-        animatorProp = serializedObject.FindProperty("animator");
-        spriteRendererProp = serializedObject.FindProperty("spriteRenderer");
-        rbProp = serializedObject.FindProperty("rb");
+//    // Flip pivot / deadzone / cooldown + debug
+//    SerializedProperty flipPivotProp, flipDeadzoneProp, flipCooldownProp, debugPolygonFlipProp;
 
-        telegraphPrefabProp = serializedObject.FindProperty("telegraphPrefab");
-        hitboxPrefabProp = serializedObject.FindProperty("hitboxPrefab");
-        decoyPrefabProp = serializedObject.FindProperty("decoyPrefab");
+//    // Gizmos
+//    SerializedProperty showGizmosProp, gizmoRealColorProp, gizmoFakeColorProp;
 
-        followSpeedProp = serializedObject.FindProperty("followSpeed");
-        followMinDistanceXProp = serializedObject.FindProperty("followMinDistanceX");
-        aggroRangeProp = serializedObject.FindProperty("aggroRange");
+//    // Attacks
+//    SerializedProperty attacksProp;
 
-        enableFakeClawProp = serializedObject.FindProperty("enableFakeClaw");
-        fakeChanceProp = serializedObject.FindProperty("fakeChance");
-        fakeSpriteProp = serializedObject.FindProperty("fakeSprite");
-        fakeSpriteDurationProp = serializedObject.FindProperty("fakeSpriteDuration");
-        fakeOriginProp = serializedObject.FindProperty("fakeOrigin");
+//    void OnEnable()
+//    {
+//        var so = serializedObject;
 
-        hitboxTargetLayerProp = serializedObject.FindProperty("hitboxTargetLayer");
-        hitboxTargetTagProp = serializedObject.FindProperty("hitboxTargetTag");
+//        // Refs
+//        playerProp = so.FindProperty("player");
+//        animatorProp = so.FindProperty("animator");
+//        spriteRendererProp = so.FindProperty("spriteRenderer");
+//        rbProp = so.FindProperty("rb");
 
-        trigClawExecuteProp = serializedObject.FindProperty("trig_ClawExecute");
-        trigClawFakeExecuteProp = serializedObject.FindProperty("trig_ClawFakeExecute");
-        trigClawTelegraphProp = serializedObject.FindProperty("trig_ClawTelegraph");
-        trigClawFakeTelegraphProp = serializedObject.FindProperty("trig_ClawFakeTelegraph");
+//        // Prefabs & visuals
+//        telegraphPrefabProp = so.FindProperty("telegraphPrefab");
+//        hitboxPrefabProp = so.FindProperty("hitboxPrefab");
+//        decoyPrefabProp = so.FindProperty("decoyPrefab");
 
-        animFacingParamProp = serializedObject.FindProperty("animFacingParam");
+//        // AI / Movement
+//        followSpeedProp = so.FindProperty("followSpeed");
+//        followMinDistanceXProp = so.FindProperty("followMinDistanceX");
+//        aggroRangeProp = so.FindProperty("aggroRange");
 
-        attacksProp = serializedObject.FindProperty("attacks");
-    }
+//        // Default claw
+//        defaultClawOffsetXProp = so.FindProperty("defaultClawOffsetX");
+//        defaultClawSizeProp = so.FindProperty("defaultClawSize");
+//        defaultClawDamageProp = so.FindProperty("defaultClawDamage");
+//        defaultHitboxLifetimeProp = so.FindProperty("defaultHitboxLifetime");
 
-    public override void OnInspectorGUI()
-    {
-        serializedObject.Update();
+//        // Fake claw
+//        enableFakeClawProp = so.FindProperty("enableFakeClaw");
+//        fakeChanceProp = so.FindProperty("fakeChance");
+//        fakeSpriteProp = so.FindProperty("fakeSprite");
+//        fakeSpriteDurationProp = so.FindProperty("fakeSpriteDuration");
+//        fakeOriginProp = so.FindProperty("fakeOrigin");
 
-        // Refs
-        EditorGUILayout.LabelField("Refs", EditorStyles.boldLabel);
-        SafePropertyField(playerProp);
-        SafePropertyField(animatorProp);
-        SafePropertyField(spriteRendererProp);
-        SafePropertyField(rbProp);
+//        // Hit target
+//        hitboxTargetLayerProp = so.FindProperty("hitboxTargetLayer");
+//        hitboxTargetTagProp = so.FindProperty("hitboxTargetTag");
 
-        EditorGUILayout.Space();
-        EditorGUILayout.LabelField("Prefabs & Visuals", EditorStyles.boldLabel);
-        SafePropertyField(telegraphPrefabProp);
-        SafePropertyField(hitboxPrefabProp);
-        SafePropertyField(decoyPrefabProp);
+//        // Animator params
+//        trigClawTelegraphProp = so.FindProperty("trig_ClawTelegraph");
+//        trigClawExecuteProp = so.FindProperty("trig_ClawExecute");
+//        trigClawFakeTelegraphProp = so.FindProperty("trig_ClawFakeTelegraph");
+//        trigClawFakeExecuteProp = so.FindProperty("trig_ClawFakeExecute");
 
-        EditorGUILayout.Space();
-        EditorGUILayout.LabelField("AI / Movement", EditorStyles.boldLabel);
-        SafePropertyField(followSpeedProp);
-        SafePropertyField(followMinDistanceXProp);
-        SafePropertyField(aggroRangeProp);
+//        // Behavior options
+//        useAnimationEventsProp = so.FindProperty("useAnimationEvents");
 
-        EditorGUILayout.Space();
-        EditorGUILayout.LabelField("Fake Claw", EditorStyles.boldLabel);
-        SafePropertyField(enableFakeClawProp);
-        SafePropertyField(fakeChanceProp);
-        SafePropertyField(fakeSpriteProp);
-        SafePropertyField(fakeSpriteDurationProp);
-        SafePropertyField(fakeOriginProp);
+//        // Flip pivot / deadzone / cooldown + debug
+//        flipPivotProp = so.FindProperty("flipPivot");
+//        flipDeadzoneProp = so.FindProperty("flipDeadzone");
+//        flipCooldownProp = so.FindProperty("flipCooldown");
+//        debugPolygonFlipProp = so.FindProperty("debugPolygonFlip");
 
-        EditorGUILayout.Space();
-        EditorGUILayout.LabelField("Hit Target", EditorStyles.boldLabel);
-        SafePropertyField(hitboxTargetLayerProp);
-        SafePropertyField(hitboxTargetTagProp);
+//        // Gizmos
+//        showGizmosProp = so.FindProperty("showGizmos");
+//        gizmoRealColorProp = so.FindProperty("gizmoRealColor");
+//        gizmoFakeColorProp = so.FindProperty("gizmoFakeColor");
 
-        EditorGUILayout.Space();
-        EditorGUILayout.LabelField("Animator Param Names", EditorStyles.boldLabel);
-        SafePropertyField(trigClawTelegraphProp, new GUIContent("ClawTelegraph Trigger"));
-        SafePropertyField(trigClawExecuteProp, new GUIContent("ClawExecute Trigger"));
-        SafePropertyField(trigClawFakeTelegraphProp, new GUIContent("ClawFakeTelegraph Trigger"));
-        SafePropertyField(trigClawFakeExecuteProp, new GUIContent("ClawFakeExecute Trigger"));
-        SafePropertyField(animFacingParamProp, new GUIContent("Facing param (animator)"));
+//        // Attacks
+//        attacksProp = so.FindProperty("attacks");
+//    }
 
-        EditorGUILayout.Space();
-        EditorGUILayout.LabelField("Attacks (configurable)", EditorStyles.boldLabel);
+//    public override void OnInspectorGUI()
+//    {
+//        serializedObject.Update();
 
-        if (attacksProp != null)
-        {
-            // draw the property with foldout + children
-            EditorGUILayout.PropertyField(attacksProp, new GUIContent("Attacks"), true);
+//        DrawHeader("Refs");
+//        Field(playerProp);
+//        Field(animatorProp);
+//        Field(spriteRendererProp);
+//        Field(rbProp);
 
-            // small help text
-            EditorGUILayout.HelpBox("Each Attack entry (AttackData) can define Offset/Size/Damage/etc. Use Expand (triangle) to edit.", MessageType.Info);
-        }
-        else
-        {
-            EditorGUILayout.HelpBox("attacks property not found. Make sure JangsanbeomBoss has a public List<AttackData> attacks field and AttackData is [System.Serializable].", MessageType.Warning);
-        }
+//        DrawHeader("Prefabs & Visuals");
+//        Field(telegraphPrefabProp);
+//        Field(hitboxPrefabProp);
+//        Field(decoyPrefabProp);
 
-        // show runtime debug values and quick actions when in Play mode
-        if (Application.isPlaying)
-        {
-            EditorGUILayout.Space();
-            EditorGUILayout.LabelField("Runtime (Play Mode)", EditorStyles.boldLabel);
-            JangsanbeomBoss boss = (JangsanbeomBoss)target;
-            if (boss != null)
-            {
-                EditorGUILayout.LabelField("busy", boss.busy.ToString());
-                EditorGUILayout.LabelField("facingRight", boss.facingRight.ToString());
-                if (GUILayout.Button("Force flip (editor)")) { boss.FlipTo(!boss.facingRight); EditorUtility.SetDirty(boss); }
-            }
-        }
+//        DrawHeader("AI / Movement");
+//        Field(followSpeedProp);
+//        Field(followMinDistanceXProp, new GUIContent("Follow Min Distance X"));
+//        Field(aggroRangeProp);
 
-        serializedObject.ApplyModifiedProperties();
-    }
+//        DrawHeader("Default Claw Settings");
+//        Field(defaultClawOffsetXProp, new GUIContent("Default Claw Offset X"));
+//        Field(defaultClawSizeProp, new GUIContent("Default Claw Size"));
+//        Field(defaultClawDamageProp, new GUIContent("Default Claw Damage"));
+//        Field(defaultHitboxLifetimeProp, new GUIContent("Default Hitbox Lifetime"));
 
-    // Helper: only draw property if not null
-    void SafePropertyField(SerializedProperty prop, GUIContent label = null)
-    {
-        if (prop == null)
-        {
-            if (label != null) EditorGUILayout.LabelField(label.text, "<missing>");
-            return;
-        }
-        if (label != null) EditorGUILayout.PropertyField(prop, label);
-        else EditorGUILayout.PropertyField(prop);
-    }
-}
+//        DrawHeader("Fake Claw");
+//        Field(enableFakeClawProp);
+//        Field(fakeChanceProp);
+//        Field(fakeSpriteProp);
+//        Field(fakeSpriteDurationProp);
+//        Field(fakeOriginProp);
+
+//        DrawHeader("Hit Target");
+//        Field(hitboxTargetLayerProp, new GUIContent("Hitbox Target Layer"));
+//        Field(hitboxTargetTagProp, new GUIContent("Hitbox Target Tag"));
+
+//        DrawHeader("Animator Parameter Names");
+//        Field(trigClawTelegraphProp, new GUIContent("ClawTelegraph Trigger"));
+//        Field(trigClawExecuteProp, new GUIContent("ClawExecute Trigger"));
+//        Field(trigClawFakeTelegraphProp, new GUIContent("ClawFakeTelegraph Trigger"));
+//        Field(trigClawFakeExecuteProp, new GUIContent("ClawFakeExecute Trigger"));
+
+//        DrawHeader("Behavior Options");
+//        Field(useAnimationEventsProp);
+
+//        DrawHeader("Flip Pivot / Deadzone");
+//        Field(flipPivotProp, new GUIContent("Flip Pivot (Transform)"));
+//        Field(flipDeadzoneProp, new GUIContent("Flip Deadzone (X units)"));
+//        Field(flipCooldownProp, new GUIContent("Flip Cooldown (sec)"));
+//        Field(debugPolygonFlipProp, new GUIContent("Debug Polygon Flip Logs"));
+
+//        DrawHeader("Gizmos");
+//        Field(showGizmosProp);
+//        Field(gizmoRealColorProp);
+//        Field(gizmoFakeColorProp);
+
+//        DrawHeader("Attacks (configurable)");
+//        if (attacksProp != null)
+//        {
+//            EditorGUILayout.PropertyField(attacksProp, new GUIContent("Attacks"), true);
+//            EditorGUILayout.HelpBox("각 AttackData에서 Offset/Size/Damage/Angle/Lifetime 등을 설정.", MessageType.Info);
+//        }
+//        else
+//        {
+//            EditorGUILayout.HelpBox("attacks 필드를 찾지 못했습니다. 스크립트에 public List<AttackData> attacks 가 있는지 확인하세요.", MessageType.Warning);
+//        }
+
+//        // ---- Play-mode utilities ----
+//        if (Application.isPlaying)
+//        {
+//            EditorGUILayout.Space();
+//            EditorGUILayout.LabelField("Runtime (Play Mode)", EditorStyles.boldLabel);
+
+//            var boss = (JangsanbeomBoss)target;
+//            using (new EditorGUI.DisabledScope(true))
+//            {
+//                EditorGUILayout.Toggle("facingRight", boss.facingRight);
+//                EditorGUILayout.Toggle("busy", boss.busy);
+//            }
+
+//            EditorGUILayout.BeginHorizontal();
+//            if (GUILayout.Button("Face Left")) { boss.ForceFlip(false); EditorUtility.SetDirty(boss); }
+//            if (GUILayout.Button("Face Right")) { boss.ForceFlip(true); EditorUtility.SetDirty(boss); }
+//            EditorGUILayout.EndHorizontal();
+
+//            if (GUILayout.Button("Test Attack[0] (real)")) { boss.StartAttackByIndex(0, true); }
+//            if (GUILayout.Button("Test Attack[0] (fake)")) { boss.StartAttackByIndex(0, false); }
+//        }
+
+//        serializedObject.ApplyModifiedProperties();
+//    }
+
+//    // --------- helpers ----------
+//    void DrawHeader(string title)
+//    {
+//        EditorGUILayout.Space();
+//        EditorGUILayout.LabelField(title, EditorStyles.boldLabel);
+//    }
+
+//    void Field(SerializedProperty p, GUIContent label = null)
+//    {
+//        if (p == null)
+//        {
+//            if (label != null) EditorGUILayout.LabelField(label, new GUIContent("<missing>"));
+//            return;
+//        }
+//        if (label != null) EditorGUILayout.PropertyField(p, label);
+//        else EditorGUILayout.PropertyField(p);
+//    }
+//}
+//#endif

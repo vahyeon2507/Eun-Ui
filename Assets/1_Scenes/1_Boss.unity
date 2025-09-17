@@ -5291,6 +5291,84 @@ RectTransform:
   m_AnchoredPosition: {x: 2.5, y: 0}
   m_SizeDelta: {x: -5, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!1 &1380034832
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1380034833}
+  - component: {fileID: 1380034834}
+  m_Layer: 6
+  m_Name: GameObject
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1380034833
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1380034832}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 1.56, y: -0.64000005, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!61 &1380034834
+BoxCollider2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1380034832}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Density: 1
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_ForceSendLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ForceReceiveLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ContactCaptureLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_CallbackLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_IsTrigger: 1
+  m_UsedByEffector: 0
+  m_CompositeOperation: 0
+  m_CompositeOrder: 0
+  m_Offset: {x: 0, y: 0}
+  m_SpriteTilingProperty:
+    border: {x: 0, y: 0, z: 0, w: 0}
+    pivot: {x: 0, y: 0}
+    oldSize: {x: 0, y: 0}
+    newSize: {x: 0, y: 0}
+    adaptiveTilingThreshold: 0
+    drawMode: 0
+    adaptiveTiling: 0
+  m_AutoTiling: 0
+  m_Size: {x: 1, y: 1}
+  m_EdgeRadius: 0
 --- !u!1 &1410130482
 GameObject:
   m_ObjectHideFlags: 0
@@ -6768,6 +6846,7 @@ GameObject:
   - component: {fileID: 1989468350}
   - component: {fileID: 1989468353}
   - component: {fileID: 1989468354}
+  - component: {fileID: 1989468355}
   m_Layer: 6
   m_Name: Boss_Jangsanbeom
   m_TagString: Boss
@@ -6791,60 +6870,57 @@ MonoBehaviour:
   animator: {fileID: 1989468348}
   spriteRenderer: {fileID: 1989468349}
   rb: {fileID: 1989468351}
-  telegraphPrefab: {fileID: 0}
-  hitboxPrefab: {fileID: 5080248838195864692, guid: 3434453123e67464ba0d22ae061ed382, type: 3}
-  decoyPrefab: {fileID: 0}
+  graphicsRoot: {fileID: 0}
+  flipTrigger: {fileID: 1380034834}
+  flipPivot: {fileID: 1380034833}
+  flipPivotDeadzone: 0.6
+  flipTriggerHysteresis: 0.05
+  flipCooldown: 0.12
+  facingRight: 1
+  enforceVisualFlip: 1
   followSpeed: 2
   followMinDistanceX: 1.2
   aggroRange: 12
-  defaultClawOffsetX: 1.5
+  hitboxPrefab: {fileID: 5080248838195864692, guid: 3434453123e67464ba0d22ae061ed382, type: 3}
+  defaultHitboxLifetime: 0.12
   defaultClawSize: {x: 3, y: 1.5}
   defaultClawDamage: 2
-  defaultHitboxLifetime: 0.12
-  enableFakeClaw: 1
-  fakeChance: 0.25
-  fakeSprite: {fileID: 0}
-  fakeSpriteDuration: 0.18
-  fakeOrigin: {fileID: 0}
-  hitboxTargetLayer:
-    serializedVersion: 2
-    m_Bits: 128
-  hitboxTargetTag: Player
   trig_ClawTelegraph: ClawTelegraph
   trig_ClawExecute: ClawExecute
   trig_ClawFakeTelegraph: ClawFakeTelegraph
   trig_ClawFakeExecute: ClawFakeExecute
   useAnimationEvents: 1
+  enableFakeClaw: 1
+  fakeChance: 0.25
   attacks:
-  - Name: Claw_Execute
-    Offset: {x: -2, y: -2}
+  - Name: ClawExecute
+    Offset: {x: 1, y: 0}
     Size: {x: 3, y: 1.5}
     Angle: 0
     Damage: 2
     Lifetime: 0.12
     TelegraphPrefab: {fileID: 0}
-    TelegraphTime: 0.8
+    TelegraphTime: 0
     DefaultFake: 0
     FakeSprite: {fileID: 0}
     FakeSpriteDuration: 0.18
     OriginOverride: {fileID: 0}
-  - Name: Claw_fake
-    Offset: {x: -2, y: -2}
+  - Name: ClawFakeExecute
+    Offset: {x: 1, y: 0}
     Size: {x: 3, y: 1.5}
     Angle: 0
     Damage: 2
     Lifetime: 0.12
     TelegraphPrefab: {fileID: 0}
-    TelegraphTime: 0.8
+    TelegraphTime: 0
     DefaultFake: 0
     FakeSprite: {fileID: 0}
     FakeSpriteDuration: 0.18
     OriginOverride: {fileID: 0}
   showGizmos: 1
-  gizmoRealColor: {r: 1, g: 0.2, b: 0.2, a: 0.18}
-  gizmoFakeColor: {r: 1, g: 0.85, b: 0.2, a: 0.12}
-  facingRight: 1
-  busy: 0
+  gizmoColor: {r: 1, g: 0.2, b: 0.2, a: 0.18}
+  debugFlip: 0
+  debugPoly: 0
 --- !u!4 &1989468347
 Transform:
   m_ObjectHideFlags: 0
@@ -6944,7 +7020,7 @@ BoxCollider2D:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1989468345}
-  m_Enabled: 1
+  m_Enabled: 0
   serializedVersion: 3
   m_Density: 1
   m_Material: {fileID: 0}
@@ -7063,6 +7139,136 @@ MonoBehaviour:
   onDied:
     m_PersistentCalls:
       m_Calls: []
+--- !u!60 &1989468355
+PolygonCollider2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1989468345}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Density: 1
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_ForceSendLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ForceReceiveLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ContactCaptureLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_CallbackLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_IsTrigger: 1
+  m_UsedByEffector: 0
+  m_CompositeOperation: 0
+  m_CompositeOrder: 0
+  m_Offset: {x: 0, y: 0}
+  m_SpriteTilingProperty:
+    border: {x: 0, y: 0, z: 0, w: 0}
+    pivot: {x: 0.5, y: 0.5}
+    oldSize: {x: 10, y: 7.314453}
+    newSize: {x: 10, y: 7.314453}
+    adaptiveTilingThreshold: 0.5
+    drawMode: 0
+    adaptiveTiling: 0
+  m_AutoTiling: 0
+  m_Points:
+    m_Paths:
+    - - {x: 0.68359375, y: -2.4414062}
+      - {x: 0.8203125, y: -2.2265625}
+      - {x: 0.8984375, y: -1.953125}
+      - {x: 0.99609375, y: -1.8359375}
+      - {x: 1.2304688, y: -1.6210938}
+      - {x: 1.328125, y: -1.7382812}
+      - {x: 1.4257812, y: -1.7773438}
+      - {x: 1.6992188, y: -1.8164062}
+      - {x: 1.796875, y: -1.7578125}
+      - {x: 1.9335938, y: -1.8945312}
+      - {x: 2.1289062, y: -2.0117188}
+      - {x: 2.2265625, y: -2.1679688}
+      - {x: 2.2265625, y: -2.4023438}
+      - {x: 2.3046875, y: -2.5}
+      - {x: 2.1484375, y: -2.5390625}
+      - {x: 1.8359375, y: -2.65625}
+      - {x: 1.8164062, y: -2.8125}
+      - {x: 1.953125, y: -2.8515625}
+      - {x: 2.109375, y: -2.8320312}
+      - {x: 2.265625, y: -2.96875}
+      - {x: 3.0859375, y: -2.96875}
+      - {x: 3.125, y: -2.9296875}
+      - {x: 3.1054688, y: -2.8710938}
+      - {x: 3.046875, y: -2.8320312}
+      - {x: 3.1640625, y: -2.6171875}
+      - {x: 3.2617188, y: -2.4414062}
+      - {x: 3.2226562, y: -2.3046875}
+      - {x: 3.0859375, y: -2.1679688}
+      - {x: 3.359375, y: -2.1875}
+      - {x: 3.4570312, y: -2.0703125}
+      - {x: 3.4570312, y: -1.8945312}
+      - {x: 3.3203125, y: -1.6796875}
+      - {x: 3.2421875, y: -1.2695312}
+      - {x: 3.28125, y: -1.171875}
+      - {x: 3.1835938, y: -0.99609375}
+      - {x: 3.0078125, y: -0.8203125}
+      - {x: 2.4804688, y: -0.7421875}
+      - {x: 2.1679688, y: -0.6640625}
+      - {x: 1.25, y: -0.1171875}
+      - {x: 0.859375, y: 0.17578125}
+      - {x: 0.64453125, y: 0.1953125}
+      - {x: 0.3515625, y: 0.3125}
+      - {x: 0.21484375, y: 0.3515625}
+      - {x: 0.078125, y: 0.3515625}
+      - {x: 0, y: 0.33203125}
+      - {x: -0.3515625, y: 0.21484375}
+      - {x: -0.52734375, y: 0.01953125}
+      - {x: -0.56640625, y: -0.078125}
+      - {x: -0.56640625, y: -0.625}
+      - {x: -0.44921875, y: -0.9765625}
+      - {x: -0.3515625, y: -1.0742188}
+      - {x: -0.21484375, y: -1.25}
+      - {x: -0.17578125, y: -1.4648438}
+      - {x: -0.078125, y: -1.71875}
+      - {x: 0.09765625, y: -2.0898438}
+      - {x: 0.21484375, y: -2.2460938}
+      - {x: 0.1953125, y: -2.3632812}
+      - {x: 0.1953125, y: -2.5390625}
+      - {x: -0.078125, y: -2.6757812}
+      - {x: -0.390625, y: -2.734375}
+      - {x: -0.46875, y: -2.9492188}
+      - {x: -0.4296875, y: -2.96875}
+      - {x: -0.25390625, y: -2.96875}
+      - {x: 0.05859375, y: -2.9296875}
+      - {x: 0.41015625, y: -2.96875}
+      - {x: 0.44921875, y: -2.9101562}
+      - {x: 0.68359375, y: -2.8710938}
+    - - {x: 2.5976562, y: -2.65625}
+      - {x: 2.6171875, y: -2.578125}
+      - {x: 2.6953125, y: -2.4804688}
+      - {x: 2.7148438, y: -2.5}
+      - {x: 2.7734375, y: -2.5}
+      - {x: 2.7148438, y: -2.6757812}
+      - {x: 2.6953125, y: -2.6953125}
+      - {x: 2.5585938, y: -2.6953125}
+    - - {x: 3.0273438, y: -1.9726562}
+      - {x: 2.9882812, y: -1.9140625}
+      - {x: 2.9882812, y: -1.8554688}
+      - {x: 3.0078125, y: -1.8359375}
+      - {x: 2.9882812, y: -1.71875}
+      - {x: 2.9492188, y: -1.875}
+      - {x: 3.046875, y: -2.1289062}
+      - {x: 3.0664062, y: -2.0898438}
+  m_UseDelaunayMesh: 0
 --- !u!1 &2004904634
 GameObject:
   m_ObjectHideFlags: 0
@@ -7316,3 +7522,4 @@ SceneRoots:
   - {fileID: 578411760}
   - {fileID: 157878495}
   - {fileID: 2102836372}
+  - {fileID: 1380034833}

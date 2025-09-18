@@ -16,7 +16,7 @@ public class JangsanbeomBoss : MonoBehaviour
         public float Lifetime = 0.12f;
 
         public GameObject TelegraphPrefab;
-        public float TelegraphTime = 0.0f;
+        public float TelegraphTime = 0f;
         public bool DefaultFake = false;
         public Sprite FakeSprite;
         public float FakeSpriteDuration = 0.18f;
@@ -30,20 +30,18 @@ public class JangsanbeomBoss : MonoBehaviour
     public Rigidbody2D rb;
 
     [Header("Visual & Flip")]
-    [Tooltip("비주얼(스프라이트/머리/VFX)을 모아두는 루트. 이 루트를 scale.x로 뒤집습니다. 비워두면 SpriteRenderer.flipX 또는 모든 SpriteRenderer.flipX 사용.")]
+    [Tooltip("비주얼 루트. 비워두면 모든 SpriteRenderer.flipX를 뒤집습니다.")]
     public Transform graphicsRoot;
-    [Tooltip("플립의 기준으로 사용할 BoxCollider2D (꼬리 등). graphicsRoot 아래에 두지 마세요.")]
+    [Tooltip("플립 기준(꼬리). 권장: Boss 루트의 자식으로 두세요.")]
     public BoxCollider2D flipTrigger;
-    [Tooltip("flipTrigger 미설정 시 fallback으로 쓸 피벗(루트 기준)")]
+    [Tooltip("트리거가 없을 때 fallback으로 쓸 피벗")]
     public Transform flipPivot;
-    [Tooltip("flip 기준 피벗에서 이 거리(X) 이상 벗어나면 플립 (fallback용)")]
     public float flipPivotDeadzone = 0.6f;
 
     [Header("Flip tuning")]
     public float flipTriggerHysteresis = 0.06f;
     public float flipCooldown = 0.12f;
     [HideInInspector] public bool facingRight = true;
-    [Tooltip("Animator가 scale을 바꾸는 경우에도 스크립트가 시각 플립을 덮어씁니다.")]
     public bool enforceVisualFlip = true;
 
     [Header("AI / Movement")]
@@ -52,7 +50,7 @@ public class JangsanbeomBoss : MonoBehaviour
     public float aggroRange = 12f;
 
     [Header("Attack")]
-    public GameObject hitboxPrefab; // must contain Collider2D (isTrigger true) or Hitbox component
+    public GameObject hitboxPrefab;
     public float defaultHitboxLifetime = 0.12f;
     public Vector2 defaultClawSize = new Vector2(3f, 1.5f);
     public int defaultClawDamage = 2;
@@ -92,6 +90,10 @@ public class JangsanbeomBoss : MonoBehaviour
     Coroutine aiCoroutine;
     bool busy = false;
 
+    // flip trigger cached local X (we DO NOT move the trigger object in this version)
+    [SerializeField, HideInInspector] float _flipTriggerOriginalLocalX = 0f;
+    [SerializeField, HideInInspector] bool _flipTriggerCached = false;
+
     void Reset()
     {
         spriteRenderer = GetComponentInChildren<SpriteRenderer>();
@@ -122,9 +124,21 @@ public class JangsanbeomBoss : MonoBehaviour
             var s = graphicsRoot.localScale; s.x = _graphicsOriginalScale.x; graphicsRoot.localScale = s;
         }
 
-        if (flipTrigger != null && graphicsRoot != null && flipTrigger.transform.IsChildOf(graphicsRoot))
+        if (flipTrigger != null)
         {
-            Debug.LogWarning("[JangsanbeomBoss] flipTrigger가 graphicsRoot 아래에 있습니다. 트리거는 graphicsRoot 자식이면 안 됩니다.", this);
+            // 캐시: 트리거가 boss의 자식이면 로컬 X 값을 저장 (우리는 이동시키지 않고 계산에 사용)
+            if (flipTrigger.transform.IsChildOf(transform))
+            {
+                _flipTriggerOriginalLocalX = flipTrigger.transform.localPosition.x;
+                _flipTriggerCached = true;
+                if (debugFlip) Debug.Log($"[Boss] Cached flipTrigger localX={_flipTriggerOriginalLocalX}", this);
+            }
+            else
+            {
+                // 만약 flipTrigger가 보스 자식이 아니라면, 우리는 flipTrigger.bounds.center 사용 (월드 기반)
+                _flipTriggerCached = false;
+                if (debugFlip) Debug.Log("[Boss] flipTrigger is NOT a child of boss - using world bounds center for trigger checks.", this);
+            }
         }
 
         CachePolygonColliderPaths();
@@ -140,16 +154,16 @@ public class JangsanbeomBoss : MonoBehaviour
         // init prev side
         if (player != null)
         {
+            float rel = 0f;
             if (flipTrigger != null)
-            {
-                float rel = player.position.x - flipTrigger.bounds.center.x;
-                _prevTriggerSide = (rel > flipTriggerHysteresis) ? 1 : (rel < -flipTriggerHysteresis ? -1 : 0);
-            }
+                rel = player.position.x - GetFlipTriggerWorldX();
             else if (flipPivot != null)
-            {
-                float rel = player.position.x - flipPivot.position.x;
-                _prevTriggerSide = (rel > flipPivotDeadzone) ? 1 : (rel < -flipPivotDeadzone ? -1 : 0);
-            }
+                rel = player.position.x - flipPivot.position.x;
+            else
+                rel = player.position.x - transform.position.x;
+
+            _prevTriggerSide = (rel > flipTriggerHysteresis) ? 1 : (rel < -flipTriggerHysteresis ? -1 : 0);
+            if (debugFlip) Debug.Log($"[Boss] init prevSide={_prevTriggerSide} rel={rel}", this);
         }
     }
 
@@ -157,7 +171,7 @@ public class JangsanbeomBoss : MonoBehaviour
     {
         if (player == null) return;
 
-        // simple X follow
+        // follow X only
         float dx = player.position.x - transform.position.x;
         if (!busy && Mathf.Abs(dx) > followMinDistanceX && Mathf.Abs(dx) < aggroRange)
         {
@@ -167,12 +181,12 @@ public class JangsanbeomBoss : MonoBehaviour
             transform.position = p;
         }
 
-        // flip decision: prefer flipTrigger; fallback to pivot deadzone
-        if (flipTrigger != null)
+        // flip decision (use computed triggerX)
+        if (Time.time - _lastFlipTime > flipCooldown)
         {
-            if (Time.time - _lastFlipTime > flipCooldown)
+            if (flipTrigger != null)
             {
-                float triggerX = flipTrigger.bounds.center.x;
+                float triggerX = GetFlipTriggerWorldX();
                 float rel = player.position.x - triggerX;
                 int curSide = (rel > flipTriggerHysteresis) ? 1 : (rel < -flipTriggerHysteresis ? -1 : 0);
 
@@ -180,18 +194,14 @@ public class JangsanbeomBoss : MonoBehaviour
                 {
                     if (curSide != 0)
                     {
-                        bool wantRight = player.position.x > triggerX;
+                        bool wantRight = rel > 0f;
                         FlipTo(wantRight);
                         _lastFlipTime = Time.time;
-                        if (debugFlip) Debug.Log($"Flip -> wantRight={wantRight} (triggerX={triggerX})", this);
+                        if (debugFlip) Debug.Log($"Flip -> wantRight={wantRight} triggerX={triggerX} rel={rel}", this);
                     }
-                    _prevTriggerSide = curSide;
                 }
             }
-        }
-        else if (flipPivot != null)
-        {
-            if (Time.time - _lastFlipTime > flipCooldown)
+            else if (flipPivot != null)
             {
                 float rel = player.position.x - flipPivot.position.x;
                 int curSide = (rel > flipPivotDeadzone) ? 1 : (rel < -flipPivotDeadzone ? -1 : 0);
@@ -204,7 +214,18 @@ public class JangsanbeomBoss : MonoBehaviour
                         _lastFlipTime = Time.time;
                         if (debugFlip) Debug.Log($"Flip (pivot) -> wantRight={wantRight}", this);
                     }
-                    _prevTriggerSide = curSide;
+                }
+            }
+            else
+            {
+                float rel = player.position.x - transform.position.x;
+                int curSide = (rel > 0f) ? 1 : (rel < 0f ? -1 : 0);
+                if (curSide != _prevTriggerSide)
+                {
+                    bool wantRight = rel > 0f;
+                    FlipTo(wantRight);
+                    _lastFlipTime = Time.time;
+                    if (debugFlip) Debug.Log($"Flip (center) -> wantRight={wantRight}", this);
                 }
             }
         }
@@ -222,7 +243,22 @@ public class JangsanbeomBoss : MonoBehaviour
             ApplyVisualFlipNow();
     }
 
-    // ---------- Flip / Visuals / Physics ----------
+    // compute trigger world X WITHOUT moving the trigger object:
+    float GetFlipTriggerWorldX()
+    {
+        if (flipTrigger == null) return transform.position.x;
+
+        // If flipTrigger is a direct/indirect child of boss, use cached local X mirrored by facingRight:
+        if (flipTrigger.transform.IsChildOf(transform) && _flipTriggerCached)
+        {
+            float localX = _flipTriggerOriginalLocalX * (facingRight ? 1f : -1f);
+            Vector3 world = transform.TransformPoint(new Vector3(localX, flipTrigger.transform.localPosition.y, 0f));
+            return world.x;
+        }
+        // Otherwise fall back to bounds center (world-space)
+        return flipTrigger.bounds.center.x;
+    }
+
     public void FlipTo(bool faceRight)
     {
         facingRight = faceRight;
@@ -239,11 +275,19 @@ public class JangsanbeomBoss : MonoBehaviour
         {
             if (spriteRenderer == null) spriteRenderer = GetComponentInChildren<SpriteRenderer>();
             if (spriteRenderer != null) spriteRenderer.flipX = !faceRight;
-            else FlipAllSpriteRenderers(faceRight); // fallback if SR not assigned
+            else FlipAllSpriteRenderers(faceRight);
         }
 
-        // physics flip: mirror polygon colliders (boss-root ones cached)
+        // physics poly flip
         ApplyFlipToPolygonColliders(faceRight);
+
+        // IMPORTANT: do NOT move the flipTrigger object.
+        // Instead, recompute prevTriggerSide using computed trigger world X so we don't immediately re-flip.
+        float refX = (flipTrigger != null) ? GetFlipTriggerWorldX() : (flipPivot != null ? flipPivot.position.x : transform.position.x);
+        float relAfter = player != null ? (player.position.x - refX) : 0f;
+        _prevTriggerSide = (relAfter > flipTriggerHysteresis) ? 1 : (relAfter < -flipTriggerHysteresis ? -1 : 0);
+
+        if (debugFlip) Debug.Log($"[Boss] FlipTo({faceRight}) applied. recomputed refX={refX} relAfter={relAfter} prevSide={_prevTriggerSide}", this);
     }
 
     void ApplyVisualFlipNow()
@@ -258,23 +302,17 @@ public class JangsanbeomBoss : MonoBehaviour
         }
         else
         {
-            // 새로 추가: graphicsRoot 없이 모든 SpriteRenderer를 뒤집는 안전한 방법
             FlipAllSpriteRenderers(facingRight);
         }
     }
 
-    // Flip all SpriteRenderers in children (used when graphicsRoot is not set)
     void FlipAllSpriteRenderers(bool faceRight)
     {
         var srs = GetComponentsInChildren<SpriteRenderer>(true);
-        foreach (var sr in srs)
-        {
-            // 기본적으로 art이 오른쪽을 바라본다고 가정: flipX = !faceRight
-            sr.flipX = !faceRight;
-        }
+        foreach (var sr in srs) sr.flipX = !faceRight;
     }
 
-    // ---------- Attacks / Hitboxes ----------
+    // ---------- Attacks / Hitboxes (kept as before) ----------
     public void StartAttackByIndex(int index = 0, bool forceReal = false)
     {
         if (busy) return;
@@ -365,7 +403,6 @@ public class JangsanbeomBoss : MonoBehaviour
         if (atk.Lifetime > 0f) Destroy(hb, atk.Lifetime + 0.02f);
     }
 
-    // overload for 2-param calls
     void SpawnFakeHit(Vector2 center, Vector2 size)
     {
         SpawnFakeHit(center, size, null);
@@ -470,40 +507,31 @@ public class JangsanbeomBoss : MonoBehaviour
         }
     }
 
-    // Gizmos
     void OnDrawGizmos()
     {
         if (!showGizmos) return;
         Gizmos.color = gizmoColor;
         if (flipTrigger != null)
         {
-            Gizmos.DrawWireCube(flipTrigger.bounds.center, flipTrigger.bounds.size);
+            // draw the computed trigger position for clarity
+            Vector3 center = flipTrigger.bounds.center;
+            if (flipTrigger.transform.IsChildOf(transform) && _flipTriggerCached)
+            {
+                float worldX = GetFlipTriggerWorldX();
+                center = new Vector3(worldX, flipTrigger.bounds.center.y, flipTrigger.bounds.center.z);
+            }
+            Gizmos.DrawWireCube(center, flipTrigger.bounds.size);
         }
+#if UNITY_EDITOR
         else if (flipPivot != null)
         {
-#if UNITY_EDITOR
             UnityEditor.Handles.color = Color.cyan;
             UnityEditor.Handles.DrawWireDisc(flipPivot.position, Vector3.forward, flipPivotDeadzone);
+        }
 #endif
-        }
-
-        if (attacks != null)
-        {
-            float dir = facingRight ? 1f : -1f;
-            for (int i = 0; i < attacks.Count; i++)
-            {
-                var a = attacks[i];
-                Vector2 pos = GetAttackWorldPos(a);
-                Vector3 size = new Vector3(a.Size.x, a.Size.y, 0.01f);
-                Matrix4x4 old = Gizmos.matrix;
-                Gizmos.matrix = Matrix4x4.TRS(pos, Quaternion.Euler(0, 0, a.Angle * dir), Vector3.one);
-                Gizmos.DrawCube(Vector3.zero, size);
-                Gizmos.matrix = old;
-            }
-        }
     }
 
-    // Polygon collider cache & flip
+    // polygon cache and flip unchanged
     void CachePolygonColliderPaths()
     {
         _polyColliders.Clear();
@@ -548,12 +576,6 @@ public class JangsanbeomBoss : MonoBehaviour
                     System.Array.Reverse(dst);
                 }
                 poly.SetPath(i, dst);
-                if (debugPoly)
-                {
-                    string s = $"Poly[{k}] Path[{i}]: ";
-                    for (int ii = 0; ii < dst.Length; ii++) s += dst[ii].ToString("F3") + ", ";
-                    Debug.Log(s, this);
-                }
             }
         }
     }

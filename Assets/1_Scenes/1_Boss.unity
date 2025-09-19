@@ -5317,7 +5317,7 @@ Transform:
   m_GameObject: {fileID: 1380034832}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 2.55, y: -1.35, z: 0}
+  m_LocalPosition: {x: 1.95, y: -2.33, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -5357,7 +5357,7 @@ BoxCollider2D:
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
-  m_Offset: {x: 0, y: 0}
+  m_Offset: {x: 0, y: 0.76396644}
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0, y: 0}
@@ -5367,7 +5367,7 @@ BoxCollider2D:
     drawMode: 0
     adaptiveTiling: 0
   m_AutoTiling: 0
-  m_Size: {x: 1, y: 1}
+  m_Size: {x: 1, y: 5.6455336}
   m_EdgeRadius: 0
 --- !u!1 &1410130482
 GameObject:
@@ -6889,13 +6889,15 @@ MonoBehaviour:
   trig_ClawExecute: ClawExecute
   trig_ClawFakeTelegraph: ClawFakeTelegraph
   trig_ClawFakeExecute: ClawFakeExecute
+  animParam_MoveBool: Move
+  animParam_MoveSpeed: Speed
   useAnimationEvents: 1
   enableFakeClaw: 1
   fakeChance: 0.25
   attacks:
   - Name: ClawExecute
-    Offset: {x: 1, y: 0}
-    Size: {x: 3, y: 1.5}
+    Offset: {x: -1, y: -2}
+    Size: {x: 2.5, y: 1.5}
     Angle: 0
     Damage: 2
     Lifetime: 0.12
@@ -6906,8 +6908,8 @@ MonoBehaviour:
     FakeSpriteDuration: 0.18
     OriginOverride: {fileID: 0}
   - Name: ClawFakeExecute
-    Offset: {x: 1, y: 0}
-    Size: {x: 3, y: 1.5}
+    Offset: {x: -1, y: -2}
+    Size: {x: 2.5, y: 1.5}
     Angle: 0
     Damage: 2
     Lifetime: 0.12
@@ -6917,8 +6919,9 @@ MonoBehaviour:
     FakeSprite: {fileID: 0}
     FakeSpriteDuration: 0.18
     OriginOverride: {fileID: 0}
-  showGizmos: 1
-  gizmoColor: {r: 1, g: 0.2, b: 0.2, a: 0.18}
+  showAttackGizmos: 1
+  gizmoRealColor: {r: 1, g: 0, b: 0, a: 0.18}
+  gizmoFakeColor: {r: 1, g: 0.8137255, b: 0, a: 0.12}
   debugFlip: 1
   debugPoly: 0
   _flipTriggerOriginalLocalX: 0

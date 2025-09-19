@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿// JangsanbeomBoss.cs
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -8,13 +9,14 @@ public class JangsanbeomBoss : MonoBehaviour
     [System.Serializable]
     public class AttackData
     {
-        public string Name = "Claw_Execute";
-        public Vector2 Offset = Vector2.right;
+        public string Name = "ClawExecute";
+        public Vector2 Offset = Vector2.right;   // local offset (boss root 기준)
         public Vector2 Size = new Vector2(3f, 1.5f);
-        public float Angle = 0f;
+        public float Angle = 0f; // degrees
         public int Damage = 2;
         public float Lifetime = 0.12f;
 
+        // visuals
         public GameObject TelegraphPrefab;
         public float TelegraphTime = 0f;
         public bool DefaultFake = false;
@@ -32,9 +34,9 @@ public class JangsanbeomBoss : MonoBehaviour
     [Header("Visual & Flip")]
     [Tooltip("비주얼 루트. 비워두면 모든 SpriteRenderer.flipX를 뒤집습니다.")]
     public Transform graphicsRoot;
-    [Tooltip("플립 기준(꼬리). 권장: Boss 루트의 자식으로 두세요.")]
+    [Tooltip("플립 기준(꼬리 권장). Boss의 자식으로 두면 로컬 Offset을 편하게 설정 가능.")]
     public BoxCollider2D flipTrigger;
-    [Tooltip("트리거가 없을 때 fallback으로 쓸 피벗")]
+    [Tooltip("피벗이 없을 때 사용할 폴백 피벗")]
     public Transform flipPivot;
     public float flipPivotDeadzone = 0.6f;
 
@@ -61,6 +63,10 @@ public class JangsanbeomBoss : MonoBehaviour
     public string trig_ClawFakeTelegraph = "ClawFakeTelegraph";
     public string trig_ClawFakeExecute = "ClawFakeExecute";
 
+    [Header("Animator - Movement")]
+    public string animParam_MoveBool = "Move";
+    public string animParam_MoveSpeed = "Speed";
+
     [Header("Behavior")]
     public bool useAnimationEvents = true;
     public bool enableFakeClaw = true;
@@ -70,8 +76,9 @@ public class JangsanbeomBoss : MonoBehaviour
     public List<AttackData> attacks = new List<AttackData>();
 
     [Header("Gizmos")]
-    public bool showGizmos = true;
-    public Color gizmoColor = new Color(1f, 0.2f, 0.2f, 0.18f);
+    public bool showAttackGizmos = true;
+    public Color gizmoRealColor = new Color(1f, 0.2f, 0.2f, 0.18f);
+    public Color gizmoFakeColor = new Color(1f, 0.85f, 0.2f, 0.12f);
 
     [Header("Debug")]
     public bool debugFlip = false;
@@ -82,17 +89,15 @@ public class JangsanbeomBoss : MonoBehaviour
     Vector3 _graphicsOriginalScale;
     float _lastFlipTime = -10f;
     int _prevTriggerSide = 0; // -1 left, 0 near, +1 right
-
-    // polygon collider cache (exclude graphicsRoot children)
     List<PolygonCollider2D> _polyColliders = new List<PolygonCollider2D>();
     List<Vector2[][]> _originalPolyPaths = new List<Vector2[][]>();
-
     Coroutine aiCoroutine;
     bool busy = false;
-
-    // flip trigger cached local X (we DO NOT move the trigger object in this version)
     [SerializeField, HideInInspector] float _flipTriggerOriginalLocalX = 0f;
     [SerializeField, HideInInspector] bool _flipTriggerCached = false;
+
+    // animator tracking
+    Vector3 _lastPosition;
 
     void Reset()
     {
@@ -126,7 +131,6 @@ public class JangsanbeomBoss : MonoBehaviour
 
         if (flipTrigger != null)
         {
-            // 캐시: 트리거가 boss의 자식이면 로컬 X 값을 저장 (우리는 이동시키지 않고 계산에 사용)
             if (flipTrigger.transform.IsChildOf(transform))
             {
                 _flipTriggerOriginalLocalX = flipTrigger.transform.localPosition.x;
@@ -135,7 +139,6 @@ public class JangsanbeomBoss : MonoBehaviour
             }
             else
             {
-                // 만약 flipTrigger가 보스 자식이 아니라면, 우리는 flipTrigger.bounds.center 사용 (월드 기반)
                 _flipTriggerCached = false;
                 if (debugFlip) Debug.Log("[Boss] flipTrigger is NOT a child of boss - using world bounds center for trigger checks.", this);
             }
@@ -151,20 +154,18 @@ public class JangsanbeomBoss : MonoBehaviour
 
         aiCoroutine = StartCoroutine(AIBehavior());
 
-        // init prev side
         if (player != null)
         {
             float rel = 0f;
-            if (flipTrigger != null)
-                rel = player.position.x - GetFlipTriggerWorldX();
-            else if (flipPivot != null)
-                rel = player.position.x - flipPivot.position.x;
-            else
-                rel = player.position.x - transform.position.x;
+            if (flipTrigger != null) rel = player.position.x - GetFlipTriggerWorldX();
+            else if (flipPivot != null) rel = player.position.x - flipPivot.position.x;
+            else rel = player.position.x - transform.position.x;
 
             _prevTriggerSide = (rel > flipTriggerHysteresis) ? 1 : (rel < -flipTriggerHysteresis ? -1 : 0);
             if (debugFlip) Debug.Log($"[Boss] init prevSide={_prevTriggerSide} rel={rel}", this);
         }
+
+        _lastPosition = transform.position;
     }
 
     void Update()
@@ -173,15 +174,24 @@ public class JangsanbeomBoss : MonoBehaviour
 
         // follow X only
         float dx = player.position.x - transform.position.x;
+        bool isMoving = false;
+
         if (!busy && Mathf.Abs(dx) > followMinDistanceX && Mathf.Abs(dx) < aggroRange)
         {
             float step = followSpeed * Time.deltaTime;
+            float prevX = transform.position.x;
             Vector3 p = transform.position;
             p.x = Mathf.MoveTowards(transform.position.x, player.position.x - Mathf.Sign(dx) * followMinDistanceX, step);
             transform.position = p;
+
+            isMoving = Mathf.Abs(p.x - prevX) > 0.0001f;
         }
 
-        // flip decision (use computed triggerX)
+        // animator Move bool
+        if (animator != null && !string.IsNullOrEmpty(animParam_MoveBool))
+            animator.SetBool(animParam_MoveBool, isMoving);
+
+        // flip decision
         if (Time.time - _lastFlipTime > flipCooldown)
         {
             if (flipTrigger != null)
@@ -233,29 +243,36 @@ public class JangsanbeomBoss : MonoBehaviour
 
     void LateUpdate()
     {
-        // keep root scale positive
         if (transform.localScale.x != _rootOriginalScale.x)
         {
             var s = transform.localScale; s.x = _rootOriginalScale.x; transform.localScale = s;
         }
 
-        if (enforceVisualFlip)
-            ApplyVisualFlipNow();
+        if (enforceVisualFlip) ApplyVisualFlipNow();
+
+        if (animator != null && !string.IsNullOrEmpty(animParam_MoveSpeed))
+        {
+            float dt = Time.deltaTime;
+            float vx = 0f;
+            if (dt > 0f) vx = (transform.position.x - _lastPosition.x) / dt;
+            float speedAbs = Mathf.Abs(vx);
+            animator.SetFloat(animParam_MoveSpeed, speedAbs);
+        }
+
+        _lastPosition = transform.position;
     }
 
-    // compute trigger world X WITHOUT moving the trigger object:
+    // compute trigger world X without moving trigger object
     float GetFlipTriggerWorldX()
     {
         if (flipTrigger == null) return transform.position.x;
 
-        // If flipTrigger is a direct/indirect child of boss, use cached local X mirrored by facingRight:
         if (flipTrigger.transform.IsChildOf(transform) && _flipTriggerCached)
         {
             float localX = _flipTriggerOriginalLocalX * (facingRight ? 1f : -1f);
             Vector3 world = transform.TransformPoint(new Vector3(localX, flipTrigger.transform.localPosition.y, 0f));
             return world.x;
         }
-        // Otherwise fall back to bounds center (world-space)
         return flipTrigger.bounds.center.x;
     }
 
@@ -263,7 +280,6 @@ public class JangsanbeomBoss : MonoBehaviour
     {
         facingRight = faceRight;
 
-        // visual flip
         if (graphicsRoot != null)
         {
             var s = _graphicsOriginalScale;
@@ -278,16 +294,13 @@ public class JangsanbeomBoss : MonoBehaviour
             else FlipAllSpriteRenderers(faceRight);
         }
 
-        // physics poly flip
         ApplyFlipToPolygonColliders(faceRight);
 
-        // IMPORTANT: do NOT move the flipTrigger object.
-        // Instead, recompute prevTriggerSide using computed trigger world X so we don't immediately re-flip.
         float refX = (flipTrigger != null) ? GetFlipTriggerWorldX() : (flipPivot != null ? flipPivot.position.x : transform.position.x);
         float relAfter = player != null ? (player.position.x - refX) : 0f;
         _prevTriggerSide = (relAfter > flipTriggerHysteresis) ? 1 : (relAfter < -flipTriggerHysteresis ? -1 : 0);
 
-        if (debugFlip) Debug.Log($"[Boss] FlipTo({faceRight}) applied. recomputed refX={refX} relAfter={relAfter} prevSide={_prevTriggerSide}", this);
+        if (debugFlip) Debug.Log($"[Boss] FlipTo({faceRight}) applied. refX={refX} relAfter={relAfter} prevSide={_prevTriggerSide}", this);
     }
 
     void ApplyVisualFlipNow()
@@ -300,10 +313,7 @@ public class JangsanbeomBoss : MonoBehaviour
                 var s = _graphicsOriginalScale; s.x = wantX; graphicsRoot.localScale = s;
             }
         }
-        else
-        {
-            FlipAllSpriteRenderers(facingRight);
-        }
+        else FlipAllSpriteRenderers(facingRight);
     }
 
     void FlipAllSpriteRenderers(bool faceRight)
@@ -312,16 +322,15 @@ public class JangsanbeomBoss : MonoBehaviour
         foreach (var sr in srs) sr.flipX = !faceRight;
     }
 
-    // ---------- Attacks / Hitboxes (kept as before) ----------
+    // Attacks (kept)
     public void StartAttackByIndex(int index = 0, bool forceReal = false)
     {
         if (busy) return;
-
         AttackData atk = null;
         if (index >= 0 && index < attacks.Count) atk = attacks[index];
         if (atk == null)
         {
-            atk = new AttackData
+            atk = new AttackData()
             {
                 Name = "DefaultClaw",
                 Offset = new Vector2(defaultClawSize.x * 0.5f, 0f),
@@ -330,14 +339,12 @@ public class JangsanbeomBoss : MonoBehaviour
                 Lifetime = defaultHitboxLifetime
             };
         }
-
         StartCoroutine(ClawRoutine_Generic(atk, forceReal));
     }
 
     IEnumerator ClawRoutine_Generic(AttackData atk, bool forceReal)
     {
         busy = true;
-
         bool isFake = false;
         if (!forceReal && enableFakeClaw) isFake = Random.value < fakeChance || atk.DefaultFake;
 
@@ -386,7 +393,6 @@ public class JangsanbeomBoss : MonoBehaviour
     void SpawnRealHit(Vector2 center, Vector2 size)
     {
         if (hitboxPrefab == null) { Debug.LogWarning("[JangsanbeomBoss] hitboxPrefab missing"); return; }
-
         GameObject hb = Instantiate(hitboxPrefab, center, Quaternion.identity);
         ConfigureColliderShape(hb, size, (facingRight ? 1f : -1f));
         SetupHitboxComponent(hb, defaultClawDamage, "Player", 0, true);
@@ -509,29 +515,51 @@ public class JangsanbeomBoss : MonoBehaviour
 
     void OnDrawGizmos()
     {
-        if (!showGizmos) return;
-        Gizmos.color = gizmoColor;
-        if (flipTrigger != null)
+        if (!showAttackGizmos) return;
+        if (attacks == null) return;
+
+        for (int i = 0; i < attacks.Count; i++)
         {
-            // draw the computed trigger position for clarity
-            Vector3 center = flipTrigger.bounds.center;
-            if (flipTrigger.transform.IsChildOf(transform) && _flipTriggerCached)
+            var a = attacks[i];
+            bool isFake = a.DefaultFake;
+            Color fill = isFake ? gizmoFakeColor : gizmoRealColor;
+            Color wire = new Color(fill.r, fill.g, fill.b, Mathf.Min(1f, fill.a * 2f));
+
+            Vector2 pos2;
+            float angleDeg;
+            if (Application.isPlaying)
             {
-                float worldX = GetFlipTriggerWorldX();
-                center = new Vector3(worldX, flipTrigger.bounds.center.y, flipTrigger.bounds.center.z);
+                pos2 = GetAttackWorldPos(a);
+                angleDeg = a.Angle * (facingRight ? 1f : -1f);
             }
-            Gizmos.DrawWireCube(center, flipTrigger.bounds.size);
+            else
+            {
+                float dir = (facingRight ? 1f : -1f);
+                Vector2 origin = (a.OriginOverride != null) ? (Vector2)a.OriginOverride.position : (Vector2)transform.position;
+                Vector2 off = a.Offset; off.x *= dir;
+                float ang = (a.Angle * dir) * Mathf.Deg2Rad;
+                float c = Mathf.Cos(ang), s = Mathf.Sin(ang);
+                Vector2 rotated = new Vector2(off.x * c - off.y * s, off.x * s + off.y * c);
+                pos2 = origin + rotated;
+                angleDeg = a.Angle * dir;
+            }
+
+            Vector3 pos = new Vector3(pos2.x, pos2.y, 0f);
+            Vector3 size = new Vector3(a.Size.x, a.Size.y, 0.01f);
+
+            Matrix4x4 prev = Gizmos.matrix;
+            Quaternion rot = Quaternion.Euler(0f, 0f, angleDeg);
+            Gizmos.matrix = Matrix4x4.TRS(pos, rot, Vector3.one);
+
+            Gizmos.color = fill;
+            Gizmos.DrawCube(Vector3.zero, size);
+            Gizmos.color = wire;
+            Gizmos.DrawWireCube(Vector3.zero, size * 1.001f);
+
+            Gizmos.matrix = prev;
         }
-#if UNITY_EDITOR
-        else if (flipPivot != null)
-        {
-            UnityEditor.Handles.color = Color.cyan;
-            UnityEditor.Handles.DrawWireDisc(flipPivot.position, Vector3.forward, flipPivotDeadzone);
-        }
-#endif
     }
 
-    // polygon cache and flip unchanged
     void CachePolygonColliderPaths()
     {
         _polyColliders.Clear();

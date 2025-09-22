@@ -1076,6 +1076,7 @@ GameObject:
   - component: {fileID: 313790842}
   - component: {fileID: 313790845}
   - component: {fileID: 313790843}
+  - component: {fileID: 313790848}
   - component: {fileID: 313790847}
   - component: {fileID: 313790844}
   m_Layer: 7
@@ -1201,12 +1202,86 @@ MonoBehaviour:
   dashCooldown: 0.6
   animDashTrigger: Dash
   animIsDashingBool: isDashing
-  parryWindow: 0.2
+  parryWindow: 0.4
   parryCooldown: 1
   animParryTrigger: Parry
   animIsParryingBool: isParrying
+  parrySuccessNeeded: 4
+  animParrySpecialTrigger: ParrySpecial
+  parrySpecialInvulDuration: 0.3
+  parrySuccessResetDelay: 3
   groundCheckRadius: 0.14
   groundRememberTime: 0.08
+  healthComponent: {fileID: 313790845}
+  showParryDebugUI: 1
+  parryDebugPosition: {x: 10, y: 10}
+  parryDebugStyle:
+    m_Name: 
+    m_Normal:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_Hover:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_Active:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_Focused:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_OnNormal:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_OnHover:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_OnActive:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_OnFocused:
+      m_Background: {fileID: 0}
+      m_ScaledBackgrounds: []
+      m_TextColor: {r: 0, g: 0, b: 0, a: 1}
+    m_Border:
+      m_Left: 0
+      m_Right: 0
+      m_Top: 0
+      m_Bottom: 0
+    m_Margin:
+      m_Left: 0
+      m_Right: 0
+      m_Top: 0
+      m_Bottom: 0
+    m_Padding:
+      m_Left: 0
+      m_Right: 0
+      m_Top: 0
+      m_Bottom: 0
+    m_Overflow:
+      m_Left: 0
+      m_Right: 0
+      m_Top: 0
+      m_Bottom: 0
+    m_Font: {fileID: 0}
+    m_FontSize: 0
+    m_FontStyle: 0
+    m_Alignment: 0
+    m_WordWrap: 0
+    m_RichText: 1
+    m_TextClipping: 0
+    m_ImagePosition: 0
+    m_ContentOffset: {x: 0, y: 0}
+    m_FixedWidth: 0
+    m_FixedHeight: 0
+    m_StretchWidth: 1
+    m_StretchHeight: 0
 --- !u!50 &313790842
 Rigidbody2D:
   serializedVersion: 5
@@ -1314,7 +1389,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7dfc66168e9649543af5b6c808321cff, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  maxHealth: 5
+  maxHealth: 100
   currentHealth: 0
   iFrameDuration: 0.8
   flashInterval: 0.1
@@ -1341,6 +1416,18 @@ MonoBehaviour:
   owner: {fileID: 313790837}
   destroyOnHit: 0
   singleUse: 0
+--- !u!114 &313790848
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 313790837}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e7e9f0e3cd998514db02c0f432579238, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &316635428
 GameObject:
   m_ObjectHideFlags: 0
@@ -6870,6 +6957,16 @@ MonoBehaviour:
   animator: {fileID: 1989468348}
   spriteRenderer: {fileID: 1989468349}
   rb: {fileID: 1989468351}
+  bossHealthComponent: {fileID: 1989468354}
+  MaxHealth: 100
+  CurrentHealth: 100
+  Phase2HealthThreshold: 0.66
+  Phase1MapRoot: {fileID: 578411758}
+  Phase2MapRoot: {fileID: 0}
+  playerLayer:
+    serializedVersion: 2
+    m_Bits: 128
+  playerTag: Player
   graphicsRoot: {fileID: 0}
   flipTrigger: {fileID: 1380034834}
   flipPivot: {fileID: 1380034833}
@@ -6878,26 +6975,20 @@ MonoBehaviour:
   flipCooldown: 0.12
   facingRight: 1
   enforceVisualFlip: 1
+  debugFlip: 0
   followSpeed: 2
   followMinDistanceX: 1.2
   aggroRange: 12
-  hitboxPrefab: {fileID: 5080248838195864692, guid: 3434453123e67464ba0d22ae061ed382, type: 3}
-  defaultHitboxLifetime: 0.12
-  defaultClawSize: {x: 3, y: 1.5}
-  defaultClawDamage: 2
-  trig_ClawTelegraph: ClawTelegraph
-  trig_ClawExecute: ClawExecute
-  trig_ClawFakeTelegraph: ClawFakeTelegraph
-  trig_ClawFakeExecute: ClawFakeExecute
   animParam_MoveBool: Move
   animParam_MoveSpeed: Speed
   useAnimationEvents: 1
-  enableFakeClaw: 1
-  fakeChance: 0.25
-  attacks:
+  enableFakePhase1: 0
+  enableFakePhase2: 1
+  fakeChancePhase2: 0.25
+  attacksPhase1:
   - Name: ClawExecute
-    Offset: {x: -1, y: -2}
-    Size: {x: 2.5, y: 1.5}
+    Offset: {x: -2, y: -2}
+    Size: {x: 3, y: 1.5}
     Angle: 0
     Damage: 2
     Lifetime: 0.12
@@ -6905,11 +6996,12 @@ MonoBehaviour:
     TelegraphTime: 0
     DefaultFake: 0
     FakeSprite: {fileID: 0}
-    FakeSpriteDuration: 0.18
+    FakeSpriteDuration: 0
     OriginOverride: {fileID: 0}
+  attacksPhase2:
   - Name: ClawFakeExecute
-    Offset: {x: -1, y: -2}
-    Size: {x: 2.5, y: 1.5}
+    Offset: {x: -2, y: -2}
+    Size: {x: 3, y: 1.5}
     Angle: 0
     Damage: 2
     Lifetime: 0.12
@@ -6917,15 +7009,14 @@ MonoBehaviour:
     TelegraphTime: 0
     DefaultFake: 0
     FakeSprite: {fileID: 0}
-    FakeSpriteDuration: 0.18
+    FakeSpriteDuration: 0
     OriginOverride: {fileID: 0}
   showAttackGizmos: 1
   gizmoRealColor: {r: 1, g: 0, b: 0, a: 0.18}
-  gizmoFakeColor: {r: 1, g: 0.8137255, b: 0, a: 0.12}
-  debugFlip: 1
-  debugPoly: 0
-  _flipTriggerOriginalLocalX: 0
-  _flipTriggerCached: 0
+  gizmoFakeColor: {r: 1, g: 0.85, b: 0.2, a: 0.12}
+  trig_ClawTelegraph: ClawTelegraph
+  trig_ClawExecute: ClawExecute
+  trig_ClawFakeExecute: ClawFakeExecute
 --- !u!4 &1989468347
 Transform:
   m_ObjectHideFlags: 0

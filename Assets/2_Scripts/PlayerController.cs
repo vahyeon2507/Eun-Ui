@@ -1,9 +1,13 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
+// PlayerController — 패링/스페셜/호환성 보강판 (디버그 UI 포함)
+// 변경: 패링 성공 카운트는 시간 경과로 자동 초기화되지 않음.
+//       오직 ParrySpecial 발동(소모) 시에만 parrySuccessCount를 0으로 초기화.
 [RequireComponent(typeof(Rigidbody2D))]
 [RequireComponent(typeof(Animator))]
-public class PlayerController : MonoBehaviour
+public class PlayerController : MonoBehaviour, IDamageable
 {
     [Header("Movement")]
     public float moveSpeed = 5f;
@@ -25,6 +29,7 @@ public class PlayerController : MonoBehaviour
     public int maxCombo = 3;
     public float[] comboRanges = new float[3] { 0.6f, 0.8f, 1.0f };
     public int[] comboDamages = new int[3] { 1, 1, 2 };
+    // <-- 배열명 정확히: comboLockDurations
     public float[] comboLockDurations = new float[3] { 0.25f, 0.3f, 0.4f };
 
     [Header("Animator parameter names (must match)")]
@@ -36,18 +41,33 @@ public class PlayerController : MonoBehaviour
     public float dashSpeed = 16f;
     public float dashDuration = 0.16f;
     public float dashCooldown = 0.6f;
-    public string animDashTrigger = "Dash";         // Animator에 트리거로 추가
-    public string animIsDashingBool = "isDashing"; // Animator에 Bool로 추가
+    public string animDashTrigger = "Dash";
+    public string animIsDashingBool = "isDashing";
 
     [Header("Parry")]
-    public float parryWindow = 0.2f;   // 패링 유효 시간
-    public float parryCooldown = 1.0f;
-    public string animParryTrigger = "Parry";         // 트리거
-    public string animIsParryingBool = "isParrying"; // Bool
+    public float parryWindow = 0.2f;   // 패링 유효 시간 (버튼 누른 후)
+    public float parryCooldown = 1.0f; // 패링 자체 재사용 대기
+    public string animParryTrigger = "Parry";
+    public string animIsParryingBool = "isParrying";
+
+    [Header("Parry → Special")]
+    public int parrySuccessNeeded = 4;
+    public string animParrySpecialTrigger = "ParrySpecial";
+    public float parrySpecialInvulDuration = 0.3f;
+    [Tooltip("(더 이상 자동 리셋을 원하지 않는 경우 무시) 패링 성공 후 카운트 리셋까지의 허용 시간(초). 현재는 사용하지 않습니다.")]
+    public float parrySuccessResetDelay = 3.0f; // **이 값은 더 이상 자동 리셋에 사용되지 않음**
 
     [Header("Ground Check / Stability")]
-    public float groundCheckRadius = 0.14f;        // 반지름 (조정 권장 0.12~0.18)
-    public float groundRememberTime = 0.08f;       // 코요테 타임 (false flicker 방지)
+    public float groundCheckRadius = 0.14f;
+    public float groundRememberTime = 0.08f;
+
+    [Header("Optional health forwarder (if you have a separate health component)")]
+    public MonoBehaviour healthComponent; // optional
+
+    [Header("Debug / UI")]
+    public bool showParryDebugUI = true; // 인게임 OnGUI로 카운트/상태 표시
+    public Vector2 parryDebugPosition = new Vector2(10, 10);
+    public GUIStyle parryDebugStyle;
 
     // internals
     Rigidbody2D rb;
@@ -67,10 +87,22 @@ public class PlayerController : MonoBehaviour
     bool isParrying = false;
     bool canParry = true;
 
+    // parry bookkeeping
+    int parrySuccessCount = 0;
+    float lastParrySuccessTime = -999f;
+    bool parrySpecialLocked = false;
+
+    // prevent multiple consumption of the same incoming hit
+    HashSet<int> _recentlyConsumedHitIds = new HashSet<int>();
+    float _recentlyConsumedClearDelay = 0.25f;
+
+    // invulnerability
+    bool isInvulnerable = false;
+
     // grounded stability
     float groundedRememberCounter = 0f;
 
-    // public getters for other systems (e.g. boss)
+    // public getters
     public bool IsDashing => isDashing;
     public bool IsParrying => isParrying;
 
@@ -81,44 +113,45 @@ public class PlayerController : MonoBehaviour
 
         if (attackPoint == null) Debug.LogWarning("[PlayerController] attackPoint not assigned!");
         if (groundCheck == null) Debug.LogWarning("[PlayerController] groundCheck not assigned!");
+
+        if (parryDebugStyle == null)
+        {
+            parryDebugStyle = new GUIStyle();
+            parryDebugStyle.fontSize = 14;
+            parryDebugStyle.normal.textColor = Color.white;
+        }
     }
 
     void Update()
     {
         HandleInputs();
-
-        // movement uses physics velocity but input read here
         HandleMovement();
-
         HandleGravity();
-
-        // 안정적인 ground 판정
         UpdateGrounded();
-
         UpdateAnimationParams();
 
         if (attackLockTimer > 0f) attackLockTimer -= Time.deltaTime;
+
+        // **자동 리셋 코드 제거**
+        // 원래는 parrySuccessResetDelay 때문에 시간이 지나면 parrySuccessCount를 0으로 초기화했음.
+        // 이제는 사용자가 원할 경우에만(스페셜 발동 시) 리셋하도록 변경했음.
     }
 
     void HandleInputs()
     {
-        // ATTACK -> Left mouse button
         if (Input.GetMouseButtonDown(0))
         {
             lastAttackButtonTime = Time.time;
             if (isAttacking)
             {
-                // 이미 공격 중이면 큐 넣기 허용 (다음 단계가 있으면)
                 if (comboIndex > 0 && comboIndex < maxCombo) queuedNext = true;
             }
             else
             {
-                // 공격 시작. 대쉬/패리 중일 때 공격 안 하도록
                 if (!isDashing && !isParrying) StartAttack(1);
             }
         }
 
-        // DASH (Left Shift or Right Shift)
         if (Input.GetKeyDown(KeyCode.LeftShift) || Input.GetKeyDown(KeyCode.RightShift))
         {
             if (canDash && !isDashing && !isParrying && !isAttacking && attackLockTimer <= 0f)
@@ -127,7 +160,6 @@ public class PlayerController : MonoBehaviour
             }
         }
 
-        // PARRY (C or Left Ctrl)
         if (Input.GetKeyDown(KeyCode.C) || Input.GetKeyDown(KeyCode.LeftControl))
         {
             if (canParry && !isParrying && !isDashing && attackLockTimer <= 0f)
@@ -136,7 +168,6 @@ public class PlayerController : MonoBehaviour
             }
         }
 
-        // JUMP
         if (Input.GetButtonDown("Jump"))
         {
             bool grounded = Physics2D.OverlapCircle(groundCheck.position, groundCheckRadius, groundLayer);
@@ -151,14 +182,11 @@ public class PlayerController : MonoBehaviour
 
     void HandleMovement()
     {
-        // locked only when attackLockTimer active or while parrying/dashing.
-        // (이전처럼 isAttacking 전체를 막지 않음 — attackLockTimer로 잠금 제어)
         bool locked = attackLockTimer > 0f || isParrying;
         if (isDashing) locked = true;
 
         float moveInput = locked ? 0f : Input.GetAxisRaw("Horizontal");
 
-        // apply horizontal velocity while preserving vertical velocity
         Vector2 vel = rb.linearVelocity;
         vel.x = moveInput * moveSpeed;
         rb.linearVelocity = vel;
@@ -182,17 +210,11 @@ public class PlayerController : MonoBehaviour
 
     void UpdateGrounded()
     {
-        // current overlap test
         bool groundedNow = Physics2D.OverlapCircle(groundCheck.position, groundCheckRadius, groundLayer);
-
-        if (groundedNow)
-            groundedRememberCounter = groundRememberTime;
-        else
-            groundedRememberCounter -= Time.deltaTime;
+        if (groundedNow) groundedRememberCounter = groundRememberTime;
+        else groundedRememberCounter -= Time.deltaTime;
 
         bool groundedForChar = groundedRememberCounter > 0f;
-
-        // animator 파라미터에 전달
         if (animator != null)
         {
             animator.SetBool("isGrounded", groundedForChar);
@@ -204,10 +226,7 @@ public class PlayerController : MonoBehaviour
     {
         if (animator != null)
         {
-            // Speed (move) — 애니메이터에서 달리기 전이에 사용
             animator.SetFloat("Speed", Mathf.Abs(rb.linearVelocity.x));
-
-            // dash/parry bools
             animator.SetBool(animIsDashingBool, isDashing);
             animator.SetBool(animIsParryingBool, isParrying);
         }
@@ -216,7 +235,9 @@ public class PlayerController : MonoBehaviour
     void Flip()
     {
         isFacingRight = !isFacingRight;
-        transform.localScale = new Vector3(transform.localScale.x * -1f, transform.localScale.y, transform.localScale.z);
+        Vector3 s = transform.localScale;
+        s.x *= -1f;
+        transform.localScale = s;
     }
 
     // --------------------------------------------------------
@@ -225,17 +246,15 @@ public class PlayerController : MonoBehaviour
     void StartAttack(int attackStep)
     {
         if (attackStep < 1 || attackStep > maxCombo) return;
-        if (isDashing || isParrying) return; // optional: block attacks while special states
+        if (isDashing || isParrying) return;
 
         isAttacking = true;
         comboIndex = attackStep;
         queuedNext = false;
 
-        // 안전하게 인덱스 체크
         int idx = Mathf.Clamp(comboIndex - 1, 0, comboLockDurations.Length - 1);
         attackLockTimer = comboLockDurations[idx];
 
-        // animator 트리거
         if (animator != null)
         {
             switch (comboIndex)
@@ -247,7 +266,6 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    // 이 함수는 애니메이션 이벤트로 호출되어야 함 (데미지 프레임)
     public void OnAttackHit()
     {
         if (comboIndex <= 0 || comboIndex > maxCombo) return;
@@ -258,32 +276,19 @@ public class PlayerController : MonoBehaviour
         if (attackPoint == null) { Debug.LogWarning("[PlayerController] attackPoint null"); return; }
 
         Collider2D[] hits = Physics2D.OverlapCircleAll(attackPoint.position, range, enemyLayer);
-        Debug.Log($"PerformAttack_DEBUG: OverlapCircleAll found {hits.Length} colliders (step {comboIndex})");
-
-        foreach (Collider2D col in hits)
+        foreach (var col in hits)
         {
             if (col == null) continue;
-            // IDamageable 우선
             var dmgComp = col.GetComponent<IDamageable>() ?? col.GetComponentInParent<IDamageable>() ?? col.GetComponentInChildren<IDamageable>();
-            if (dmgComp != null) { dmgComp.TakeDamage(dmg); Debug.Log($"Hit {col.name} for {dmg}"); continue; }
-
-            // 예: 기존 EnemyHealth 체계
-            var enemyHealth = col.GetComponent<EnemyHealth>();
-            if (enemyHealth != null) { enemyHealth.TakeDamage(dmg); Debug.Log($"Hit EnemyHealth {col.name} for {dmg}"); }
+            if (dmgComp != null) dmgComp.TakeDamage(dmg);
         }
     }
 
-    // 애니메이션 이벤트에서 공격 애니메이션이 끝날 때 호출
     public void OnAttackAnimationEnd()
     {
         if (queuedNext && comboIndex < maxCombo)
-        {
             StartAttack(comboIndex + 1);
-        }
-        else
-        {
-            ResetCombo();
-        }
+        else ResetCombo();
     }
 
     void ResetCombo()
@@ -309,7 +314,6 @@ public class PlayerController : MonoBehaviour
         float prevGravity = rb.gravityScale;
         float originalYVel = rb.linearVelocity.y;
 
-        // lock movement for dash duration
         float prevLock = attackLockTimer;
         attackLockTimer = dashDuration;
 
@@ -324,13 +328,12 @@ public class PlayerController : MonoBehaviour
         isDashing = false;
         attackLockTimer = prevLock;
 
-        // cooldown
         yield return new WaitForSeconds(dashCooldown);
         canDash = true;
     }
 
     // --------------------------------------------------------
-    // Parry coroutine (temporary parry window)
+    // Parry coroutine (패링 윈도우 ON)
     // --------------------------------------------------------
     IEnumerator DoParry()
     {
@@ -346,13 +349,123 @@ public class PlayerController : MonoBehaviour
         }
         isParrying = false;
 
-        // cooldown
         yield return new WaitForSeconds(parryCooldown);
         canParry = true;
     }
 
     // --------------------------------------------------------
-    // Gizmos for debug (ground check & attack range)
+    // Parry consumption API — 보스에서 호출할 수 있도록 public
+    // --------------------------------------------------------
+    public bool ConsumeHitboxIfParrying(object hitInfo = null)
+    {
+        // 디버그 로그 - 호출 및 현재 상태 확인
+        Debug.Log($"[Player] ConsumeHitboxIfParrying called. isParrying={isParrying}, isInvulnerable={isInvulnerable}, hitInfo={hitInfo}");
+
+        if (isInvulnerable) return true;
+
+        if (isParrying)
+        {
+            int hitId = 0;
+            if (hitInfo is Collider2D col) hitId = col.GetInstanceID();
+            else if (hitInfo is GameObject go) hitId = go.GetInstanceID();
+            else if (hitInfo is int i) hitId = i;
+
+            // 중복 소비 방지
+            if (hitId != 0)
+            {
+                if (_recentlyConsumedHitIds.Contains(hitId))
+                {
+                    Debug.Log($"[Player] Hit already consumed (id={hitId})");
+                    return true;
+                }
+
+                _recentlyConsumedHitIds.Add(hitId);
+                StartCoroutine(ClearConsumedHitAfter(hitId, _recentlyConsumedClearDelay));
+            }
+            else
+            {
+                // ID가 없을 때의 하드 체크 (짧은 시간 내 재호출 방지)
+                if (Time.time - lastParrySuccessTime < 0.06f) return true;
+            }
+
+            // 실제 패링 성공 처리 (카운트 증가 등)
+            parrySuccessCount++;
+            lastParrySuccessTime = Time.time;
+            Debug.Log($"[Player] Parry success #{parrySuccessCount}");
+
+            // 잠깐 무적(중복 히트 방지)
+            StartCoroutine(TemporaryInvul(0.06f));
+
+            // 스페셜 조건 만족 시 트리거
+            if (!parrySpecialLocked && parrySuccessCount >= parrySuccessNeeded)
+            {
+                StartCoroutine(TriggerParrySpecial());
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    IEnumerator ClearConsumedHitAfter(int hitId, float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        _recentlyConsumedHitIds.Remove(hitId);
+    }
+
+    // --------------------------------------------------------
+    // IDamageable implementation (defensive: check parry here too)
+    // --------------------------------------------------------
+    public void TakeDamage(int amount)
+    {
+        if (isInvulnerable) return;
+
+        if (isParrying)
+        {
+            bool consumed = ConsumeHitboxIfParrying(null);
+            if (consumed) return;
+        }
+
+        Debug.Log($"[Player] Took {amount} damage.");
+        if (healthComponent != null)
+        {
+            var mi = healthComponent.GetType().GetMethod("TakeDamage");
+            if (mi != null) mi.Invoke(healthComponent, new object[] { amount });
+            else Debug.LogWarning("[Player] healthComponent provided but no TakeDamage(int) found.");
+            return;
+        }
+    }
+
+    // --------------------------------------------------------
+    // Parry special logic
+    // --------------------------------------------------------
+    IEnumerator TriggerParrySpecial()
+    {
+        parrySpecialLocked = true;
+        Debug.Log("[Player] ParrySpecial triggered!");
+        if (animator != null) animator.SetTrigger(animParrySpecialTrigger);
+
+        yield return TemporaryInvul(parrySpecialInvulDuration);
+
+        // **스패셜을 소비했을 때만 카운트 초기화**
+        parrySuccessCount = 0;
+        lastParrySuccessTime = -999f;
+
+        // 잠깐 유지 후 잠금 해제
+        yield return new WaitForSeconds(0.25f);
+        parrySpecialLocked = false;
+    }
+
+    IEnumerator TemporaryInvul(float dur)
+    {
+        isInvulnerable = true;
+        yield return new WaitForSeconds(dur);
+        isInvulnerable = false;
+    }
+
+    // --------------------------------------------------------
+    // Gizmos
     // --------------------------------------------------------
     void OnDrawGizmosSelected()
     {
@@ -363,11 +476,34 @@ public class PlayerController : MonoBehaviour
         }
         if (attackPoint != null && comboRanges != null && comboRanges.Length > 0)
         {
-            // show current combo range when attacking (or first range if idle)
             int idx = Mathf.Clamp(comboIndex - 1, 0, comboRanges.Length - 1);
             float r = (comboRanges != null && comboRanges.Length > 0) ? comboRanges[idx] : comboRanges[0];
             Gizmos.color = Color.yellow;
             Gizmos.DrawWireSphere(attackPoint.position, r);
         }
+
+#if UNITY_EDITOR
+        if (isParrying)
+        {
+            UnityEditor.Handles.color = Color.green;
+            UnityEditor.Handles.DrawWireDisc(transform.position + Vector3.up * 1.2f, Vector3.forward, 0.4f);
+        }
+#endif
+    }
+
+    // --------------------------------------------------------
+    // Simple in-game debug UI for parry status/count
+    // --------------------------------------------------------
+    void OnGUI()
+    {
+        if (!showParryDebugUI) return;
+
+        string text = $"Parry: {(isParrying ? "ON" : "off")}  |  SuccessCount: {parrySuccessCount} / {parrySuccessNeeded}\n" +
+                      $"ParrySpecialLocked: {parrySpecialLocked}  |  Invul: {isInvulnerable}\n" +
+                      $"LastParryTimeAgo: {(lastParrySuccessTime < -900f ? "n/a" : (Time.time - lastParrySuccessTime).ToString("F2") + "s")}";
+
+        Rect r = new Rect(parryDebugPosition.x, parryDebugPosition.y, 360, 60);
+        GUI.Box(r, GUIContent.none);
+        GUI.Label(new Rect(r.x + 6, r.y + 4, r.width - 10, r.height - 8), text, parryDebugStyle);
     }
 }

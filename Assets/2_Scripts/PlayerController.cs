@@ -9,6 +9,8 @@ using UnityEngine;
 [RequireComponent(typeof(Animator))]
 public class PlayerController : MonoBehaviour, IDamageable
 {
+    [HideInInspector] public bool ExternalRangedOverride;
+
     [Header("Movement")]
     public float moveSpeed = 5f;
     public float jumpForce = 12f;
@@ -56,6 +58,15 @@ public class PlayerController : MonoBehaviour, IDamageable
     public float parrySpecialInvulDuration = 0.3f;
     [Tooltip("(더 이상 자동 리셋을 원하지 않는 경우 무시) 패링 성공 후 카운트 리셋까지의 허용 시간(초). 현재는 사용하지 않습니다.")]
     public float parrySuccessResetDelay = 3.0f; // **이 값은 더 이상 자동 리셋에 사용되지 않음**
+
+    // === NEW: 패링 스페셜 타격 설정 ===
+    [Header("Parry Special Attack (hit settings)")]
+    public bool parrySpecialUseCircle = true;           // 원형 or 박스형
+    public float parrySpecialRadius = 1.6f;             // 원형 반경
+    public Vector2 parrySpecialBoxSize = new(3.2f, 1.6f); // 박스 크기
+    public Vector2 parrySpecialOffset = new(1.0f, 0.1f);  // 캐릭터 기준 오프셋 (우측이 +)
+    public int parrySpecialDamage = 3;                  // 대미지
+    public LayerMask parrySpecialEnemyMaskOverride;     // 비워두면 enemyLayer 사용
 
     [Header("Ground Check / Stability")]
     public float groundCheckRadius = 0.14f;
@@ -132,9 +143,7 @@ public class PlayerController : MonoBehaviour, IDamageable
 
         if (attackLockTimer > 0f) attackLockTimer -= Time.deltaTime;
 
-        // **자동 리셋 코드 제거**
-        // 원래는 parrySuccessResetDelay 때문에 시간이 지나면 parrySuccessCount를 0으로 초기화했음.
-        // 이제는 사용자가 원할 경우에만(스페셜 발동 시) 리셋하도록 변경했음.
+        // (자동 리셋 제거)
     }
 
     void HandleInputs()
@@ -446,15 +455,78 @@ public class PlayerController : MonoBehaviour, IDamageable
         Debug.Log("[Player] ParrySpecial triggered!");
         if (animator != null) animator.SetTrigger(animParrySpecialTrigger);
 
+        // 스페셜 타격은 애니메이션 이벤트(OnParrySpecialHit)에서 처리
         yield return TemporaryInvul(parrySpecialInvulDuration);
 
-        // **스패셜을 소비했을 때만 카운트 초기화**
+        // **스페셜을 소비했을 때만 카운트 초기화**
         parrySuccessCount = 0;
         lastParrySuccessTime = -999f;
 
         // 잠깐 유지 후 잠금 해제
         yield return new WaitForSeconds(0.25f);
         parrySpecialLocked = false;
+    }
+
+    // === NEW: 패링 스페셜 타격 함수(애니메이션 이벤트로 호출) ===
+    public void OnParrySpecialHit()
+    {
+        // 사용할 레이어 마스크 결정
+        var mask = (parrySpecialEnemyMaskOverride.value != 0) ? parrySpecialEnemyMaskOverride : enemyLayer;
+
+        // 기준점: attackPoint가 있으면 사용, 없으면 본인 위치
+        Vector2 originBase = (attackPoint != null) ? (Vector2)attackPoint.position : (Vector2)transform.position;
+
+        // 좌우 방향(스케일 x 기준) 반영
+        float dir = (transform.localScale.x >= 0f) ? 1f : -1f;
+
+        // 오프셋 적용
+        Vector2 origin = originBase + new Vector2(parrySpecialOffset.x * dir, parrySpecialOffset.y);
+
+        // 충돌 수집
+        Collider2D[] hits;
+        if (parrySpecialUseCircle)
+        {
+            hits = Physics2D.OverlapCircleAll(origin, parrySpecialRadius, mask);
+#if UNITY_EDITOR
+            Debug.DrawLine(origin + Vector2.right * parrySpecialRadius, origin - Vector2.right * parrySpecialRadius, Color.red, 0.25f);
+            Debug.DrawLine(origin + Vector2.up * parrySpecialRadius, origin - Vector2.up * parrySpecialRadius, Color.red, 0.25f);
+#endif
+        }
+        else
+        {
+            float ang = 0f; // 필요하면 회전값 사용
+            // 박스의 가로는 좌우에 맞게 생각했지만 OverlapBoxAll은 크기를 절대값으로 받으므로 그대로 전달
+            hits = Physics2D.OverlapBoxAll(origin, parrySpecialBoxSize, ang, mask);
+#if UNITY_EDITOR
+            Vector2 hx = new(parrySpecialBoxSize.x * 0.5f * dir, parrySpecialBoxSize.y * 0.5f);
+            Debug.DrawLine(origin - hx, origin + hx, Color.red, 0.25f);
+            Debug.DrawLine(new(origin.x - hx.x, origin.y + hx.y), new(origin.x + hx.x, origin.y - hx.y), Color.red, 0.25f);
+#endif
+        }
+
+        var touched = new HashSet<Collider2D>();
+        foreach (var col in hits)
+        {
+            if (col == null || touched.Contains(col)) continue;
+            touched.Add(col);
+
+            var dmg = col.GetComponent<IDamageable>()
+                   ?? col.GetComponentInParent<IDamageable>()
+                   ?? col.GetComponentInChildren<IDamageable>();
+            if (dmg != null)
+            {
+                dmg.TakeDamage(parrySpecialDamage);
+                continue;
+            }
+
+            // 구형 EnemyHealth 지원
+            var enemyHealth = col.GetComponent<EnemyHealth>() ?? col.GetComponentInParent<EnemyHealth>();
+            if (enemyHealth != null)
+            {
+                enemyHealth.TakeDamage(parrySpecialDamage);
+                continue;
+            }
+        }
     }
 
     IEnumerator TemporaryInvul(float dur)

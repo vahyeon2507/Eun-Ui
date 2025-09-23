@@ -4,7 +4,6 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
-using UnityEngine.Events;
 
 [DisallowMultipleComponent]
 public class JangsanbeomBoss : MonoBehaviour
@@ -13,13 +12,12 @@ public class JangsanbeomBoss : MonoBehaviour
     public class AttackData
     {
         public string Name = "ClawExecute";
-        public Vector2 Offset = Vector2.right;   // local offset from boss root
+        public Vector2 Offset = Vector2.right;
         public Vector2 Size = new Vector2(3f, 1.5f);
-        public float Angle = 0f; // degrees, local
+        public float Angle = 0f;
         public int Damage = 2;
         public float Lifetime = 0.12f;
 
-        // editor visuals (optional)
         public GameObject TelegraphPrefab;
         public float TelegraphTime = 0f;
         public bool DefaultFake = false;
@@ -28,7 +26,6 @@ public class JangsanbeomBoss : MonoBehaviour
         public Transform OriginOverride;
     }
 
-    // ---------------- Refs & inspector ----------------
     [Header("Refs")]
     public Transform player;
     public Animator animator;
@@ -36,25 +33,24 @@ public class JangsanbeomBoss : MonoBehaviour
     public Rigidbody2D rb;
 
     [Header("Health / Phase")]
-    [Tooltip("Optional: any component that exposes current/max HP (we will try to read common names). If left empty, use manual MaxHealth/CurrentHealth below.")]
     public MonoBehaviour bossHealthComponent;
-    [Tooltip("Fallback if no health component assigned")]
     public float MaxHealth = 100f;
     public float CurrentHealth = 100f;
     [Range(0f, 1f)]
-    public float Phase2HealthThreshold = 0.66f; // when current/max <= this -> enter phase2
+    public float Phase2HealthThreshold = 0.66f;
+
     [Header("Phase map roots (enable/disable when transitioning)")]
+    [Tooltip("1페이즈 맵 루트 (비활성화될 수 있음)")]
     public GameObject Phase1MapRoot;
+    [Tooltip("2페이즈 맵 루트 (비활성화된 것을 활성화)")]
     public GameObject Phase2MapRoot;
 
     [Header("Player detection (no hitbox prefab)")]
-    public LayerMask playerLayer; // set to player's layer
+    public LayerMask playerLayer;
     public string playerTag = "Player";
 
     [Header("Visual & Flip")]
-    [Tooltip("Optional: visual root. if empty we'll flip SpriteRenderer.flipX on children.")]
     public Transform graphicsRoot;
-    [Tooltip("Flip trigger box (place at tail / behind). If child of boss, we mirror its local X on flip.")]
     public BoxCollider2D flipTrigger;
     public Transform flipPivot;
     public float flipPivotDeadzone = 0.6f;
@@ -101,23 +97,19 @@ public class JangsanbeomBoss : MonoBehaviour
     Vector3 _rootOriginalScale;
     Vector3 _graphicsOriginalScale;
     float _lastFlipTime = -10f;
-    int _prevTriggerSide = 0; // -1 left, 0 near, +1 right
+    int _prevTriggerSide = 0;
     Coroutine aiCoroutine;
     bool busy = false;
     float _flipTriggerOriginalLocalX = 0f;
     bool _flipTriggerIsChild = false;
 
-    // poly colliders (physics flip)
     List<PolygonCollider2D> _polyColliders = new List<PolygonCollider2D>();
     List<Vector2[][]> _originalPolyPaths = new List<Vector2[][]>();
 
-    // movement tracking
     Vector3 _lastPosition;
 
-    // phase state
     bool _inPhase2 = false;
 
-    // health reflection helpers
     float _lastKnownHp = -1f;
     float _lastKnownMaxHp = -1f;
     float _healthPollInterval = 0.2f;
@@ -156,10 +148,8 @@ public class JangsanbeomBoss : MonoBehaviour
         if (flipTrigger != null)
         {
             _flipTriggerIsChild = flipTrigger.transform.IsChildOf(transform);
-            if (_flipTriggerIsChild)
-                _flipTriggerOriginalLocalX = flipTrigger.transform.localPosition.x;
-            else
-                _flipTriggerOriginalLocalX = 0f;
+            if (_flipTriggerIsChild) _flipTriggerOriginalLocalX = flipTrigger.transform.localPosition.x;
+            else _flipTriggerOriginalLocalX = 0f;
         }
 
         CachePolygonColliderPaths();
@@ -182,15 +172,16 @@ public class JangsanbeomBoss : MonoBehaviour
             _prevTriggerSide = (rel > flipTriggerHysteresis) ? 1 : (rel < -flipTriggerHysteresis ? -1 : 0);
         }
 
-        UpdatePhaseFlagsFromHealth(); // initial check
-        ApplyPhaseMapRoots(); // ensure correct roots active
+        // 보스 시작 시 맵 루트 상태를 안전하게 맞춰준다
+        _inPhase2 = false;
+        ApplyPhaseMapRoots();
+        UpdatePhaseFlagsFromHealth(); // 만약 시작부터 2페이즈라면 EnterPhase2 호출
     }
 
     void Update()
     {
         if (player == null) return;
 
-        // follow X only
         float dx = player.position.x - transform.position.x;
         bool isMoving = false;
 
@@ -201,15 +192,12 @@ public class JangsanbeomBoss : MonoBehaviour
             Vector3 p = transform.position;
             p.x = Mathf.MoveTowards(transform.position.x, player.position.x - Mathf.Sign(dx) * followMinDistanceX, step);
             transform.position = p;
-
             isMoving = Mathf.Abs(p.x - prevX) > 0.0001f;
         }
 
-        // animator Move bool
         if (animator != null && !string.IsNullOrEmpty(animParam_MoveBool))
             SafeSetBool(animParam_MoveBool, isMoving);
 
-        // flip decision
         if (Time.time - _lastFlipTime > flipCooldown)
         {
             if (flipTrigger != null)
@@ -255,7 +243,6 @@ public class JangsanbeomBoss : MonoBehaviour
             }
         }
 
-        // health polling (safe, handles external BossHealth components)
         _healthPollTimer -= Time.deltaTime;
         if (_healthPollTimer <= 0f)
         {
@@ -290,15 +277,13 @@ public class JangsanbeomBoss : MonoBehaviour
     {
         if (bossHealthComponent != null)
         {
-            // try common field/property names
-            Type t = bossHealthComponent.GetType();
             float c = TryGetFloatMember(bossHealthComponent, "CurrentHp", "currentHp", "CurrentHP", "currentHP", "hp", "HP", "cur", "current");
             float m = TryGetFloatMember(bossHealthComponent, "MaxHp", "maxHp", "MaxHP", "maxHP", "maxHealth", "MaxHealth", "HPMax");
 
             if (!float.IsNaN(c)) CurrentHealth = c;
             if (!float.IsNaN(m) && m > 0f) MaxHealth = m;
         }
-        // clamp
+
         CurrentHealth = Mathf.Clamp(CurrentHealth, 0f, Mathf.Max(1f, MaxHealth));
         _lastKnownHp = CurrentHealth;
         _lastKnownMaxHp = MaxHealth;
@@ -310,7 +295,6 @@ public class JangsanbeomBoss : MonoBehaviour
         Type t = obj.GetType();
         foreach (var n in names)
         {
-            // property
             var pi = t.GetProperty(n, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
             if (pi != null && (pi.PropertyType == typeof(float) || pi.PropertyType == typeof(double) || pi.PropertyType == typeof(int)))
             {
@@ -319,7 +303,6 @@ public class JangsanbeomBoss : MonoBehaviour
                 if (v is double d) return (float)d;
                 if (v is int i) return (float)i;
             }
-            // field
             var fi = t.GetField(n, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
             if (fi != null && (fi.FieldType == typeof(float) || fi.FieldType == typeof(double) || fi.FieldType == typeof(int)))
             {
@@ -347,19 +330,63 @@ public class JangsanbeomBoss : MonoBehaviour
     void EnterPhase2()
     {
         Debug.Log("[Boss] Entering Phase 2!");
-        // do phase-enter stuff
-        ApplyPhaseMapRoots();
-        // you can add animation trigger if desired here:
+        SwapPhaseMapRoots(true);
         SafeSetTrigger("EnterPhase2");
+    }
+
+    /// <summary>
+    /// 안전하게 Phase1/Phase2 맵 루트를 전환한다.
+    /// true -> Phase2 활성화, Phase1 비활성화
+    /// false -> Phase2 비활성화, Phase1 활성화
+    /// </summary>
+    void SwapPhaseMapRoots(bool toPhase2)
+    {
+        if (Phase1MapRoot == null && Phase2MapRoot == null) return;
+
+        if (Phase1MapRoot != null)
+        {
+            bool wantActive = !toPhase2;
+            if (Phase1MapRoot.activeSelf != wantActive)
+            {
+                Phase1MapRoot.SetActive(wantActive);
+                if (debugFlip) Debug.Log($"[Boss] Phase1MapRoot setActive={wantActive}");
+            }
+        }
+
+        if (Phase2MapRoot != null)
+        {
+            bool wantActive = toPhase2;
+            if (Phase2MapRoot.activeSelf != wantActive)
+            {
+                Phase2MapRoot.SetActive(wantActive);
+                if (debugFlip) Debug.Log($"[Boss] Phase2MapRoot setActive={wantActive}");
+            }
+        }
     }
 
     void ApplyPhaseMapRoots()
     {
+        // 1) 플레이어가 맵 루트의 자식이면 먼저 빼낸다 (비활성화에 딸려 꺼지는 것 방지)
+        if (player != null)
+        {
+            if (Phase1MapRoot != null && player.IsChildOf(Phase1MapRoot.transform))
+            {
+                Debug.LogWarning("[Boss] Player is under Phase1MapRoot. Reparenting to scene root for safety.");
+                player.SetParent(null, true); // 월드 좌표 유지
+            }
+            if (Phase2MapRoot != null && player.IsChildOf(Phase2MapRoot.transform))
+            {
+                Debug.LogWarning("[Boss] Player is under Phase2MapRoot. Reparenting to scene root for safety.");
+                player.SetParent(null, true);
+            }
+        }
+
+        // 2) 루트 on/off
         if (Phase1MapRoot != null) Phase1MapRoot.SetActive(!_inPhase2);
         if (Phase2MapRoot != null) Phase2MapRoot.SetActive(_inPhase2);
     }
 
-    // ---------------- Flip / Visuals ----------------
+
     public void FlipTo(bool faceRight)
     {
         facingRight = faceRight;

@@ -16,6 +16,12 @@ public class GameManager : MonoBehaviour
     [SerializeField] private GameObject settingsPanel;
     [SerializeField] private GameObject[] settingPanels;   // 오디오, 해상도, 그래픽, 키 세팅 등 패널들
 
+    [Header("UI 연출 관련")]
+    [SerializeField] private UIAnimator menuAnimator;
+    [SerializeField] private UIAnimator settingsAnimator;
+    [SerializeField] private UIDim dim;
+
+
     [SerializeField] private Slider soundSlider;
     [SerializeField] private TMP_Dropdown resolutionDropdown;
 
@@ -63,27 +69,27 @@ public class GameManager : MonoBehaviour
     {
         if (Input.GetKeyDown(KeyCode.Escape))
         {
-            // 설정창이 열려 있으면 닫고 메뉴창으로 복귀
             if (settingsPanel.activeSelf)
             {
-                settingsPanel.SetActive(false);
-                menuPanel.SetActive(true);
+                settingsAnimator.Hide();   // 설정 패널 닫기
+                menuAnimator.Show();       // 메뉴 다시 열기
             }
-            // 메뉴창이 열려 있으면 닫기
-            else if (menuPanel.activeSelf)
+            else if (isMenuOpen) // 이미 메뉴 열려 있으면 닫기
             {
                 isMenuOpen = false;
-                menuPanel.SetActive(false);
+                menuAnimator.Hide();   // menuPanel.SetActive(false) 대신
+                dim.HideDim();
                 Time.timeScale = 1;
             }
-            // 메뉴창이 닫혀 있으면 열기
-            else
+            else // 메뉴가 닫혀 있으면 열기
             {
                 isMenuOpen = true;
-                menuPanel.SetActive(true);
+                menuAnimator.Show();   // menuPanel.SetActive(true) 대신
+                dim.ShowDim();
                 Time.timeScale = 0;
             }
         }
+
     }
 
     void OnRestart()
@@ -95,9 +101,11 @@ public class GameManager : MonoBehaviour
     void OnContinue()
     {
         isMenuOpen = false;
-        menuPanel.SetActive(false);
+        menuAnimator.Hide();   // menuPanel.SetActive(false) 대신
+        dim.HideDim();
         Time.timeScale = 1;
     }
+
 
     void OnQuit()
     {

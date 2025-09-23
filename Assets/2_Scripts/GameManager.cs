@@ -1,7 +1,7 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
-using TMPro;
 
 public class GameManager : MonoBehaviour
 {
@@ -14,15 +14,19 @@ public class GameManager : MonoBehaviour
 
     [Header("설정 메뉴 UI")]
     [SerializeField] private GameObject settingsPanel;
-    [SerializeField] private Button backButton;
-    [SerializeField] private GameObject audioPanel;
-    [SerializeField] private GameObject resolutionPanel;
-    [SerializeField] private Button audioTabButton;
-    [SerializeField] private Button resolutionTabButton;
+    [SerializeField] private GameObject[] settingPanels;   // 오디오, 해상도, 그래픽, 키 세팅 등 패널들
+
+    [Header("UI 연출 관련")]
+    [SerializeField] private UIAnimator menuAnimator;
+    [SerializeField] private UIAnimator settingsAnimator;
+    [SerializeField] private UIDim dim;
+
+
     [SerializeField] private Slider soundSlider;
     [SerializeField] private TMP_Dropdown resolutionDropdown;
 
     private bool isMenuOpen = false;
+
     private readonly Vector2Int[] resolutions = new Vector2Int[]
     {
         new Vector2Int(1920, 1080),
@@ -40,11 +44,6 @@ public class GameManager : MonoBehaviour
         quitButton.onClick.AddListener(OnQuit);
         settingsButton.onClick.AddListener(OpenSettings);
 
-        backButton.onClick.AddListener(CloseSettings);
-
-        audioTabButton.onClick.AddListener(() => ShowSettingsTab(true));
-        resolutionTabButton.onClick.AddListener(() => ShowSettingsTab(false));
-
         soundSlider.onValueChanged.AddListener(OnSoundChanged);
         resolutionDropdown.onValueChanged.AddListener(OnResolutionChanged);
 
@@ -61,7 +60,9 @@ public class GameManager : MonoBehaviour
         soundSlider.value = 1f; // 사운드 기본값 100%
         AudioListener.volume = 1f; // 실제 볼륨도 100%
 
-        ShowSettingsTab(true); // 기본 오디오 탭 활성화
+        // 기본으로 첫 번째 탭 켜기 (예: 오디오 패널)
+        if (settingPanels.Length > 0)
+            OpenPanel(0);
     }
 
     void Update()
@@ -70,15 +71,25 @@ public class GameManager : MonoBehaviour
         {
             if (settingsPanel.activeSelf)
             {
-                CloseSettings();
+                settingsAnimator.Hide();   // 설정 패널 닫기
+                menuAnimator.Show();       // 메뉴 다시 열기
             }
-            else
+            else if (isMenuOpen) // 이미 메뉴 열려 있으면 닫기
             {
-                isMenuOpen = !isMenuOpen;
-                menuPanel.SetActive(isMenuOpen);
-                Time.timeScale = isMenuOpen ? 0 : 1;
+                isMenuOpen = false;
+                menuAnimator.Hide();   // menuPanel.SetActive(false) 대신
+                dim.HideDim();
+                Time.timeScale = 1;
+            }
+            else // 메뉴가 닫혀 있으면 열기
+            {
+                isMenuOpen = true;
+                menuAnimator.Show();   // menuPanel.SetActive(true) 대신
+                dim.ShowDim();
+                Time.timeScale = 0;
             }
         }
+
     }
 
     void OnRestart()
@@ -90,9 +101,11 @@ public class GameManager : MonoBehaviour
     void OnContinue()
     {
         isMenuOpen = false;
-        menuPanel.SetActive(false);
+        menuAnimator.Hide();   // menuPanel.SetActive(false) 대신
+        dim.HideDim();
         Time.timeScale = 1;
     }
+
 
     void OnQuit()
     {
@@ -105,16 +118,13 @@ public class GameManager : MonoBehaviour
         settingsPanel.SetActive(true);
     }
 
-    void CloseSettings()
+    // Inspector에서 버튼 OnClick에 직접 연결할 함수
+    public void OpenPanel(int index)
     {
-        settingsPanel.SetActive(false);
-        menuPanel.SetActive(true);
-    }
-
-    void ShowSettingsTab(bool audio)
-    {
-        audioPanel.SetActive(audio);
-        resolutionPanel.SetActive(!audio);
+        for (int i = 0; i < settingPanels.Length; i++)
+        {
+            settingPanels[i].SetActive(i == index);
+        }
     }
 
     void OnSoundChanged(float value)

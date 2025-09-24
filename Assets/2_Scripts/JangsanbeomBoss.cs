@@ -22,6 +22,8 @@ public class JangsanbeomBoss : MonoBehaviour
         [Header("Editor Visuals")]
         public GameObject TelegraphPrefab;
         public float TelegraphTime = 0f;
+        public float cloneSpawnOffsetX = 3.0f;   // 보스 x 기준 옆으로
+        public float cloneSpawnOffsetY = 0.0f;
         public bool DefaultFake = false;
         public Sprite FakeSprite;
         public float FakeSpriteDuration = 0.18f;

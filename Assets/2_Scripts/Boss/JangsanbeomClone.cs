@@ -7,11 +7,16 @@ using UnityEngine;
 public class JangsanbeomClone : MonoBehaviour, IDamageable
 {
     [Header("Owner & Refs")]
-    public JangsanbeomBoss owner;      // 본체 참조(콜백용)
-    public Transform player;           // 타겟
+    public JangsanbeomBoss owner;
+    public Transform player;
     public Animator animator;
     public SpriteRenderer sr;
     public Rigidbody2D rb;
+
+    [Header("Visual Flip")]
+    public Transform graphicsRoot;          // 있으면 이 루트만 좌우 반전
+    [Tooltip("원본 스프라이트가 ‘오른쪽’을 바라보는가? (false면 기본이 왼쪽)")]
+    public bool spriteFacesRight = true;
 
     [Header("Move/AI")]
     public float followSpeed = 2.2f;
@@ -27,9 +32,9 @@ public class JangsanbeomClone : MonoBehaviour, IDamageable
     public string trig_AttackFake = "ClawFakeExecute";
 
     [Header("Attacks")]
-    public List<JangsanbeomBoss.AttackData> attacks = new(); // 본체가 채워줌
-    public bool useAnimationEvents = true; // 본체와 동일하게 운용
-    [Tooltip("2페이즈 기준: 페이크도 실체화할지(본체에서 상속)")]
+    public List<JangsanbeomBoss.AttackData> attacks = new();
+    public bool useAnimationEvents = true;
+    [Tooltip("2페이즈 기준: 페이크도 실체화할지")]
     public bool enableFakePhase2 = true;
     [Range(0f, 1f)] public float fakeChancePhase2 = 0.25f;
 
@@ -40,7 +45,7 @@ public class JangsanbeomClone : MonoBehaviour, IDamageable
     [Header("Health")]
     public int maxHp = 5;
     public int currentHp = 5;
-    public bool allowDropRewards = false; // 분신은 보상 X
+    public bool allowDropRewards = false;
 
     // state
     bool facingRight = true;
@@ -60,6 +65,10 @@ public class JangsanbeomClone : MonoBehaviour, IDamageable
     {
         if (player == null && owner != null) player = owner.player;
         _lastPos = transform.position;
+
+        // 스폰 직후 시선 보정: 플레이어 쪽을 바라보게
+        if (player != null) FaceRight(player.position.x >= transform.position.x);
+
         StartCoroutine(AI());
     }
 
@@ -67,7 +76,6 @@ public class JangsanbeomClone : MonoBehaviour, IDamageable
     {
         if (player == null) return;
 
-        // 이동
         bool isMoving = false;
         float dx = player.position.x - transform.position.x;
         if (!_busy && Mathf.Abs(dx) > followMinDistanceX && Mathf.Abs(dx) < aggroRange)
@@ -76,12 +84,13 @@ public class JangsanbeomClone : MonoBehaviour, IDamageable
             var p = transform.position;
             p.x = Mathf.MoveTowards(p.x, player.position.x - Mathf.Sign(dx) * followMinDistanceX, step);
             transform.position = p;
-            isMoving = Mathf.Abs(step) > 0.0001f;
+            isMoving = Mathf.Abs(p.x - _lastPos.x) > 0.0001f;
         }
 
-        SafeSetBool(animParam_MoveBool, isMoving);
+        if (animator && !string.IsNullOrEmpty(animParam_MoveBool))
+            animator.SetBool(animParam_MoveBool, isMoving);
 
-        // 플립
+        // 플립(지터 방지 쿨다운 포함)
         if (Time.time - _lastFlipTime > flipCooldown)
         {
             float rel = player.position.x - transform.position.x;
@@ -93,10 +102,12 @@ public class JangsanbeomClone : MonoBehaviour, IDamageable
             }
         }
 
-        // 이동 속도 파라미터
-        float dt = Time.deltaTime;
-        float vx = dt > 0f ? (transform.position.x - _lastPos.x) / dt : 0f;
-        SafeSetFloat(animParam_MoveSpeed, Mathf.Abs(vx));
+        if (animator && !string.IsNullOrEmpty(animParam_MoveSpeed))
+        {
+            float dt = Time.deltaTime;
+            float vx = dt > 0f ? (transform.position.x - _lastPos.x) / dt : 0f;
+            animator.SetFloat(animParam_MoveSpeed, Mathf.Abs(vx));
+        }
         _lastPos = transform.position;
     }
 
@@ -109,7 +120,6 @@ public class JangsanbeomClone : MonoBehaviour, IDamageable
                 float d = Mathf.Abs(player.position.x - transform.position.x);
                 if (d <= aggroRange)
                 {
-                    // 단순: 첫 슬롯 공격을 확률적으로 사용
                     if (Random.Range(0, 100) < 60) StartAttack(attacks[0]);
                 }
             }
@@ -120,11 +130,25 @@ public class JangsanbeomClone : MonoBehaviour, IDamageable
     public void FaceRight(bool right)
     {
         facingRight = right;
-        if (sr) sr.flipX = !right;
+
+        if (graphicsRoot != null)
+        {
+            var s = graphicsRoot.localScale;
+            float sign = right ? 1f : -1f;
+            // spriteFacesRight=false(=기본이 왼쪽)이면 좌우 반전 방향 한번 더 뒤집음
+            s.x = Mathf.Abs(s.x) * (spriteFacesRight ? sign : -sign);
+            graphicsRoot.localScale = s;
+        }
+        else if (sr != null)
+        {
+            // SpriteRenderer.flipX는 “왼쪽 보이도록 뒤집기”라서 기본 바라보는 방향에 따라 XOR
+            bool flipX = spriteFacesRight ? !right : right;
+            sr.flipX = flipX;
+        }
         else
         {
             foreach (var r in GetComponentsInChildren<SpriteRenderer>(true))
-                r.flipX = !right;
+                r.flipX = spriteFacesRight ? !right : right;
         }
     }
 
@@ -147,7 +171,7 @@ public class JangsanbeomClone : MonoBehaviour, IDamageable
             applyDamage = visualFake ? atk.Phase2_FakeDealsDamage : true;
         }
 
-        SafeSetTrigger(visualFake ? trig_AttackFake : trig_AttackReal);
+        if (animator) animator.SetTrigger(visualFake ? trig_AttackFake : trig_AttackReal);
 
         if (!useAnimationEvents)
         {
@@ -162,12 +186,7 @@ public class JangsanbeomClone : MonoBehaviour, IDamageable
         _busy = false;
     }
 
-    // ===== 애니메이션 이벤트 =====
-    // 클립에서 기존 이름(본체용)으로 쏴도 받게 포워딩
-    public void OnClawHitFrame() { OnCloneHitFrame(); }
-    public void OnClawFakeHitFrame() { OnCloneFakeHitFrame(); }
-
-    // 분신 전용 이벤트 이름
+    // --- Animation Events ---
     public void OnCloneHitFrame()
     {
         if (attacks == null || attacks.Count == 0) return;
@@ -197,7 +216,6 @@ public class JangsanbeomClone : MonoBehaviour, IDamageable
             set.Add(col);
             if (!string.IsNullOrEmpty(playerTag) && !col.CompareTag(playerTag)) continue;
 
-            // 패링 처리
             var pc = col.GetComponent<PlayerController>() ?? col.GetComponentInParent<PlayerController>() ?? col.GetComponentInChildren<PlayerController>();
             if (pc != null && pc.IsParrying)
             {
@@ -272,29 +290,7 @@ public class JangsanbeomClone : MonoBehaviour, IDamageable
 
     void Die()
     {
-        // 보상/페이즈 전환 같은 건 없음
         if (owner != null) owner.OnCloneDied(this);
         Destroy(gameObject);
-    }
-
-    // ===== Animator 안전 호출 유틸 =====
-    bool HasParam(string name, AnimatorControllerParameterType type)
-    {
-        if (!animator || string.IsNullOrEmpty(name)) return false;
-        foreach (var p in animator.parameters)
-            if (p.type == type && p.name == name) return true;
-        return false;
-    }
-    void SafeSetFloat(string name, float v)
-    {
-        if (HasParam(name, AnimatorControllerParameterType.Float)) animator.SetFloat(name, v);
-    }
-    void SafeSetBool(string name, bool v)
-    {
-        if (HasParam(name, AnimatorControllerParameterType.Bool)) animator.SetBool(name, v);
-    }
-    void SafeSetTrigger(string name)
-    {
-        if (HasParam(name, AnimatorControllerParameterType.Trigger)) animator.SetTrigger(name);
     }
 }

@@ -79,8 +79,7 @@ public class JangsanbeomClone : MonoBehaviour, IDamageable
             isMoving = Mathf.Abs(step) > 0.0001f;
         }
 
-        if (animator && !string.IsNullOrEmpty(animParam_MoveBool))
-            animator.SetBool(animParam_MoveBool, isMoving);
+        SafeSetBool(animParam_MoveBool, isMoving);
 
         // 플립
         if (Time.time - _lastFlipTime > flipCooldown)
@@ -95,12 +94,9 @@ public class JangsanbeomClone : MonoBehaviour, IDamageable
         }
 
         // 이동 속도 파라미터
-        if (animator && !string.IsNullOrEmpty(animParam_MoveSpeed))
-        {
-            float dt = Time.deltaTime;
-            float vx = dt > 0f ? (transform.position.x - _lastPos.x) / dt : 0f;
-            animator.SetFloat(animParam_MoveSpeed, Mathf.Abs(vx));
-        }
+        float dt = Time.deltaTime;
+        float vx = dt > 0f ? (transform.position.x - _lastPos.x) / dt : 0f;
+        SafeSetFloat(animParam_MoveSpeed, Mathf.Abs(vx));
         _lastPos = transform.position;
     }
 
@@ -151,7 +147,7 @@ public class JangsanbeomClone : MonoBehaviour, IDamageable
             applyDamage = visualFake ? atk.Phase2_FakeDealsDamage : true;
         }
 
-        if (animator) animator.SetTrigger(visualFake ? trig_AttackFake : trig_AttackReal);
+        SafeSetTrigger(visualFake ? trig_AttackFake : trig_AttackReal);
 
         if (!useAnimationEvents)
         {
@@ -166,7 +162,12 @@ public class JangsanbeomClone : MonoBehaviour, IDamageable
         _busy = false;
     }
 
-    // 애니메이션 이벤트에서 호출
+    // ===== 애니메이션 이벤트 =====
+    // 클립에서 기존 이름(본체용)으로 쏴도 받게 포워딩
+    public void OnClawHitFrame() { OnCloneHitFrame(); }
+    public void OnClawFakeHitFrame() { OnCloneFakeHitFrame(); }
+
+    // 분신 전용 이벤트 이름
     public void OnCloneHitFrame()
     {
         if (attacks == null || attacks.Count == 0) return;
@@ -196,11 +197,10 @@ public class JangsanbeomClone : MonoBehaviour, IDamageable
             set.Add(col);
             if (!string.IsNullOrEmpty(playerTag) && !col.CompareTag(playerTag)) continue;
 
-            // 패링 처리 (플레이어 컨트롤러가 있다면)
+            // 패링 처리
             var pc = col.GetComponent<PlayerController>() ?? col.GetComponentInParent<PlayerController>() ?? col.GetComponentInChildren<PlayerController>();
             if (pc != null && pc.IsParrying)
             {
-                // 보스와 동일한 호환성 리플렉션
                 TryAskPlayerToConsumeParry(pc, atk.Damage);
                 continue;
             }
@@ -255,7 +255,6 @@ public class JangsanbeomClone : MonoBehaviour, IDamageable
         return false;
     }
 
-
     IEnumerator TempShow(Sprite s, float dur)
     {
         if (!sr) yield break;
@@ -276,5 +275,26 @@ public class JangsanbeomClone : MonoBehaviour, IDamageable
         // 보상/페이즈 전환 같은 건 없음
         if (owner != null) owner.OnCloneDied(this);
         Destroy(gameObject);
+    }
+
+    // ===== Animator 안전 호출 유틸 =====
+    bool HasParam(string name, AnimatorControllerParameterType type)
+    {
+        if (!animator || string.IsNullOrEmpty(name)) return false;
+        foreach (var p in animator.parameters)
+            if (p.type == type && p.name == name) return true;
+        return false;
+    }
+    void SafeSetFloat(string name, float v)
+    {
+        if (HasParam(name, AnimatorControllerParameterType.Float)) animator.SetFloat(name, v);
+    }
+    void SafeSetBool(string name, bool v)
+    {
+        if (HasParam(name, AnimatorControllerParameterType.Bool)) animator.SetBool(name, v);
+    }
+    void SafeSetTrigger(string name)
+    {
+        if (HasParam(name, AnimatorControllerParameterType.Trigger)) animator.SetTrigger(name);
     }
 }

@@ -23,7 +23,7 @@ public class JangsanbeomBoss : MonoBehaviour
         public GameObject TelegraphPrefab;
         public float TelegraphTime = 0f;
         public float cloneSpawnOffsetX = 3.0f;   // 보스 x 기준 옆으로
-        public float cloneSpawnOffsetY = 0.0f;
+        public float cloneSpawnOffsetY = 0.71f;
         public bool DefaultFake = false;
         public Sprite FakeSprite;
         public float FakeSpriteDuration = 0.18f;
@@ -148,29 +148,27 @@ public class JangsanbeomBoss : MonoBehaviour
     float _lastKnownHp = -1f, _lastKnownMaxHp = -1f;
     float _healthPollInterval = 0.2f, _healthPollTimer = 0f;
 
-    // (네가 쓰던 최신 JangsanbeomBoss.cs 맨 윗부분/기존 내용 유지)
-    // ▼ 추가 필드만 붙이면 됨 (클래스 내부, 다른 필드들과 함께)
+    // ▼ Phase2 Clones
     [Header("Phase2 Clones")]
-    public JangsanbeomClone clonePrefab;   // 분신 프리팹(아래 2번 스크립트 붙은 오브젝트)
+    public bool lockCloneY = true;
+    public float cloneFixedY = 0.71f;
+    public JangsanbeomClone clonePrefab;   // 분신 프리팹
     public int maxClones = 1;              // 최대 동시 분신 수
     public float cloneSpawnCooldown = 6f;  // 분신 소환 쿨타임
     public float cloneSpawnRadius = 6f;    // 본체 기준 랜덤 스폰 반경
-    public int cloneInitialHp = 5;       // 분신 체력(낮게)
-    public bool cloneInheritFlip = true;  // 스폰 시 본체 바라보는 방향 따라갈지
+    public int cloneInitialHp = 5;         // 분신 체력(낮게)
+    public bool cloneInheritFlip = true;   // 스폰 시 본체 바라보는 방향 따라갈지
 
     float _cloneCooldownTimer = 0f;
     readonly List<JangsanbeomClone> _clones = new();
-
-
 
     // ▼ 분신 스폰 로직
     void TrySpawnCloneIfNeeded()
     {
         // 정리: null 로스트 제거
         for (int i = _clones.Count - 1; i >= 0; i--)
-        {
             if (_clones[i] == null) _clones.RemoveAt(i);
-        }
+
         if (_clones.Count >= maxClones) return;
         if (_cloneCooldownTimer > 0f) return;
         if (clonePrefab == null) return;
@@ -178,21 +176,20 @@ public class JangsanbeomBoss : MonoBehaviour
         // 스폰 위치: 본체 주변 원형 랜덤
         Vector2 basePos = transform.position;
         Vector2 spawnPos = basePos + UnityEngine.Random.insideUnitCircle.normalized * cloneSpawnRadius;
+        if (lockCloneY) spawnPos.y = cloneFixedY;
 
         var clone = Instantiate(clonePrefab, spawnPos, Quaternion.identity);
-        // 초기화: 플레이어 참조/공격 세트/확률 등 본체 설정을 복사
+
+        // 초기화: 플레이어/공격 세트/확률 등 복사
         clone.owner = this;
         clone.player = this.player;
         clone.enableFakePhase2 = this.enableFakePhase2;
         clone.fakeChancePhase2 = this.fakeChancePhase2;
-        clone.attacks = BuildPhase2AttackPoolForClone(); // 아래 함수
+        clone.attacks = BuildPhase2AttackPoolForClone();
         clone.maxHp = Mathf.Max(1, cloneInitialHp);
         clone.currentHp = clone.maxHp;
-        clone.allowDropRewards = false; // 분신은 보상 X
+        clone.allowDropRewards = false;
         if (cloneInheritFlip) clone.FaceRight(this.facingRight);
-
-        // (선택) 스폰 연출 트리거
-        // clone.PlaySpawnFx();
 
         _clones.Add(clone);
         _cloneCooldownTimer = cloneSpawnCooldown;
@@ -207,12 +204,11 @@ public class JangsanbeomBoss : MonoBehaviour
         return list;
     }
 
-    // 분신 사망 콜백(아래 2번 스크립트에서 호출)
+    // 분신 사망 콜백
     public void OnCloneDied(JangsanbeomClone who)
     {
         _clones.Remove(who);
     }
-
 
     void Reset()
     {
@@ -271,7 +267,7 @@ public class JangsanbeomBoss : MonoBehaviour
     {
         if (player == null) return;
 
-        // follow (2페이즈/인트로 동안은 이동 금지)
+        // follow(2페이즈 / 인트로 동안은 이동 금지)
         float dx = player.position.x - transform.position.x;
         bool isMoving = false;
         bool blockMove = busy || _phase2IntroPlaying || (_inPhase2 && lockMovementInPhase2);
@@ -286,17 +282,17 @@ public class JangsanbeomBoss : MonoBehaviour
             transform.position = p;
             isMoving = Mathf.Abs(p.x - prevX) > 0.0001f;
         }
+
+        // 2페이즈일 때만 분신 스폰 로직 돌리되, 이동 여부는 건드리지 말자
         if (_inPhase2 && !_phase2IntroPlaying)
         {
             if (_cloneCooldownTimer > 0f) _cloneCooldownTimer -= Time.deltaTime;
             TrySpawnCloneIfNeeded();
         }
-        else
-        {
-            isMoving = false;
-        }
 
-        if (animator && !string.IsNullOrEmpty(animParam_MoveBool)) SafeSetBool(animParam_MoveBool, isMoving);
+        // 애니 파라미터 세팅
+        if (animator && !string.IsNullOrEmpty(animParam_MoveBool))
+            SafeSetBool(animParam_MoveBool, isMoving);
 
         // flip
         if (Time.time - _lastFlipTime > flipCooldown)
@@ -339,11 +335,14 @@ public class JangsanbeomBoss : MonoBehaviour
 
         if (enforceVisualFlip) ApplyVisualFlipNow();
 
+        // ✅ 이동 잠금 상태면 Speed=0
+        bool blockMove = busy || _phase2IntroPlaying || (_inPhase2 && lockMovementInPhase2);
+
         if (animator && !string.IsNullOrEmpty(animParam_MoveSpeed))
         {
             float dt = Time.deltaTime;
-            float vx = dt > 0f ? (transform.position.x - _lastPosition.x) / dt : 0f;
-            animator.SetFloat(animParam_MoveSpeed, Mathf.Abs(vx));
+            float vx = (!blockMove && dt > 0f) ? (transform.position.x - _lastPosition.x) / dt : 0f;
+            SafeSetFloat(animParam_MoveSpeed, Mathf.Abs(vx));
         }
         _lastPosition = transform.position;
     }
@@ -727,6 +726,7 @@ public class JangsanbeomBoss : MonoBehaviour
             _originalPolyPaths.Add(paths);
         }
     }
+
     void ApplyFlipToPolygonColliders(bool faceRight)
     {
         for (int k = 0; k < _polyColliders.Count; k++)
@@ -747,15 +747,24 @@ public class JangsanbeomBoss : MonoBehaviour
         }
     }
 
+    // ---------- Safe Animator helpers ----------
     void SafeSetTrigger(string name)
     {
         if (!animator || string.IsNullOrEmpty(name)) return;
-        foreach (var p in animator.parameters) if (p.name == name && p.type == AnimatorControllerParameterType.Trigger) { animator.SetTrigger(name); return; }
+        foreach (var p in animator.parameters)
+            if (p.name == name && p.type == AnimatorControllerParameterType.Trigger) { animator.SetTrigger(name); return; }
     }
     void SafeSetBool(string name, bool val)
     {
         if (!animator || string.IsNullOrEmpty(name)) return;
-        foreach (var p in animator.parameters) if (p.name == name && p.type == AnimatorControllerParameterType.Bool) { animator.SetBool(name, val); return; }
+        foreach (var p in animator.parameters)
+            if (p.name == name && p.type == AnimatorControllerParameterType.Bool) { animator.SetBool(name, val); return; }
+    }
+    void SafeSetFloat(string name, float v)
+    {
+        if (!animator || string.IsNullOrEmpty(name)) return;
+        foreach (var p in animator.parameters)
+            if (p.name == name && p.type == AnimatorControllerParameterType.Float) { animator.SetFloat(name, v); return; }
     }
 
     void OnDrawGizmos()

@@ -14,8 +14,8 @@ GameObject:
   - component: {fileID: 7416866839839367655}
   - component: {fileID: 7981605130189176299}
   - component: {fileID: 5524862830917284306}
-  - component: {fileID: 5278687365429929430}
   - component: {fileID: 6828043349408605396}
+  - component: {fileID: 1160088556880770004}
   m_Layer: 6
   m_Name: JangsanbeomClone
   m_TagString: Boss
@@ -56,11 +56,17 @@ MonoBehaviour:
   animator: {fileID: 4547791149822455607}
   sr: {fileID: 7416866839839367655}
   rb: {fileID: 7981605130189176299}
+  graphicsRoot: {fileID: 0}
+  spriteFacesRight: 1
+  enforceVisualFlip: 1
+  flipTrigger: {fileID: 3916823305677708761}
+  flipPivot: {fileID: 6037677251377769617}
+  flipPivotDeadzone: 0.6
+  flipTriggerHysteresis: 0.05
+  flipCooldown: 0.1
   followSpeed: 2.2
   followMinDistanceX: 1.2
   aggroRange: 12
-  flipCooldown: 0.1
-  flipHysteresis: 0.05
   animParam_MoveBool: Move
   animParam_MoveSpeed: Speed
   trig_AttackReal: ClawExecute
@@ -226,26 +232,6 @@ BoxCollider2D:
   m_AutoTiling: 0
   m_Size: {x: 1, y: 1}
   m_EdgeRadius: 0
---- !u!114 &5278687365429929430
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2205647563620491776}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 6595de8451c986f4ea6cc678c78077b4, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  damage: 1
-  targetTag: Boss
-  targetLayerMask:
-    serializedVersion: 2
-    m_Bits: 128
-  owner: {fileID: 0}
-  destroyOnHit: 1
-  singleUse: 0
 --- !u!60 &6828043349408605396
 PolygonCollider2D:
   m_ObjectHideFlags: 0
@@ -376,6 +362,19 @@ PolygonCollider2D:
       - {x: 3.046875, y: -2.1289062}
       - {x: 3.0664062, y: -2.0898438}
   m_UseDelaunayMesh: 0
+--- !u!114 &1160088556880770004
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2205647563620491776}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5c9d6945d6180ad47b91e88a646ec676, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  owner: {fileID: 2750500252869842319}
 --- !u!1 &3793087244692076055
 GameObject:
   m_ObjectHideFlags: 0

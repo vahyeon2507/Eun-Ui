@@ -92,7 +92,6 @@ GameObject:
   - component: {fileID: 4289124929252179962}
   - component: {fileID: 1577382608492882019}
   - component: {fileID: 996999645668590922}
-  - component: {fileID: 3694277430368671812}
   - component: {fileID: 5754081757908428923}
   - component: {fileID: 4778396291792005674}
   m_Layer: 6
@@ -130,7 +129,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: acce9f3aef10763449dbe2d6b6bdfd01, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  player: {fileID: 0}
+  player: {fileID: 2186251996989526959, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
   animator: {fileID: 265008684467289856}
   spriteRenderer: {fileID: 4289124929252179962}
   rb: {fileID: 1577382608492882019}
@@ -177,6 +176,8 @@ MonoBehaviour:
     Lifetime: 0.12
     TelegraphPrefab: {fileID: 0}
     TelegraphTime: 0
+    cloneSpawnOffsetX: 3
+    cloneSpawnOffsetY: 0
     DefaultFake: 0
     FakeSprite: {fileID: 0}
     FakeSpriteDuration: 0
@@ -192,6 +193,8 @@ MonoBehaviour:
     Lifetime: 0.12
     TelegraphPrefab: {fileID: 0}
     TelegraphTime: 0
+    cloneSpawnOffsetX: 3
+    cloneSpawnOffsetY: 0
     DefaultFake: 0
     FakeSprite: {fileID: 0}
     FakeSpriteDuration: 0
@@ -208,6 +211,8 @@ MonoBehaviour:
     Lifetime: 0.12
     TelegraphPrefab: {fileID: 0}
     TelegraphTime: 0
+    cloneSpawnOffsetX: 3
+    cloneSpawnOffsetY: 0
     DefaultFake: 0
     FakeSprite: {fileID: 0}
     FakeSpriteDuration: 0
@@ -224,6 +229,8 @@ MonoBehaviour:
   trig_EnterPhase2: EnterPhase2
   phase2IntroInvulnerable: 1
   phase2IntroFallbackDuration: 1.5
+  lockCloneY: 1
+  cloneFixedY: 0.71
   clonePrefab: {fileID: 2750500252869842319, guid: 7a95fccb560d22f4eb4cdab81a73b158, type: 3}
   maxClones: 1
   cloneSpawnCooldown: 6
@@ -380,26 +387,6 @@ BoxCollider2D:
   m_AutoTiling: 0
   m_Size: {x: 1, y: 1}
   m_EdgeRadius: 0
---- !u!114 &3694277430368671812
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7272233421490376400}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 6595de8451c986f4ea6cc678c78077b4, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  damage: 1
-  targetTag: Boss
-  targetLayerMask:
-    serializedVersion: 2
-    m_Bits: 128
-  owner: {fileID: 0}
-  destroyOnHit: 1
-  singleUse: 0
 --- !u!114 &5754081757908428923
 MonoBehaviour:
   m_ObjectHideFlags: 0

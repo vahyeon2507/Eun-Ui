@@ -1,4 +1,4 @@
-using System.Collections;
+Ôªøusing System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
@@ -13,17 +13,22 @@ public class JangsanbeomClone : MonoBehaviour, IDamageable
     public SpriteRenderer sr;
     public Rigidbody2D rb;
 
-    [Header("Visual Flip")]
-    public Transform graphicsRoot;          // ¿÷¿∏∏È ¿Ã ∑Á∆Æ∏∏ ¡¬øÏ π›¿¸
-    [Tooltip("ø¯∫ª Ω∫«¡∂Û¿Ã∆Æ∞° °Æø¿∏•¬ °Ø¿ª πŸ∂Û∫∏¥¬∞°? (false∏È ±‚∫ª¿Ã øﬁ¬ )")]
+    [Header("Visual Flip (optional)")]
+    public Transform graphicsRoot;                 // ÎπÑÏõåÎèÑ OK. ÏûàÏúºÎ©¥ Ïó¨Í∏∞Îßå Ï¢åÏö∞Î∞òÏ†Ñ
     public bool spriteFacesRight = true;
+    public bool enforceVisualFlip = true;
+
+    [Header("Flip Trigger / Pivot (Î≥∏Ï≤¥ÏôÄ ÎèôÏùº)")]
+    public BoxCollider2D flipTrigger;             // ÏûêÏãù Î∞ïÏä§ ÏΩúÎùºÏù¥Îçî Ï∂îÏ≤ú
+    public Transform flipPivot;                   // ÏóÜÏúºÎ©¥ ÏûêÍ∏∞ transform.x ÏÇ¨Ïö©
+    public float flipPivotDeadzone = 0.6f;
+    public float flipTriggerHysteresis = 0.05f;
+    public float flipCooldown = 0.12f;
 
     [Header("Move/AI")]
     public float followSpeed = 2.2f;
     public float followMinDistanceX = 1.2f;
     public float aggroRange = 12f;
-    public float flipCooldown = 0.1f;
-    public float flipHysteresis = 0.05f;
 
     [Header("Animator params")]
     public string animParam_MoveBool = "Move";
@@ -34,7 +39,6 @@ public class JangsanbeomClone : MonoBehaviour, IDamageable
     [Header("Attacks")]
     public List<JangsanbeomBoss.AttackData> attacks = new();
     public bool useAnimationEvents = true;
-    [Tooltip("2∆‰¿Ã¡Ó ±‚¡ÿ: ∆‰¿Ã≈©µµ Ω«√º»≠«“¡ˆ")]
     public bool enableFakePhase2 = true;
     [Range(0f, 1f)] public float fakeChancePhase2 = 0.25f;
 
@@ -47,11 +51,20 @@ public class JangsanbeomClone : MonoBehaviour, IDamageable
     public int currentHp = 5;
     public bool allowDropRewards = false;
 
-    // state
+    // --- state ---
     bool facingRight = true;
     float _lastFlipTime = -10f;
     bool _busy = false;
     Vector3 _lastPos;
+
+    Vector3 _rootOriginalScale, _graphicsOriginalScale;
+    readonly List<PolygonCollider2D> _polys = new();
+    readonly List<Vector2[][]> _polyPaths = new();
+
+    // flip-trigger bookkeeping (child offset Î∞òÏ†ÑÏö©)
+    float _flipTriggerOriginalLocalX = 0f;
+    bool _flipTriggerIsChild = false;
+    int _prevTriggerSide = 0;
 
     void Reset()
     {
@@ -61,13 +74,43 @@ public class JangsanbeomClone : MonoBehaviour, IDamageable
         if (rb) { rb.bodyType = RigidbodyType2D.Kinematic; rb.simulated = true; }
     }
 
+    void Awake()
+    {
+        if (sr == null) sr = GetComponentInChildren<SpriteRenderer>();
+
+        _rootOriginalScale = transform.localScale; _rootOriginalScale.x = Mathf.Abs(_rootOriginalScale.x);
+        transform.localScale = _rootOriginalScale;
+
+        if (graphicsRoot != null)
+        {
+            _graphicsOriginalScale = graphicsRoot.localScale;
+            _graphicsOriginalScale.x = Mathf.Abs(_graphicsOriginalScale.x);
+            var s = graphicsRoot.localScale; s.x = Mathf.Abs(s.x); graphicsRoot.localScale = s;
+        }
+
+        if (flipTrigger)
+        {
+            _flipTriggerIsChild = flipTrigger.transform.IsChildOf(transform);
+            _flipTriggerOriginalLocalX = _flipTriggerIsChild ? flipTrigger.transform.localPosition.x : 0f;
+        }
+
+        CachePolyPaths();
+    }
+
     void Start()
     {
         if (player == null && owner != null) player = owner.player;
         _lastPos = transform.position;
 
-        // Ω∫∆˘ ¡˜»ƒ Ω√º± ∫∏¡§: «√∑π¿ÃæÓ ¬ ¿ª πŸ∂Û∫∏∞‘
+        // Ï¥àÍ∏∞ Î∞îÎùºÎ≥¥Îäî Î∞©Ìñ• Î≥¥Ï†ï
         if (player != null) FaceRight(player.position.x >= transform.position.x);
+
+        // ÌîåÎ¶Ω Î∞©Ìñ• ÌûàÏä§ÌÖåÎ¶¨ÏãúÏä§ Ï¥àÍ∏∞Ìôî
+        if (player != null)
+        {
+            float rel = player.position.x - GetFlipReferenceX();
+            _prevTriggerSide = (rel > flipTriggerHysteresis) ? 1 : (rel < -flipTriggerHysteresis ? -1 : 0);
+        }
 
         StartCoroutine(AI());
     }
@@ -76,6 +119,7 @@ public class JangsanbeomClone : MonoBehaviour, IDamageable
     {
         if (player == null) return;
 
+        // Ïù¥Îèô
         bool isMoving = false;
         float dx = player.position.x - transform.position.x;
         if (!_busy && Mathf.Abs(dx) > followMinDistanceX && Mathf.Abs(dx) < aggroRange)
@@ -84,31 +128,43 @@ public class JangsanbeomClone : MonoBehaviour, IDamageable
             var p = transform.position;
             p.x = Mathf.MoveTowards(p.x, player.position.x - Mathf.Sign(dx) * followMinDistanceX, step);
             transform.position = p;
-            isMoving = Mathf.Abs(p.x - _lastPos.x) > 0.0001f;
+            isMoving = Mathf.Abs(transform.position.x - _lastPos.x) > 0.0001f;
         }
+        SafeSetBool(animParam_MoveBool, isMoving);
 
-        if (animator && !string.IsNullOrEmpty(animParam_MoveBool))
-            animator.SetBool(animParam_MoveBool, isMoving);
-
-        // «√∏≥(¡ˆ≈Õ πÊ¡ˆ ƒ¥ŸøÓ ∆˜«‘)
+        // ÌîåÎ¶Ω Í≤∞Ï†ï (Ìä∏Î¶¨Í±∞ ‚Üí ÌîºÎ≤ó ‚Üí ÏûêÍ∏∞ ÏúÑÏπò Ïàú)
         if (Time.time - _lastFlipTime > flipCooldown)
         {
-            float rel = player.position.x - transform.position.x;
-            int cur = (rel > flipHysteresis) ? 1 : (rel < -flipHysteresis ? -1 : 0);
-            if (cur != 0 && ((cur > 0) != facingRight))
+            float refX = GetFlipReferenceX();
+            float rel = player.position.x - refX;
+
+            int cur = 0;
+            if (flipTrigger) cur = (rel > flipTriggerHysteresis) ? 1 : (rel < -flipTriggerHysteresis ? -1 : 0);
+            else if (flipPivot) cur = (rel > flipPivotDeadzone) ? 1 : (rel < -flipPivotDeadzone ? -1 : 0);
+            else cur = (rel > 0f) ? 1 : (rel < 0f ? -1 : 0);
+
+            if (cur != _prevTriggerSide && cur != 0)
             {
                 FaceRight(rel > 0f);
                 _lastFlipTime = Time.time;
             }
         }
 
-        if (animator && !string.IsNullOrEmpty(animParam_MoveSpeed))
-        {
-            float dt = Time.deltaTime;
-            float vx = dt > 0f ? (transform.position.x - _lastPos.x) / dt : 0f;
-            animator.SetFloat(animParam_MoveSpeed, Mathf.Abs(vx));
-        }
+        // ÏÜçÎèÑ ÌååÎùºÎØ∏ÌÑ∞(Í≥µÍ≤© Ï§ëÏóî 0)
+        float dt = Time.deltaTime;
+        float vx = (!_busy && dt > 0f) ? (transform.position.x - _lastPos.x) / dt : 0f;
+        SafeSetFloat(animParam_MoveSpeed, Mathf.Abs(vx));
+
         _lastPos = transform.position;
+    }
+
+    void LateUpdate()
+    {
+        // Î£®Ìä∏ XÎäî Ìï≠ÏÉÅ + Ïú†ÏßÄ
+        if (!Mathf.Approximately(transform.localScale.x, _rootOriginalScale.x))
+        { var s = transform.localScale; s.x = _rootOriginalScale.x; transform.localScale = s; }
+
+        if (enforceVisualFlip) ApplyVisualFlipNow();
     }
 
     IEnumerator AI()
@@ -127,31 +183,109 @@ public class JangsanbeomClone : MonoBehaviour, IDamageable
         }
     }
 
+    // -------- Flip helpers --------
+    float GetFlipReferenceX()
+    {
+        if (flipTrigger)
+        {
+            if (_flipTriggerIsChild)
+            {
+                float localX = _flipTriggerOriginalLocalX * (facingRight ? 1f : -1f);
+                Vector3 world = transform.TransformPoint(new Vector3(localX, flipTrigger.transform.localPosition.y, 0f));
+                return world.x;
+            }
+            return flipTrigger.bounds.center.x;
+        }
+        if (flipPivot) return flipPivot.position.x;
+        return transform.position.x;
+    }
+
     public void FaceRight(bool right)
     {
         facingRight = right;
+        transform.localScale = _rootOriginalScale;
 
+        // ÎπÑÏ£ºÏñº Î∞òÏ†Ñ
         if (graphicsRoot != null)
         {
-            var s = graphicsRoot.localScale;
-            float sign = right ? 1f : -1f;
-            // spriteFacesRight=false(=±‚∫ª¿Ã øﬁ¬ )¿Ã∏È ¡¬øÏ π›¿¸ πÊ«‚ «—π¯ ¥ı µ⁄¡˝¿Ω
-            s.x = Mathf.Abs(s.x) * (spriteFacesRight ? sign : -sign);
+            var s = _graphicsOriginalScale;
+            s.x = Mathf.Abs(_graphicsOriginalScale.x) * (spriteFacesRight ? (right ? 1f : -1f) : (right ? -1f : 1f));
             graphicsRoot.localScale = s;
+            if (sr) sr.flipX = false;
         }
-        else if (sr != null)
+        else if (sr != null) sr.flipX = spriteFacesRight ? !right : right;
+        else foreach (var r in GetComponentsInChildren<SpriteRenderer>(true))
+                r.flipX = spriteFacesRight ? !right : right;
+
+        // Ìè¥Î¶¨Í≥§ ÏΩúÎùºÏù¥Îçî Î∞òÏ†Ñ
+        ApplyFlipToPolys(right);
+
+        // child flipTriggerÏùò X Ïò§ÌîÑÏÖãÎèÑ Î∞òÏ†Ñ
+        if (flipTrigger && _flipTriggerIsChild)
         {
-            // SpriteRenderer.flipX¥¬ °∞øﬁ¬  ∫∏¿Ãµµ∑œ µ⁄¡˝±‚°±∂Ûº≠ ±‚∫ª πŸ∂Û∫∏¥¬ πÊ«‚ø° µ˚∂Û XOR
-            bool flipX = spriteFacesRight ? !right : right;
-            sr.flipX = flipX;
+            var lp = flipTrigger.transform.localPosition;
+            lp.x = _flipTriggerOriginalLocalX * (right ? 1f : -1f);
+            flipTrigger.transform.localPosition = lp;
+        }
+
+        // ÌûàÏä§ÌÖåÎ¶¨ÏãúÏä§ Í∏∞Ï§Ä ÏóÖÎç∞Ïù¥Ìä∏
+        float relAfter = player ? (player.position.x - GetFlipReferenceX()) : 0f;
+        _prevTriggerSide = (relAfter > flipTriggerHysteresis) ? 1 : (relAfter < -flipTriggerHysteresis ? -1 : 0);
+    }
+
+    void ApplyVisualFlipNow()
+    {
+        if (graphicsRoot != null)
+        {
+            float wantX = facingRight ? Mathf.Abs(_graphicsOriginalScale.x) : -Mathf.Abs(_graphicsOriginalScale.x);
+            if (!Mathf.Approximately(graphicsRoot.localScale.x, wantX))
+            { var s = _graphicsOriginalScale; s.x = wantX; graphicsRoot.localScale = s; }
         }
         else
         {
-            foreach (var r in GetComponentsInChildren<SpriteRenderer>(true))
-                r.flipX = spriteFacesRight ? !right : right;
+            if (sr != null) sr.flipX = spriteFacesRight ? !facingRight : facingRight;
+            else foreach (var r in GetComponentsInChildren<SpriteRenderer>(true))
+                    r.flipX = spriteFacesRight ? !facingRight : facingRight;
         }
     }
 
+    void CachePolyPaths()
+    {
+        _polys.Clear(); _polyPaths.Clear();
+        foreach (var p in GetComponentsInChildren<PolygonCollider2D>(true))
+        {
+            _polys.Add(p);
+            int pc = p.pathCount;
+            var paths = new Vector2[pc][];
+            for (int i = 0; i < pc; i++)
+            {
+                var src = p.GetPath(i);
+                var cp = new Vector2[src.Length];
+                System.Array.Copy(src, cp, src.Length);
+                paths[i] = cp;
+            }
+            _polyPaths.Add(paths);
+        }
+    }
+    void ApplyFlipToPolys(bool faceRight)
+    {
+        for (int k = 0; k < _polys.Count; k++)
+        {
+            var poly = _polys[k]; if (!poly) continue;
+            var orig = _polyPaths[k]; poly.pathCount = orig.Length;
+            bool mirror = !faceRight;
+            for (int i = 0; i < orig.Length; i++)
+            {
+                var src = orig[i];
+                var dst = new Vector2[src.Length];
+                if (!mirror) System.Array.Copy(src, dst, src.Length);
+                else { for (int j = 0; j < src.Length; j++) dst[j] = new Vector2(-src[j].x, src[j].y); System.Array.Reverse(dst); }
+                poly.SetPath(i, dst);
+            }
+        }
+    }
+
+    // -------- Attack / Events --------
     void StartAttack(JangsanbeomBoss.AttackData atk)
     {
         if (_busy) return;
@@ -171,7 +305,7 @@ public class JangsanbeomClone : MonoBehaviour, IDamageable
             applyDamage = visualFake ? atk.Phase2_FakeDealsDamage : true;
         }
 
-        if (animator) animator.SetTrigger(visualFake ? trig_AttackFake : trig_AttackReal);
+        SafeSetTrigger(visualFake ? trig_AttackFake : trig_AttackReal);
 
         if (!useAnimationEvents)
         {
@@ -186,7 +320,6 @@ public class JangsanbeomClone : MonoBehaviour, IDamageable
         _busy = false;
     }
 
-    // --- Animation Events ---
     public void OnCloneHitFrame()
     {
         if (attacks == null || attacks.Count == 0) return;
@@ -245,7 +378,7 @@ public class JangsanbeomClone : MonoBehaviour, IDamageable
         Vector2 off = atk.Offset; off.x *= dir;
         float rad = (atk.Angle * dir) * Mathf.Deg2Rad;
         float c = Mathf.Cos(rad), s = Mathf.Sin(rad);
-        Vector2 rot = new Vector2(off.x * c - off.y * s, off.x * s + off.y * c);
+        Vector2 rot = new(off.x * c - off.y * s, off.x * s + off.y * c);
         return origin + rot;
     }
 
@@ -292,5 +425,25 @@ public class JangsanbeomClone : MonoBehaviour, IDamageable
     {
         if (owner != null) owner.OnCloneDied(this);
         Destroy(gameObject);
+    }
+
+    // ---- Safe Animator helpers ----
+    void SafeSetTrigger(string name)
+    {
+        if (!animator || string.IsNullOrEmpty(name)) return;
+        foreach (var p in animator.parameters)
+            if (p.name == name && p.type == AnimatorControllerParameterType.Trigger) { animator.SetTrigger(name); return; }
+    }
+    void SafeSetBool(string name, bool val)
+    {
+        if (!animator || string.IsNullOrEmpty(name)) return;
+        foreach (var p in animator.parameters)
+            if (p.name == name && p.type == AnimatorControllerParameterType.Bool) { animator.SetBool(name, val); return; }
+    }
+    void SafeSetFloat(string name, float v)
+    {
+        if (!animator || string.IsNullOrEmpty(name)) return;
+        foreach (var p in animator.parameters)
+            if (p.name == name && p.type == AnimatorControllerParameterType.Float) { animator.SetFloat(name, v); return; }
     }
 }

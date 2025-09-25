@@ -125,6 +125,13 @@ public class JangsanbeomBoss : MonoBehaviour
     [Tooltip("애니 이벤트가 없다면 이 시간으로 폴백(초). 0이면 즉시 종료 X")]
     public float phase2IntroFallbackDuration = 1.5f;
 
+    // ---------- Dash / Animation Locks ----------
+    [Header("Dash / Animation Locks")]
+    public string trig_Dash = "Dash";   // 애니메이터에 동일 이름 트리거 생성해서 사용
+    bool _dashActive = false;
+    bool _animLockMove = false;         // 애니메이션으로 이동 잠금
+    bool _animLockFlip = false;         // 애니메이션으로 플립 잠금
+
     // internals
     Vector3 _rootOriginalScale, _graphicsOriginalScale;
     float _lastFlipTime = -10f;
@@ -270,7 +277,7 @@ public class JangsanbeomBoss : MonoBehaviour
         // follow(2페이즈 / 인트로 동안은 이동 금지)
         float dx = player.position.x - transform.position.x;
         bool isMoving = false;
-        bool blockMove = busy || _phase2IntroPlaying || (_inPhase2 && lockMovementInPhase2);
+        bool blockMove = busy || _phase2IntroPlaying || (_inPhase2 && lockMovementInPhase2) || _animLockMove;
 
         if (!blockMove && Mathf.Abs(dx) > followMinDistanceX && Mathf.Abs(dx) < aggroRange)
         {
@@ -283,7 +290,7 @@ public class JangsanbeomBoss : MonoBehaviour
             isMoving = Mathf.Abs(p.x - prevX) > 0.0001f;
         }
 
-        // 2페이즈일 때만 분신 스폰 로직 돌리되, 이동 여부는 건드리지 말자
+        // 2페이즈일 때만 분신 스폰 로직
         if (_inPhase2 && !_phase2IntroPlaying)
         {
             if (_cloneCooldownTimer > 0f) _cloneCooldownTimer -= Time.deltaTime;
@@ -294,8 +301,8 @@ public class JangsanbeomBoss : MonoBehaviour
         if (animator && !string.IsNullOrEmpty(animParam_MoveBool))
             SafeSetBool(animParam_MoveBool, isMoving);
 
-        // flip
-        if (Time.time - _lastFlipTime > flipCooldown)
+        // flip (애니 락 중이면 비활성화)
+        if (!_animLockFlip && (Time.time - _lastFlipTime > flipCooldown))
         {
             if (flipTrigger)
             {
@@ -336,7 +343,7 @@ public class JangsanbeomBoss : MonoBehaviour
         if (enforceVisualFlip) ApplyVisualFlipNow();
 
         // ✅ 이동 잠금 상태면 Speed=0
-        bool blockMove = busy || _phase2IntroPlaying || (_inPhase2 && lockMovementInPhase2);
+        bool blockMove = busy || _phase2IntroPlaying || (_inPhase2 && lockMovementInPhase2) || _animLockMove;
 
         if (animator && !string.IsNullOrEmpty(animParam_MoveSpeed))
         {
@@ -607,7 +614,7 @@ public class JangsanbeomBoss : MonoBehaviour
         busy = false;
     }
 
-    // 애니 이벤트 훅
+    // 애니 이벤트 훅 (클로 공격)
     public void OnClawHitFrame()
     {
         var pool = BuildCurrentAttackPool(); if (pool.Count > 0) PerformAttackOnce(pool[0], true);
@@ -620,7 +627,7 @@ public class JangsanbeomBoss : MonoBehaviour
     void PerformAttackOnce(AttackData atk, bool applyDamage)
     {
         if (!applyDamage) return;
-        if (_invulnerable) return; // 변신 중엔 보스 공격 자체를 묶고 싶으면 유지
+        if (_invulnerable) return; // 변신/무적 중엔 공격 무시(원하면 제거)
 
         if (playerLayer == 0) { Debug.LogWarning("[Boss] playerLayer not set."); return; }
 
@@ -765,6 +772,45 @@ public class JangsanbeomBoss : MonoBehaviour
         if (!animator || string.IsNullOrEmpty(name)) return;
         foreach (var p in animator.parameters)
             if (p.name == name && p.type == AnimatorControllerParameterType.Float) { animator.SetFloat(name, v); return; }
+    }
+
+    // ===== Animation Events: Dash / Locks / I-Frames / Relative motion =====
+    public void Anim_DashStart() { _dashActive = true; _animLockMove = true; _animLockFlip = true; busy = true; }
+    public void Anim_DashEnd() { _dashActive = false; _animLockMove = false; _animLockFlip = false; busy = false; }
+
+    public void Anim_SetMoveLock(int on) { _animLockMove = (on != 0); }
+    public void Anim_SetFlipLock(int on) { _animLockFlip = (on != 0); }
+
+    public void Anim_InvulnOn() { _invulnerable = true; }
+    public void Anim_InvulnOff() { _invulnerable = false; }
+
+    // spec: "dx,dy[,local|world][,face]"
+    public void Anim_MoveBy(string spec)
+    {
+        if (string.IsNullOrEmpty(spec)) return;
+        string[] p = spec.Split(',');
+        if (p.Length < 2) return;
+
+        float dx = 0f, dy = 0f;
+        float.TryParse(p[0], out dx);
+        float.TryParse(p[1], out dy);
+
+        bool useLocal = false;
+        bool useFacingSign = false;
+
+        for (int i = 2; i < p.Length; i++)
+        {
+            string s = p[i].Trim().ToLowerInvariant();
+            if (s == "local") useLocal = true;
+            else if (s == "world") useLocal = false;
+            else if (s == "face" || s == "signed") useFacingSign = true;
+        }
+
+        if (useFacingSign) dx *= (facingRight ? 1f : -1f);
+
+        Vector3 delta = new Vector3(dx, dy, 0f);
+        if (useLocal) transform.position = transform.TransformPoint(delta);
+        else transform.position += delta;
     }
 
     void OnDrawGizmos()

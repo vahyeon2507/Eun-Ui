@@ -76,7 +76,7 @@ public class PlayerController : MonoBehaviour, IDamageable
     public MonoBehaviour healthComponent; // optional
 
     [Header("Debug / UI")]
-    public bool showParryDebugUI = true; // 인게임 OnGUI로 카운트/상태 표시
+    public bool showParryDebugUI = false; // 인게임 OnGUI로 카운트/상태 표시 (기본값 false로 변경)
     public Vector2 parryDebugPosition = new Vector2(10, 10);
     public GUIStyle parryDebugStyle;
 
@@ -367,9 +367,6 @@ public class PlayerController : MonoBehaviour, IDamageable
     // --------------------------------------------------------
     public bool ConsumeHitboxIfParrying(object hitInfo = null)
     {
-        // 디버그 로그 - 호출 및 현재 상태 확인
-        Debug.Log($"[Player] ConsumeHitboxIfParrying called. isParrying={isParrying}, isInvulnerable={isInvulnerable}, hitInfo={hitInfo}");
-
         if (isInvulnerable) return true;
 
         if (isParrying)
@@ -384,7 +381,6 @@ public class PlayerController : MonoBehaviour, IDamageable
             {
                 if (_recentlyConsumedHitIds.Contains(hitId))
                 {
-                    Debug.Log($"[Player] Hit already consumed (id={hitId})");
                     return true;
                 }
 
@@ -400,7 +396,6 @@ public class PlayerController : MonoBehaviour, IDamageable
             // 실제 패링 성공 처리 (카운트 증가 등)
             parrySuccessCount++;
             lastParrySuccessTime = Time.time;
-            Debug.Log($"[Player] Parry success #{parrySuccessCount}");
 
             // 잠깐 무적(중복 히트 방지)
             StartCoroutine(TemporaryInvul(0.06f));
@@ -436,7 +431,7 @@ public class PlayerController : MonoBehaviour, IDamageable
             if (consumed) return;
         }
 
-        Debug.Log($"[Player] Took {amount} damage.");
+        // Debug.Log($"[Player] Took {amount} damage."); // 디버그 로그 제거
         if (healthComponent != null)
         {
             var mi = healthComponent.GetType().GetMethod("TakeDamage");
@@ -452,7 +447,6 @@ public class PlayerController : MonoBehaviour, IDamageable
     IEnumerator TriggerParrySpecial()
     {
         parrySpecialLocked = true;
-        Debug.Log("[Player] ParrySpecial triggered!");
         if (animator != null) animator.SetTrigger(animParrySpecialTrigger);
 
         // 스페셜 타격은 애니메이션 이벤트(OnParrySpecialHit)에서 처리

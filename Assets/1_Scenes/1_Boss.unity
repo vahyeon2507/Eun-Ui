@@ -8866,6 +8866,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 5754081757908428923, guid: 705886ff133db74468b31e30d18bf1b0, type: 3}
+      propertyPath: hpBar
+      value: 
+      objectReference: {fileID: 1384591960}
     - target: {fileID: 7272233421490376400, guid: 705886ff133db74468b31e30d18bf1b0, type: 3}
       propertyPath: m_Name
       value: Boss_Jangsanbeom
@@ -8910,7 +8914,7 @@ PrefabInstance:
     - target: {fileID: 1407434714894907121, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
       propertyPath: healthBar
       value: 
-      objectReference: {fileID: 0}
+      objectReference: {fileID: 1962588413}
     - target: {fileID: 2186251996989526959, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
       propertyPath: m_LocalPosition.x
       value: -7

@@ -6,9 +6,9 @@ using TMPro;
 
 public class Title : MonoBehaviour
 {
-    [SerializeField] private Transform imageParent; // ImageBackGround ¿ÀºêÁ§Æ®
-    [SerializeField] private TMP_Text titleText;    // TitleText ¿ÀºêÁ§Æ®
-    [SerializeField] private TMP_Text openingText;  // OpeningText ¿ÀºêÁ§Æ®
+    [SerializeField] private Transform imageParent; // ImageBackGround ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®
+    [SerializeField] private TMP_Text titleText;    // TitleText ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®
+    [SerializeField] private TMP_Text openingText;  // OpeningText ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®
     [SerializeField] private string nextSceneName = "GameScene";
     [SerializeField] private float fadeDuration = 1.0f;
 
@@ -19,11 +19,17 @@ public class Title : MonoBehaviour
     {
         images = imageParent.GetComponentsInChildren<Image>(true);
 
-        // ¸ðµç ÀÌ¹ÌÁö¿Í ÅØ½ºÆ® Åõ¸íÇÏ°Ô ÃÊ±âÈ­
+        // ï¿½ï¿½ï¿½ ï¿½Ì¹ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ø½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½ï¿½Ï°ï¿½ ï¿½Ê±ï¿½È­
         foreach (var img in images)
             img.color = new Color(1, 1, 1, 0);
         SetTextAlpha(titleText, 0f);
         SetTextAlpha(openingText, 0f);
+
+        // BGM ìž¬ìƒ (AudioManagerê°€ ìžˆë‹¤ë©´)
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlayBGM("TitleBGM", true);
+        }
 
         StartCoroutine(FadeAll(0f, 1f, () => isWaitingForInput = true));
     }
@@ -33,6 +39,13 @@ public class Title : MonoBehaviour
         if (isWaitingForInput && (Input.anyKeyDown || Input.GetMouseButtonDown(0)))
         {
             isWaitingForInput = false;
+            
+            // ê²Œìž„ ì”¬ìœ¼ë¡œ ì „í™˜í•  ë•Œ BGM ë³€ê²½
+            if (AudioManager.Instance != null)
+            {
+                AudioManager.Instance.PlayBGM("GameBGM", true);
+            }
+            
             StartCoroutine(FadeAll(1f, 0f, () => SceneManager.LoadScene(nextSceneName)));
         }
     }

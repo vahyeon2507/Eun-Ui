@@ -5,23 +5,23 @@ using UnityEngine.UI;
 
 public class GameManager : MonoBehaviour
 {
-    [Header("¸ŞÀÎ ¸Ş´º UI")]
+    [Header("ë©”ì¸ ë©”ë‰´ UI")]
     [SerializeField] private GameObject menuPanel;
     [SerializeField] private Button restartButton;
     [SerializeField] private Button continueButton;
     [SerializeField] private Button quitButton;
     [SerializeField] private Button settingsButton;
 
-    [Header("¼³Á¤ ¸Ş´º UI")]
+    [Header("ì„¤ì • ë©”ë‰´ UI")]
     [SerializeField] private GameObject settingsPanel;
-    [SerializeField] private GameObject[] settingPanels;   // ¿Àµğ¿À, ÇØ»óµµ, ±×·¡ÇÈ, Å° ¼¼ÆÃ µî ÆĞ³Îµé
+    [SerializeField] private GameObject[] settingPanels;   // ì‚¬ìš´ë“œ, í•´ìƒë„, ê·¸ë˜í”½, í‚¤ ì„¤ì • ë“± íŒ¨ë„
 
-    [Header("UI ¿¬Ãâ °ü·Ã")]
+    [Header("UI ì• ë‹ˆë©”ì´ì…˜ ì„¤ì •")]
     [SerializeField] private UIAnimator menuAnimator;
     [SerializeField] private UIAnimator settingsAnimator;
     [SerializeField] private UIDim dim;
 
-
+    [Header("Audio")]
     [SerializeField] private Slider soundSlider;
     [SerializeField] private TMP_Dropdown resolutionDropdown;
 
@@ -47,7 +47,7 @@ public class GameManager : MonoBehaviour
         soundSlider.onValueChanged.AddListener(OnSoundChanged);
         resolutionDropdown.onValueChanged.AddListener(OnResolutionChanged);
 
-        // ÇØ»óµµ ¿É¼Ç 3°³·Î °íÁ¤
+        // í•´ìƒë„ ì˜µì…˜ 3ê°€ì§€ ì¶”ê°€
         resolutionDropdown.ClearOptions();
         var options = new System.Collections.Generic.List<string>
         {
@@ -57,10 +57,13 @@ public class GameManager : MonoBehaviour
         };
         resolutionDropdown.AddOptions(options);
 
-        soundSlider.value = 1f; // »ç¿îµå ±âº»°ª 100%
-        AudioListener.volume = 1f; // ½ÇÁ¦ º¼·ıµµ 100%
+        // AudioManagerì™€ ì—°ë™
+        if (soundSlider != null)
+        {
+            soundSlider.value = AudioManager.Instance != null ? AudioManager.Instance.masterVolume : 1f;
+        }
 
-        // ±âº»À¸·Î Ã¹ ¹øÂ° ÅÇ ÄÑ±â (¿¹: ¿Àµğ¿À ÆĞ³Î)
+        // ê¸°ë³¸ì ìœ¼ë¡œ ì²« ë²ˆì§¸ íƒ­ ì¼œê¸° (ì˜ˆ: ì‚¬ìš´ë“œ íŒ¨ë„)
         if (settingPanels.Length > 0)
             OpenPanel(0);
     }
@@ -71,22 +74,24 @@ public class GameManager : MonoBehaviour
         {
             if (settingsPanel.activeSelf)
             {
-                settingsAnimator.Hide();   // ¼³Á¤ ÆĞ³Î ´İ±â
-                menuAnimator.Show();       // ¸Ş´º ´Ù½Ã ¿­±â
+                settingsAnimator.Hide();   // ì„¤ì • íŒ¨ë„ ë‹«ê¸°
+                menuAnimator.Show();       // ë©”ë‰´ ë‹¤ì‹œ ë³´ì´ê¸°
             }
-            else if (isMenuOpen) // ÀÌ¹Ì ¸Ş´º ¿­·Á ÀÖÀ¸¸é ´İ±â
+            else if (isMenuOpen) // ì´ë¯¸ ë©”ë‰´ ì—´ë¦° ìƒíƒœë©´ ë‹«ê¸°
             {
                 isMenuOpen = false;
-                menuAnimator.Hide();   // menuPanel.SetActive(false) ´ë½Å
+                menuAnimator.Hide();   // menuPanel.SetActive(false) ëŒ€ì‹ 
                 dim.HideDim();
                 Time.timeScale = 1;
+                AudioManager.Instance?.OnGamePause(false);
             }
-            else // ¸Ş´º°¡ ´İÇô ÀÖÀ¸¸é ¿­±â
+            else // ë©”ë‰´ê°€ ë‹«íŒ ìƒíƒœë©´ ì—´ê¸°
             {
                 isMenuOpen = true;
-                menuAnimator.Show();   // menuPanel.SetActive(true) ´ë½Å
+                menuAnimator.Show();   // menuPanel.SetActive(true) ëŒ€ì‹ 
                 dim.ShowDim();
                 Time.timeScale = 0;
+                AudioManager.Instance?.OnGamePause(true);
             }
         }
 
@@ -101,9 +106,10 @@ public class GameManager : MonoBehaviour
     void OnContinue()
     {
         isMenuOpen = false;
-        menuAnimator.Hide();   // menuPanel.SetActive(false) ´ë½Å
+        menuAnimator.Hide();   // menuPanel.SetActive(false) ëŒ€ì‹ 
         dim.HideDim();
         Time.timeScale = 1;
+        AudioManager.Instance?.OnGamePause(false);
     }
 
 
@@ -118,7 +124,7 @@ public class GameManager : MonoBehaviour
         settingsPanel.SetActive(true);
     }
 
-    // Inspector¿¡¼­ ¹öÆ° OnClick¿¡ Á÷Á¢ ¿¬°áÇÒ ÇÔ¼ö
+    // Inspectorì—ì„œ ë²„íŠ¼ OnClickì— ì—°ê²° ì‚¬ìš©í•  í•¨ìˆ˜
     public void OpenPanel(int index)
     {
         for (int i = 0; i < settingPanels.Length; i++)
@@ -129,7 +135,10 @@ public class GameManager : MonoBehaviour
 
     void OnSoundChanged(float value)
     {
-        AudioListener.volume = value;
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.SetMasterVolume(value);
+        }
     }
 
     void OnResolutionChanged(int index)

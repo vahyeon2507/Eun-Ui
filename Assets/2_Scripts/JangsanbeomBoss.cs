@@ -128,7 +128,7 @@ public class JangsanbeomBoss : MonoBehaviour
     // ---------- Dash / Animation Locks ----------
     [Header("Dash / Animation Locks")]
     public string trig_Dash = "Dash";   // 애니메이터에 동일 이름 트리거 생성해서 사용
-    bool _dashActive = false;
+    // bool _dashActive = false; // 사용하지 않는 변수 - 주석 처리
     bool _animLockMove = false;         // 애니메이션으로 이동 잠금
     bool _animLockFlip = false;         // 애니메이션으로 플립 잠금
 
@@ -402,6 +402,12 @@ public class JangsanbeomBoss : MonoBehaviour
     {
         if (debugFlip) Debug.Log("[Boss] Entering Phase 2!");
 
+        // 2페이즈 BGM 전환
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlayPhase2BGM();
+        }
+
         // **핵심**: 인트로 맵을 켜기 전에 Phase2 플래그를 true로 먼저 설정
         _inPhase2 = true;
 
@@ -629,6 +635,10 @@ public class JangsanbeomBoss : MonoBehaviour
         if (!applyDamage) return;
         if (_invulnerable) return; // 변신/무적 중엔 공격 무시(원하면 제거)
 
+        // 보스 공격 사운드 재생
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlayBossAttack();
+
         if (playerLayer == 0) { Debug.LogWarning("[Boss] playerLayer not set."); return; }
 
         Vector2 center = GetAttackWorldPos(atk);
@@ -775,8 +785,8 @@ public class JangsanbeomBoss : MonoBehaviour
     }
 
     // ===== Animation Events: Dash / Locks / I-Frames / Relative motion =====
-    public void Anim_DashStart() { _dashActive = true; _animLockMove = true; _animLockFlip = true; busy = true; }
-    public void Anim_DashEnd() { _dashActive = false; _animLockMove = false; _animLockFlip = false; busy = false; }
+    public void Anim_DashStart() { /* _dashActive = true; */ _animLockMove = true; _animLockFlip = true; busy = true; }
+    public void Anim_DashEnd() { /* _dashActive = false; */ _animLockMove = false; _animLockFlip = false; busy = false; }
 
     public void Anim_SetMoveLock(int on) { _animLockMove = (on != 0); }
     public void Anim_SetFlipLock(int on) { _animLockFlip = (on != 0); }

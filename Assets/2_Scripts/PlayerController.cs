@@ -165,6 +165,9 @@ public class PlayerController : MonoBehaviour, IDamageable
         {
             if (canDash && !isDashing && !isParrying && !isAttacking && attackLockTimer <= 0f)
             {
+                // 대시 사운드 재생
+                if (AudioManager.Instance != null)
+                    AudioManager.Instance.PlayPlayerDash();
                 StartCoroutine(DoDash());
             }
         }
@@ -173,6 +176,9 @@ public class PlayerController : MonoBehaviour, IDamageable
         {
             if (canParry && !isParrying && !isDashing && attackLockTimer <= 0f)
             {
+                // 패링 사운드 재생
+                if (AudioManager.Instance != null)
+                    AudioManager.Instance.PlayPlayerParry();
                 StartCoroutine(DoParry());
             }
         }
@@ -182,6 +188,9 @@ public class PlayerController : MonoBehaviour, IDamageable
             bool grounded = Physics2D.OverlapCircle(groundCheck.position, groundCheckRadius, groundLayer);
             if (grounded && !isDashing && !isParrying)
             {
+                // 점프 사운드 재생
+                if (AudioManager.Instance != null)
+                    AudioManager.Instance.PlayPlayerJump();
                 Vector2 v = rb.linearVelocity;
                 v.y = jumpForce;
                 rb.linearVelocity = v;
@@ -284,6 +293,10 @@ public class PlayerController : MonoBehaviour, IDamageable
 
         if (attackPoint == null) { Debug.LogWarning("[PlayerController] attackPoint null"); return; }
 
+        // 공격 사운드 재생
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlayPlayerAttack();
+
         Collider2D[] hits = Physics2D.OverlapCircleAll(attackPoint.position, range, enemyLayer);
         foreach (var col in hits)
         {
@@ -315,7 +328,18 @@ public class PlayerController : MonoBehaviour, IDamageable
     {
         canDash = false;
         isDashing = true;
-        if (animator != null) animator.SetTrigger(animDashTrigger);
+        if (animator != null) 
+        {
+            // 안전한 트리거 설정
+            foreach (var param in animator.parameters)
+            {
+                if (param.name == animDashTrigger && param.type == AnimatorControllerParameterType.Trigger)
+                {
+                    animator.SetTrigger(animDashTrigger);
+                    break;
+                }
+            }
+        }
 
         float elapsed = 0f;
         float dir = isFacingRight ? 1f : -1f;
@@ -348,7 +372,18 @@ public class PlayerController : MonoBehaviour, IDamageable
     {
         canParry = false;
         isParrying = true;
-        if (animator != null) animator.SetTrigger(animParryTrigger);
+        if (animator != null) 
+        {
+            // 안전한 트리거 설정
+            foreach (var param in animator.parameters)
+            {
+                if (param.name == animParryTrigger && param.type == AnimatorControllerParameterType.Trigger)
+                {
+                    animator.SetTrigger(animParryTrigger);
+                    break;
+                }
+            }
+        }
 
         float elapsed = 0f;
         while (elapsed < parryWindow)
@@ -435,6 +470,10 @@ public class PlayerController : MonoBehaviour, IDamageable
             bool consumed = ConsumeHitboxIfParrying(null);
             if (consumed) return;
         }
+
+        // 피격 사운드 재생
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlayPlayerHurt();
 
         Debug.Log($"[Player] Took {amount} damage.");
         if (healthComponent != null)

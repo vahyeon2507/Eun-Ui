@@ -187,9 +187,26 @@ public class JangsanbeomBoss : MonoBehaviour
     public GameObject clonePrefab;
     public int maxClones = 1;
     public float cloneSpawnCooldown = 6f;
-    public float cloneSpawnRadius = 6f;
+    public float cloneSpawnRadius = 6f; // (원랜덤 스폰에서 쓰던 값, 유지)
     public int cloneInitialHp = 5;
     public bool cloneInheritFlip = true;
+
+    // ====== One-Shot Clone 추가 설정 ======
+    [Header("One-Shot Clone Config")]
+    [Tooltip("원샷 분신 사용 여부(페이드인→한 번 공격→페이드아웃)")]
+    public bool useOneShotClones = true;
+    [Tooltip("플레이어 바로 앞(보스 쪽)으로 띄울 X 오프셋")]
+    public float oneShotFrontOffsetX = 1.2f;
+    [Tooltip("등장 페이드 인 시간")]
+    public float oneShotFadeIn = 0.12f;
+    [Tooltip("공격 전 아주 짧은 딜레이(텔레그래프 대용)")]
+    public float oneShotPreDelay = 0.06f;
+    [Tooltip("공격 후 제거까지 대기")]
+    public float oneShotDespawnDelay = 0.05f;
+    [Tooltip("사라질 때 페이드 아웃 시간")]
+    public float oneShotFadeOut = 0.18f;
+    [Tooltip("스폰 시 원보스의 바라보는 방향을 상속")]
+    public bool oneShotInheritFlip = true;
 
     float _cloneCooldownTimer = 0f;
     readonly List<JangsanbeomClone> _clones = new();   // 프로젝트에 존재하는 타입 그대로 유지
@@ -306,9 +323,9 @@ public class JangsanbeomBoss : MonoBehaviour
 
         // 스폰 호출부 1차 가드
         if (_inPhase2 && !_phase2IntroPlaying
-    && allowCloneSpawns
-    && maxClones > 0
-    && clonePrefab != null)
+            && allowCloneSpawns
+            && maxClones > 0
+            && clonePrefab != null)
         {
             if (_cloneCooldownTimer > 0f) _cloneCooldownTimer -= Time.deltaTime;
             TrySpawnCloneIfNeeded();
@@ -947,10 +964,13 @@ public class JangsanbeomBoss : MonoBehaviour
         if (_clones.Count >= maxClones) return;
         if (_cloneCooldownTimer > 0f) return;
 
-        // 스폰 위치
+        // === 스폰 위치: 플레이어 "바로 앞"(보스 방향 쪽) ===
         Vector2 basePos = transform.position;
-        Vector2 spawnPos = basePos + UnityEngine.Random.insideUnitCircle.normalized * cloneSpawnRadius;
-        if (lockCloneY) spawnPos.y = cloneFixedY;
+        float dirToBoss = Mathf.Sign(transform.position.x - player.position.x); // 플레이어에서 보스 쪽(+/-1)
+        Vector2 spawnPos = new Vector2(
+            player.position.x + dirToBoss * oneShotFrontOffsetX,
+            lockCloneY ? cloneFixedY : basePos.y
+        );
 
         // 생성
         var go = Instantiate(clonePrefab, spawnPos, Quaternion.identity);
@@ -974,12 +994,31 @@ public class JangsanbeomBoss : MonoBehaviour
             if (cloneInheritFlip) cloneBoss.FlipTo(this.facingRight);
         }
 
-        // 관리
-        var jsbClone = go.GetComponent<JangsanbeomClone>();  // 있다면 리스트에 보관
+        // 관리 리스트(있다면)
+        var jsbClone = go.GetComponent<JangsanbeomClone>();
         if (jsbClone != null) _clones.Add(jsbClone);
+
+        // === 원샷 분신 모드 부착 ===
+        if (useOneShotClones)
+        {
+            var oneShot = go.GetComponent<JangsanbeomOneShotClone>();
+            if (!oneShot) oneShot = go.AddComponent<JangsanbeomOneShotClone>();
+
+            oneShot.Init(
+                owner: this,
+                selfBoss: cloneBoss,
+                player: this.player,
+                preDelay: oneShotPreDelay,
+                fadeIn: oneShotFadeIn,
+                fadeOut: oneShotFadeOut,
+                despawnDelay: oneShotDespawnDelay,
+                inheritFlip: oneShotInheritFlip
+            );
+        }
 
         _cloneCooldownTimer = cloneSpawnCooldown;
     }
+
     List<AttackData> BuildPhase2AttackPoolForClone()
     {
         var list = new List<AttackData>(8);
@@ -990,7 +1029,3 @@ public class JangsanbeomBoss : MonoBehaviour
 
     public void OnCloneDied(JangsanbeomClone who) { _clones.Remove(who); }
 }
-
-
-// ====== 간단 마커 컴포넌트(클론 라이트 모드 설정) ======
-

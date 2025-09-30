@@ -65,6 +65,45 @@ public class JangsanbeomClone : MonoBehaviour, IDamageable
     bool _flipTriggerIsChild = false;
     int _prevTriggerSide = 0;
 
+    bool _animLockMove, _animLockFlip, _invuln;
+
+    public void EVT_DashStart() { _animLockMove = true; _animLockFlip = true; }
+    public void EVT_DashEnd() { _animLockMove = false; _animLockFlip = false; }
+
+    public void EVT_MoveBy(string spec)
+    {
+        // 보스랑 동일 규칙으로 이동시키고 싶으면 보스의 파서를 재사용하거나,
+        // 여기서 간단히 처리해도 됩니다. 가장 간단한 버전:
+        // spec: "dx,dy[,local|world][,face]"
+        if (string.IsNullOrEmpty(spec)) return;
+        var p = spec.Split(',');
+        if (p.Length < 2) return;
+        float dx = float.Parse(p[0]); float dy = float.Parse(p[1]);
+        bool useLocal = false, useFacing = false;
+        for (int i = 2; i < p.Length; i++)
+        {
+            var s = p[i].Trim().ToLowerInvariant();
+            if (s == "local") useLocal = true;
+            else if (s == "world") useLocal = false;
+            else if (s == "face" || s == "signed") useFacing = true;
+        }
+        if (useFacing) dx *= (/*clone의 바라보는 방향*/ transform.localScale.x >= 0 ? 1f : -1f);
+        var delta = new Vector3(dx, dy, 0);
+        if (useLocal) transform.position = transform.TransformPoint(delta);
+        else transform.position += delta;
+    }
+
+    public void EVT_DashHit()
+    {
+        // ★ 보스의 대쉬 히트 로직을 그대로 재사용 (원점은 클론)
+        owner?.PerformAttackOnceFrom(owner.dashAttack, this.transform, true);
+    }
+
+    // (옵션) 필요하면 락/무적도 구현
+    public void EVT_SetMoveLock(bool on) { _animLockMove = on; }
+    public void EVT_SetFlipLock(bool on) { _animLockFlip = on; }
+    public void EVT_Invuln(bool on) { _invuln = on; }
+
     void Reset()
     {
         animator = GetComponent<Animator>();

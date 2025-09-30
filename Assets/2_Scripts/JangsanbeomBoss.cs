@@ -8,6 +8,15 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public class JangsanbeomBoss : MonoBehaviour
 {
+
+    [Header("Clone / Light Mode")]
+    public bool allowCloneSpawns = true;  // 기본은 원본 보스: true, 클론은 false로 바꿈
+    public bool isCloneInstance = false;  // 클론 여부 표시(디버그용)
+
+
+
+
+
     [Serializable]
     public class AttackData
     {
@@ -37,6 +46,18 @@ public class JangsanbeomBoss : MonoBehaviour
         public bool Phase2_FakeDealsDamage = true;
     }
 
+    // ---------- Dash Attack ----------
+    [Header("Dash Attack")]
+    public AttackData dashAttack;
+
+    public void OnDashHitFrame()
+    {
+        if (debugDamage) Debug.Log("[Boss] OnDashHitFrame()");
+        if (dashAttack != null) { PerformAttackOnce(dashAttack, true); return; }
+        var pool = BuildCurrentAttackPool();
+        if (pool.Count > 0) PerformAttackOnce(pool[0], true);
+    }
+
     // ---------- Refs ----------
     [Header("Refs")]
     public Transform player;
@@ -51,10 +72,13 @@ public class JangsanbeomBoss : MonoBehaviour
     public float CurrentHealth = 100f;
     [Range(0f, 1f)] public float Phase2HealthThreshold = 0.66f;
 
+    [Header("Damage Gates")]
+    public bool requirePlayerTag = false;
+    public bool blockOutgoingDamageWhileInvuln = false;
+    public bool debugDamage = false;
+
     [Header("Map Roots")]
-    public GameObject Phase1MapRoot;
-    public GameObject Phase2IntroMapRoot;
-    public GameObject Phase2MapRoot;
+    public GameObject Phase1MapRoot, Phase2IntroMapRoot, Phase2MapRoot;
 
     [Header("Phase 2 Positioning")]
     public Transform phase2CenterPoint;
@@ -63,12 +87,12 @@ public class JangsanbeomBoss : MonoBehaviour
     public bool lockMovementInPhase2 = true;
 
     [Header("Player detection (no hitbox prefab)")]
-    public LayerMask playerLayer;
+    public LayerMask playerLayer;          // 비워두면(0) AllLayers로 검색
     public string playerTag = "Player";
 
     // ---------- Flip ----------
     [Header("Visual & Flip")]
-    public Transform graphicsRoot;          // ← 애니메이션은 여기에 키 찍는 걸 권장
+    public Transform graphicsRoot;         // 애니메이션용 노드(Animator가 보통 여기)
     public BoxCollider2D flipTrigger;
     public Transform flipPivot;
     public float flipPivotDeadzone = 0.6f;
@@ -80,10 +104,12 @@ public class JangsanbeomBoss : MonoBehaviour
     public bool enforceVisualFlip = true;
     public bool debugFlip = false;
 
+    [Header("Orientation")]
+    [Tooltip("원본 스프라이트 기본이 오른쪽이면 true, 왼쪽이면 false")]
+    public bool spriteFacesRight = true;
+
     [Header("Facing (bounds-based)")]
-    [Tooltip("이 콜라이더의 가로 범위를 기준으로, 플레이어가 범위 바깥에 있으면 강제 플립")]
     public Collider2D bodyCollider;
-    [Tooltip("바깥 판정을 느슨하게 하는 마진(월드 단위)")]
     public float faceOutsideMarginX = 0.2f;
 
     // ---------- Movement / AI ----------
@@ -158,309 +184,302 @@ public class JangsanbeomBoss : MonoBehaviour
     [Header("Phase2 Clones")]
     public bool lockCloneY = true;
     public float cloneFixedY = 0.71f;
-    public JangsanbeomClone clonePrefab;   // 분신 프리팹
-    public int maxClones = 1;              // 최대 동시 분신 수
-    public float cloneSpawnCooldown = 6f;  // 분신 소환 쿨타임(초)
-    public float cloneSpawnRadius = 6f;    // 본체 기준 랜덤 스폰 반경
-    public int cloneInitialHp = 5;         // 분신 체력
-    public bool cloneInheritFlip = true;   // 스폰 시 본체 바라보는 방향 따라갈지
+    public GameObject clonePrefab;
+    public int maxClones = 1;
+    public float cloneSpawnCooldown = 6f;
+    public float cloneSpawnRadius = 6f;
+    public int cloneInitialHp = 5;
+    public bool cloneInheritFlip = true;
 
     float _cloneCooldownTimer = 0f;
     readonly List<JangsanbeomClone> _clones = new();
 
-    // ===== [ADD] Phase2 Clones: methods =====
-
-    // 분신 스폰 시도
-    void TrySpawnCloneIfNeeded()
-    {
-        // null 정리
-        for (int i = _clones.Count - 1; i >= 0; i--)
-            if (_clones[i] == null) _clones.RemoveAt(i);
-
-        if (_clones.Count >= maxClones) return;
-        if (_cloneCooldownTimer > 0f) return;
-        if (clonePrefab == null) return;
-
-        // 스폰 위치: 본체 주변 원형 랜덤
-        Vector2 basePos = transform.position;
-        Vector2 spawnPos = basePos + UnityEngine.Random.insideUnitCircle.normalized * cloneSpawnRadius;
-        if (lockCloneY) spawnPos.y = cloneFixedY;
-
-        var clone = Instantiate(clonePrefab, spawnPos, Quaternion.identity);
-
-        // 초기 세팅 복사
-        clone.owner = this;
-        clone.player = this.player;
-        clone.enableFakePhase2 = this.enableFakePhase2;
-        clone.fakeChancePhase2 = this.fakeChancePhase2;
-        clone.attacks = BuildPhase2AttackPoolForClone();
-        clone.maxHp = Mathf.Max(1, cloneInitialHp);
-        clone.currentHp = clone.maxHp;
-        clone.allowDropRewards = false;
-        if (cloneInheritFlip) clone.FaceRight(this.facingRight);
-
-        _clones.Add(clone);
-        _cloneCooldownTimer = cloneSpawnCooldown;
-    }
-
-    // 분신이 사용할 공격 풀(2페이즈 허용된 것만)
-    List<AttackData> BuildPhase2AttackPoolForClone()
-    {
-        var list = new List<AttackData>(8);
-        foreach (var a in attacksPhase2) if (a != null && a.AllowInPhase2) list.Add(a);
-        foreach (var a in attacksPhase1) if (a != null && a.AllowInPhase2) list.Add(a);
-        return list;
-    }
-
-    // 분신 사망 콜백 (Clone.Die에서 호출)
-    public void OnCloneDied(JangsanbeomClone who)
-    {
-        _clones.Remove(who);
-    }
-
+    // ---------- Unity ----------
     void Reset()
     {
         spriteRenderer = GetComponentInChildren<SpriteRenderer>();
-        animator = GetComponent<Animator>();
+        animator = GetComponentInChildren<Animator>();
         rb = GetComponent<Rigidbody2D>();
     }
 
+    // JangsanbeomBoss.cs (추가)
+    public void PerformAttackOnceFrom(AttackData atk, Transform originOverride, bool applyDamage)
+    {
+        if (atk == null) return;
+        var bak = atk.OriginOverride;
+        atk.OriginOverride = originOverride;
+        PerformAttackOnce(atk, applyDamage);
+        atk.OriginOverride = bak;
+    }
+
+
     void Awake()
     {
-        if (spriteRenderer == null) spriteRenderer = GetComponentInChildren<SpriteRenderer>();
-        if (animator == null) animator = GetComponent<Animator>();
-        if (rb == null) rb = GetComponent<Rigidbody2D>();
-        if (rb) { rb.bodyType = RigidbodyType2D.Kinematic; rb.simulated = true; }
-
-        _rootOriginalScale = transform.localScale;
-        _rootOriginalScale.x = Mathf.Abs(_rootOriginalScale.x);
-        transform.localScale = _rootOriginalScale;
-
-        if (graphicsRoot)
+        var cloneCfg = GetComponent<BossCloneConfig>();
+        if (cloneCfg != null)
         {
-            _graphicsOriginalScale = graphicsRoot.localScale;
-            _graphicsOriginalScale.x = Mathf.Abs(_graphicsOriginalScale.x);
-            var s = graphicsRoot.localScale; s.x = Mathf.Abs(s.x); graphicsRoot.localScale = s;
-        }
+            isCloneInstance = true;
 
-        if (flipTrigger)
-        {
-            _flipTriggerIsChild = flipTrigger.transform.IsChildOf(transform);
-            _flipTriggerOriginalLocalX = _flipTriggerIsChild ? flipTrigger.transform.localPosition.x : 0f;
-        }
+            // 분신 완전 차단
+            allowCloneSpawns = !cloneCfg.disableCloneSpawns;
+            maxClones = 0;               // 안전망
+            clonePrefab = null;          // 안전망
 
-        CachePolygonColliderPaths();
-    }
-
-    void Start()
-    {
-        if (player == null) Debug.LogWarning("[Boss] player reference not set!");
-
-        aiCoroutine = StartCoroutine(AIBehavior());
-        _lastPosition = transform.position;
-
-        UpdateHealthCacheImmediate();
-        UpdatePhaseFlagsFromHealth();
-        ApplyPhaseMapRoots(false);
-
-        if (player != null)
-        {
-            float rel = (flipTrigger != null) ? player.position.x - GetFlipTriggerWorldX()
-                       : (flipPivot ? player.position.x - flipPivot.position.x
-                                    : player.position.x - transform.position.x);
-            _prevTriggerSide = (rel > flipTriggerHysteresis) ? 1 : (rel < -flipTriggerHysteresis ? -1 : 0);
-        }
-    }
-
-    void Update()
-    {
-        if (player == null) return;
-
-        ForceFaceWhenPlayerOutsideBounds();
-
-        // follow
-        float dx = player.position.x - transform.position.x;
-        bool isMoving = false;
-        bool blockMove = busy || _phase2IntroPlaying || (_inPhase2 && lockMovementInPhase2) || _animLockMove;
-
-        if (!blockMove && Mathf.Abs(dx) > followMinDistanceX && Mathf.Abs(dx) < aggroRange)
-        {
-            float step = followSpeed * Time.deltaTime;
-            float prevX = transform.position.x;
-            var p = transform.position;
-            p.x = Mathf.MoveTowards(transform.position.x,
-                player.position.x - Mathf.Sign(dx) * followMinDistanceX, step);
-            transform.position = p;
-            isMoving = Mathf.Abs(p.x - prevX) > 0.0001f;
-        }
-
-        if (_inPhase2 && !_phase2IntroPlaying)
-        {
-            if (_cloneCooldownTimer > 0f) _cloneCooldownTimer -= Time.deltaTime;
-            TrySpawnCloneIfNeeded();
-        }
-
-        if (animator && !string.IsNullOrEmpty(animParam_MoveBool))
-            SafeSetBool(animParam_MoveBool, isMoving);
-
-        // ▼ 바운즈 기반 강제 바라보기(콜라이더 바깥에 있을 때 즉시 플립)
-        ForceFaceWhenPlayerOutsideBounds();
-
-        if (!_animLockFlip && (Time.time - _lastFlipTime > flipCooldown))
-        {
-            if (player != null && bodyCollider != null)
+            // 2페이즈/인트로 차단(원하는 정도에 맞춰)
+            if (cloneCfg.disablePhase2)
             {
-                var b = bodyCollider.bounds;
-                b.Expand(new Vector3(faceOutsideMarginX * 2f, 0f, 0f));
-                bool insideBodyX = (player.position.x >= b.min.x && player.position.x <= b.max.x);
+                // 2페이즈로 내려가지 않도록 임계치를 0으로 내림(혹은 로직에서 무시)
+                Phase2HealthThreshold = -1f;
+            }
+            if (cloneCfg.disablePhase2Intro)
+            {
+                phase2IntroInvulnerable = false;
+                phase2IntroFallbackDuration = 0f;
+            }
 
-                if (insideBodyX) // 스프라이트가 겹칠 정도로 가까움 → 안쪽 레일 사용
+            // HP 낮추기
+            MaxHealth = Mathf.Max(1, cloneCfg.cloneMaxHp);
+            CurrentHealth = MaxHealth;
+ 
+        }
+
+
+            if (spriteRenderer == null) spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+            if (animator == null) animator = GetComponentInChildren<Animator>();
+            if (rb == null) rb = GetComponent<Rigidbody2D>();
+            if (rb) { rb.bodyType = RigidbodyType2D.Kinematic; rb.simulated = true; }
+
+            _rootOriginalScale = transform.localScale;
+            _rootOriginalScale.x = Mathf.Abs(_rootOriginalScale.x);
+            transform.localScale = _rootOriginalScale;
+
+            if (graphicsRoot)
+            {
+                _graphicsOriginalScale = graphicsRoot.localScale;
+                _graphicsOriginalScale.x = Mathf.Abs(_graphicsOriginalScale.x);
+                var s = graphicsRoot.localScale; s.x = Mathf.Abs(s.x); graphicsRoot.localScale = s;
+            }
+
+            if (flipTrigger)
+            {
+                _flipTriggerIsChild = flipTrigger.transform.IsChildOf(transform);
+                _flipTriggerOriginalLocalX = _flipTriggerIsChild ? flipTrigger.transform.localPosition.x : 0f;
+            }
+
+
+
+            CachePolygonColliderPaths();
+        }
+
+        void Start()
+        {
+            if (player == null) Debug.LogWarning("[Boss] player reference not set!");
+
+            aiCoroutine = StartCoroutine(AIBehavior());
+            _lastPosition = transform.position;
+
+            UpdateHealthCacheImmediate();
+            UpdatePhaseFlagsFromHealth();
+            ApplyPhaseMapRoots(false);
+
+            if (player != null)
+            {
+                float rel = (flipTrigger != null) ? player.position.x - GetFlipTriggerWorldX()
+                           : (flipPivot ? player.position.x - flipPivot.position.x
+                                        : player.position.x - transform.position.x);
+                _prevTriggerSide = (rel > flipTriggerHysteresis) ? 1 : (rel < -flipTriggerHysteresis ? -1 : 0);
+
+                FlipTo(player.position.x >= transform.position.x);
+            }
+        }
+
+        void Update()
+        {
+            if (player == null) return;
+
+            ForceFaceWhenPlayerOutsideBounds();
+
+            // follow
+            float dx = player.position.x - transform.position.x;
+            bool isMoving = false;
+            bool blockMove = busy || _phase2IntroPlaying || (_inPhase2 && lockMovementInPhase2) || _animLockMove;
+
+            if (!blockMove && Mathf.Abs(dx) > followMinDistanceX && Mathf.Abs(dx) < aggroRange)
+            {
+                float step = followSpeed * Time.deltaTime;
+                float prevX = transform.position.x;
+                var p = transform.position;
+                p.x = Mathf.MoveTowards(transform.position.x,
+                    player.position.x - Mathf.Sign(dx) * followMinDistanceX, step);
+                transform.position = p;
+                isMoving = Mathf.Abs(p.x - prevX) > 0.0001f;
+            }
+
+            if (_inPhase2 && !_phase2IntroPlaying && allowCloneSpawns)
+            {
+                if (_cloneCooldownTimer > 0f) _cloneCooldownTimer -= Time.deltaTime;
+                TrySpawnCloneIfNeeded();
+            }
+
+            if (animator && !string.IsNullOrEmpty(animParam_MoveBool))
+                SafeSetBool(animParam_MoveBool, isMoving);
+
+            // 근접(안쪽 레일) 히스테리시스 플립
+            if (!_animLockFlip && (Time.time - _lastFlipTime > flipCooldown))
+            {
+                if (player != null && bodyCollider != null)
                 {
-                    if (flipTrigger) // 전용 자식 박스(뒤로 약간 물린)를 기준으로 스위칭
+                    var b = bodyCollider.bounds;
+                    b.Expand(new Vector3(faceOutsideMarginX * 2f, 0f, 0f));
+                    bool insideBodyX = (player.position.x >= b.min.x && player.position.x <= b.max.x);
+
+                    if (insideBodyX)
                     {
-                        float triggerX = GetFlipTriggerWorldX();
-                        float rel = player.position.x - triggerX;
-                        int cur = (rel > flipTriggerHysteresis) ? 1 : (rel < -flipTriggerHysteresis ? -1 : 0);
-                        if (cur != 0 && cur != _prevTriggerSide)
+                        if (flipTrigger)
                         {
-                            FlipTo(rel > 0f);
-                            _lastFlipTime = Time.time;
+                            float triggerX = GetFlipTriggerWorldX();
+                            float rel = player.position.x - triggerX;
+                            int cur = (rel > flipTriggerHysteresis) ? 1 : (rel < -flipTriggerHysteresis ? -1 : 0);
+                            if (cur != 0 && cur != _prevTriggerSide)
+                            {
+                                FlipTo(rel > 0f);
+                                _lastFlipTime = Time.time;
+                            }
                         }
-                    }
-                    else if (flipPivot) // 전용 박스가 없다면 보조 피벗 사용(옵션)
-                    {
-                        float rel = player.position.x - flipPivot.position.x;
-                        int cur = (rel > flipPivotDeadzone) ? 1 : (rel < -flipPivotDeadzone ? -1 : 0);
-                        if (cur != 0 && cur != _prevTriggerSide)
+                        else if (flipPivot)
                         {
-                            FlipTo(rel > 0f);
-                            _lastFlipTime = Time.time;
+                            float rel = player.position.x - flipPivot.position.x;
+                            int cur = (rel > flipPivotDeadzone) ? 1 : (rel < -flipPivotDeadzone ? -1 : 0);
+                            if (cur != 0 && cur != _prevTriggerSide)
+                            {
+                                FlipTo(rel > 0f);
+                                _lastFlipTime = Time.time;
+                            }
                         }
-                    }
-                    else
-                    {
-                        // 최후의 보루: 자기 중심 기준(덜 자연스러움)
-                        float rel = player.position.x - transform.position.x;
-                        int cur = (rel > 0f) ? 1 : (rel < 0f ? -1 : 0);
-                        if (cur != _prevTriggerSide)
+                        else
                         {
-                            FlipTo(rel > 0f);
-                            _lastFlipTime = Time.time;
+                            float rel = player.position.x - transform.position.x;
+                            int cur = (rel > 0f) ? 1 : (rel < 0f ? -1 : 0);
+                            if (cur != _prevTriggerSide)
+                            {
+                                FlipTo(rel > 0f);
+                                _lastFlipTime = Time.time;
+                            }
                         }
                     }
                 }
-                // insideBodyX가 아니면 바깥 레일이 이미 처리함(ForceFaceWhenPlayerOutsideBounds에서 즉시 플립)
+            }
+
+            // health poll
+            _healthPollTimer -= Time.deltaTime;
+            if (_healthPollTimer <= 0f)
+            {
+                _healthPollTimer = _healthPollInterval;
+                UpdateHealthCacheImmediate();
+                UpdatePhaseFlagsFromHealth();
             }
         }
 
-        // health poll
-        _healthPollTimer -= Time.deltaTime;
-        if (_healthPollTimer <= 0f)
+        void LateUpdate()
         {
-            _healthPollTimer = _healthPollInterval;
-            UpdateHealthCacheImmediate();
-            UpdatePhaseFlagsFromHealth();
-        }
-    }
+            if (enforceVisualFlip) ApplyVisualFlipNow();
 
-    void LateUpdate()
-    {
-        // ❌ 루트 X 스케일 강제 복구 제거 (애니메이션 스케일 보존)
-        // if (transform.localScale.x != _rootOriginalScale.x)
-        // { var s = transform.localScale; s.x = _rootOriginalScale.x; transform.localScale = s; }
+            bool blockMove = busy || _phase2IntroPlaying || (_inPhase2 && lockMovementInPhase2) || _animLockMove;
 
-        if (enforceVisualFlip) ApplyVisualFlipNow();
-
-        bool blockMove = busy || _phase2IntroPlaying || (_inPhase2 && lockMovementInPhase2) || _animLockMove;
-
-        if (animator && !string.IsNullOrEmpty(animParam_MoveSpeed))
-        {
-            float dt = Time.deltaTime;
-            float vx = (!blockMove && dt > 0f) ? (transform.position.x - _lastPosition.x) / dt : 0f;
-            SafeSetFloat(animParam_MoveSpeed, Mathf.Abs(vx));
-        }
-        _lastPosition = transform.position;
-    }
-
-    // ---------- Phase ----------
-    void UpdateHealthCacheImmediate()
-    {
-        if (bossHealthComponent != null)
-        {
-            float c = TryGetFloatMember(bossHealthComponent, "CurrentHp", "currentHp", "CurrentHP", "currentHP", "hp", "HP", "cur", "current");
-            float m = TryGetFloatMember(bossHealthComponent, "MaxHp", "maxHp", "MaxHP", "maxHP", "maxHealth", "MaxHealth", "HPMax");
-            if (!float.IsNaN(c)) CurrentHealth = c;
-            if (!float.IsNaN(m) && m > 0f) MaxHealth = m;
-        }
-        CurrentHealth = Mathf.Clamp(CurrentHealth, 0f, Mathf.Max(1f, MaxHealth));
-        _lastKnownHp = CurrentHealth; _lastKnownMaxHp = MaxHealth;
-    }
-    float TryGetFloatMember(object obj, params string[] names)
-    {
-        if (obj == null) return float.NaN;
-        var t = obj.GetType();
-        foreach (var n in names)
-        {
-            var pi = t.GetProperty(n, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            if (pi != null && (pi.PropertyType == typeof(float) || pi.PropertyType == typeof(double) || pi.PropertyType == typeof(int)))
+            if (animator && !string.IsNullOrEmpty(animParam_MoveSpeed))
             {
-                var v = pi.GetValue(obj);
-                if (v is float f) return f; if (v is double d) return (float)d; if (v is int i) return i;
+                float dt = Time.deltaTime;
+                float vx = (!blockMove && dt > 0f) ? (transform.position.x - _lastPosition.x) / dt : 0f;
+                SafeSetFloat(animParam_MoveSpeed, Mathf.Abs(vx));
             }
-            var fi = t.GetField(n, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            if (fi != null && (fi.FieldType == typeof(float) || fi.FieldType == typeof(double) || fi.FieldType == typeof(int)))
-            {
-                var v = fi.GetValue(obj);
-                if (v is float f2) return f2; if (v is double d2) return (float)d2; if (v is int i2) return i2;
-            }
+            _lastPosition = transform.position;
         }
-        return float.NaN;
-    }
 
-    void UpdatePhaseFlagsFromHealth()
-    {
-        if (MaxHealth <= 0f) return;
-        float perc = CurrentHealth / MaxHealth;
-        bool goPhase2 = perc <= Phase2HealthThreshold;
-        if (goPhase2 && !_inPhase2) EnterPhase2();
-        _inPhase2 = goPhase2;
-    }
-
-    void EnterPhase2()
-    {
-        if (debugFlip) Debug.Log("[Boss] Entering Phase 2!");
-        _inPhase2 = true;
-
-        if (teleportToCenterOnPhase2)
+        // ---------- Phase ----------
+        void UpdateHealthCacheImmediate()
         {
-            Vector3 target = phase2CenterPoint ? phase2CenterPoint.position
-                                               : new Vector3(phase2CenterFallback.x, phase2CenterFallback.y, transform.position.z);
-            transform.position = target;
-            if (rb != null)
+            if (bossHealthComponent != null)
             {
+                float c = TryGetFloatMember(bossHealthComponent, "CurrentHp", "currentHp", "CurrentHP", "currentHP", "hp", "HP", "cur", "current");
+                float m = TryGetFloatMember(bossHealthComponent, "MaxHp", "maxHp", "MaxHP", "maxHP", "maxHealth", "MaxHealth", "HPMax");
+                if (!float.IsNaN(c)) CurrentHealth = c;
+                if (!float.IsNaN(m) && m > 0f) MaxHealth = m;
+            }
+            CurrentHealth = Mathf.Clamp(CurrentHealth, 0f, Mathf.Max(1f, MaxHealth));
+            _lastKnownHp = CurrentHealth; _lastKnownMaxHp = MaxHealth;
+        }
+        float TryGetFloatMember(object obj, params string[] names)
+        {
+            if (obj == null) return float.NaN;
+            var t = obj.GetType();
+            foreach (var n in names)
+            {
+                var pi = t.GetProperty(n, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                if (pi != null && (pi.PropertyType == typeof(float) || pi.PropertyType == typeof(double) || pi.PropertyType == typeof(int)))
+                {
+                    var v = pi.GetValue(obj);
+                    if (v is float f) return f; if (v is double d) return (float)d; if (v is int i) return i;
+                }
+                var fi = t.GetField(n, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                if (fi != null && (fi.FieldType == typeof(float) || fi.FieldType == typeof(double) || fi.FieldType == typeof(int)))
+                {
+                    var v = fi.GetValue(obj);
+                    if (v is float f2) return f2; if (v is double d2) return (float)d2; if (v is int i2) return i2;
+                }
+            }
+            return float.NaN;
+        }
+
+        void UpdatePhaseFlagsFromHealth()
+        {
+            if (MaxHealth <= 0f) return;
+            float perc = CurrentHealth / MaxHealth;
+            bool goPhase2 = perc <= Phase2HealthThreshold;
+            if (goPhase2 && !_inPhase2) EnterPhase2();
+            _inPhase2 = goPhase2;
+        }
+
+        void EnterPhase2()
+        {
+            if (debugFlip) Debug.Log("[Boss] Entering Phase 2!");
+            _inPhase2 = true;
+
+            if (teleportToCenterOnPhase2)
+            {
+                Vector3 target = phase2CenterPoint ? phase2CenterPoint.position
+                                                   : new Vector3(phase2CenterFallback.x, phase2CenterFallback.y, transform.position.z);
+                transform.position = target;
+                if (rb != null)
+                {
 #if UNITY_2022_3_OR_NEWER
-                rb.linearVelocity = Vector2.zero;
+                    rb.linearVelocity = Vector2.zero;
 #else
                 rb.velocity = Vector2.zero;
 #endif
+                }
             }
+
+            _phase2IntroPlaying = true;
+            if (phase2IntroInvulnerable) _invulnerable = true;
+            ApplyPhaseMapRoots(true);
+            SafeSetTrigger(trig_EnterPhase2);
+
+            if (phase2IntroFallbackDuration > 0f)
+                StartCoroutine(Phase2IntroFallback(phase2IntroFallbackDuration));
         }
 
-        _phase2IntroPlaying = true;
-        if (phase2IntroInvulnerable) _invulnerable = true;
-        ApplyPhaseMapRoots(true);
-        SafeSetTrigger(trig_EnterPhase2);
-
-        if (phase2IntroFallbackDuration > 0f)
-            StartCoroutine(Phase2IntroFallback(phase2IntroFallbackDuration));
-    }
-
-    IEnumerator Phase2IntroFallback(float t)
-    {
-        yield return new WaitForSeconds(t);
-        EndPhase2Intro();
-    }
-
+        IEnumerator Phase2IntroFallback(float t)
+        {
+            yield return new WaitForSeconds(t);
+            EndPhase2Intro();
+        }
+        void ApplyPhaseMapRoots(bool intro)
+        {
+            if (Phase1MapRoot) Phase1MapRoot.SetActive(!_inPhase2);
+            if (Phase2IntroMapRoot) Phase2IntroMapRoot.SetActive(_inPhase2 && intro);
+            if (Phase2MapRoot) Phase2MapRoot.SetActive(_inPhase2 && !intro);
+        }
+        
     public void OnPhase2IntroStart()
     {
         _inPhase2 = true;
@@ -476,31 +495,34 @@ public class JangsanbeomBoss : MonoBehaviour
         ApplyPhaseMapRoots(false);
     }
 
-    void ApplyPhaseMapRoots(bool intro)
+    // ---------- Flip / Visual ----------
+    float FacingSign() => facingRight ? 1f : -1f;
+    float VisualSign() => (facingRight ? 1f : -1f) * (spriteFacesRight ? 1f : -1f);
+
+    float VisualSignForGizmos()
     {
-        if (Phase1MapRoot) Phase1MapRoot.SetActive(!_inPhase2);
-        if (Phase2IntroMapRoot) Phase2IntroMapRoot.SetActive(_inPhase2 && intro);
-        if (Phase2MapRoot) Phase2MapRoot.SetActive(_inPhase2 && !intro);
+        if (Application.isPlaying) return VisualSign();
+        if (graphicsRoot) { float sx = graphicsRoot.localScale.x; return Mathf.Approximately(sx, 0f) ? 1f : Mathf.Sign(sx); }
+        if (spriteRenderer) { int srFlipSign = spriteRenderer.flipX ? -1 : 1; int baseSign = spriteFacesRight ? 1 : -1; return srFlipSign * baseSign; }
+        return 1f;
     }
 
-    // ---------- Flip ----------
     public void FlipTo(bool faceRight)
     {
         facingRight = faceRight;
-        // 루트 스케일은 그대로 유지(애니값 보존)
 
         if (graphicsRoot)
         {
-            // ✅ 현재 크기(절대값)는 유지하고, 부호만 설정
             var s = graphicsRoot.localScale;
-            s.x = Mathf.Abs(s.x) * (faceRight ? 1f : -1f);
+            float sign = faceRight ? 1f : -1f;
+            s.x = Mathf.Abs(s.x) * (spriteFacesRight ? sign : -sign);
             graphicsRoot.localScale = s;
             if (spriteRenderer) spriteRenderer.flipX = false;
         }
         else
         {
             if (!spriteRenderer) spriteRenderer = GetComponentInChildren<SpriteRenderer>();
-            if (spriteRenderer) spriteRenderer.flipX = !faceRight;
+            if (spriteRenderer) spriteRenderer.flipX = spriteFacesRight ? !faceRight : faceRight;
             else FlipAllSpriteRenderers(faceRight);
         }
 
@@ -509,7 +531,7 @@ public class JangsanbeomBoss : MonoBehaviour
         if (flipTrigger && _flipTriggerIsChild)
         {
             var lp = flipTrigger.transform.localPosition;
-            lp.x = _flipTriggerOriginalLocalX * (faceRight ? 1f : -1f);
+            lp.x = _flipTriggerOriginalLocalX * VisualSign();
             flipTrigger.transform.localPosition = lp;
         }
 
@@ -522,23 +544,29 @@ public class JangsanbeomBoss : MonoBehaviour
     {
         if (graphicsRoot)
         {
-            // ✅ 절대값 유지, 부호만 강제
             var s = graphicsRoot.localScale;
-            float wantSign = facingRight ? 1f : -1f;
-            if (Mathf.Sign(s.x) != wantSign) { s.x = Mathf.Abs(s.x) * wantSign; graphicsRoot.localScale = s; }
+            float sign = facingRight ? 1f : -1f;
+            float want = Mathf.Abs(s.x) * (spriteFacesRight ? sign : -sign);
+            if (!Mathf.Approximately(s.x, want)) { s.x = want; graphicsRoot.localScale = s; }
         }
-        else FlipAllSpriteRenderers(facingRight);
+        else
+        {
+            if (spriteRenderer) spriteRenderer.flipX = spriteFacesRight ? !facingRight : facingRight;
+            else foreach (var sr in GetComponentsInChildren<SpriteRenderer>(true))
+                    sr.flipX = spriteFacesRight ? !facingRight : facingRight;
+        }
     }
     void FlipAllSpriteRenderers(bool faceRight)
     {
-        foreach (var sr in GetComponentsInChildren<SpriteRenderer>(true)) sr.flipX = !faceRight;
+        foreach (var sr in GetComponentsInChildren<SpriteRenderer>(true))
+            sr.flipX = spriteFacesRight ? !faceRight : faceRight;
     }
     float GetFlipTriggerWorldX()
     {
         if (!flipTrigger) return transform.position.x;
         if (_flipTriggerIsChild)
         {
-            float localX = _flipTriggerOriginalLocalX * (facingRight ? 1f : -1f);
+            float localX = _flipTriggerOriginalLocalX * VisualSign();
             Vector3 world = transform.TransformPoint(new Vector3(localX, flipTrigger.transform.localPosition.y, 0f));
             return world.x;
         }
@@ -583,11 +611,9 @@ public class JangsanbeomBoss : MonoBehaviour
     {
         if (busy) return;
         pool ??= BuildCurrentAttackPool();
-
         AttackData atk = null;
         if (pool != null && index >= 0 && index < pool.Count) atk = pool[index];
         if (atk == null) atk = new AttackData();
-
         StartCoroutine(ClawRoutine_Generic(atk));
     }
 
@@ -641,50 +667,54 @@ public class JangsanbeomBoss : MonoBehaviour
         var pool = BuildCurrentAttackPool(); if (pool.Count > 0) { var a = pool[0]; bool dmg = _inPhase2 ? a.Phase2_FakeDealsDamage : false; PerformAttackOnce(a, dmg); }
     }
 
+    // ★ 레이어/태그에 의존하지 않는, 공통 히트 처리
     void PerformAttackOnce(AttackData atk, bool applyDamage)
     {
         if (!applyDamage) return;
-        if (_invulnerable) return;
-
-        if (playerLayer == 0) { Debug.LogWarning("[Boss] playerLayer not set."); return; }
 
         Vector2 center = GetAttackWorldPos(atk);
-        float dirSign = facingRight ? 1f : -1f;
-        float worldAngle = atk.Angle * dirSign;
+        float worldAngle = atk.Angle * VisualSign();
 
-        var hits = Physics2D.OverlapBoxAll(center, atk.Size, worldAngle, playerLayer);
-        var set = new HashSet<Collider2D>();
+        // 1) 마스크 없이 전부 겹침 검사
+        var hits = Physics2D.OverlapBoxAll(center, atk.Size, worldAngle);
 
+        var seen = new HashSet<Collider2D>();
         foreach (var col in hits)
         {
-            if (!col || set.Contains(col)) continue;
-            set.Add(col);
-            if (!string.IsNullOrEmpty(playerTag) && !col.CompareTag(playerTag)) continue;
+            if (!col || seen.Contains(col)) continue;
+            seen.Add(col);
 
-            var pc = col.GetComponent<PlayerController>() ?? col.GetComponentInParent<PlayerController>() ?? col.GetComponentInChildren<PlayerController>();
-            if (pc != null)
+            // 2) 플레이어 쪽 컴포넌트가 있으면 그때만 대미지
+            var pc = col.GetComponent<PlayerController>() ??
+                     col.GetComponentInParent<PlayerController>() ??
+                     col.GetComponentInChildren<PlayerController>();
+
+            // 플레이어가 아니면 스킵
+            if (pc == null) continue;
+
+            // 패링 체크(있다면)
+            if (pc.IsParrying && TryAskPlayerToConsumeParry(pc, atk.Damage)) continue;
+
+            // 3) 실제 체력/인터페이스로 대미지 전달
+            var dmg = col.GetComponent<IDamageable>() ??
+                      col.GetComponentInParent<IDamageable>() ??
+                      col.GetComponentInChildren<IDamageable>();
+            if (dmg != null) { dmg.TakeDamage(atk.Damage); continue; }
+
+            var pHealth = col.GetComponent<PlayerHealth>() ??
+                          col.GetComponentInParent<PlayerHealth>() ??
+                          col.GetComponentInChildren<PlayerHealth>();
+            if (pHealth != null) { pHealth.TakeDamage(atk.Damage); continue; }
+
+            var mb = col.GetComponent<MonoBehaviour>() ?? col.GetComponentInParent<MonoBehaviour>();
+            if (mb != null)
             {
-                if (pc.IsParrying)
-                {
-                    bool consumed = TryAskPlayerToConsumeParry(pc, atk.Damage);
-                    if (consumed) continue;
-                }
-
-                var dmg = col.GetComponent<IDamageable>() ?? col.GetComponentInParent<IDamageable>() ?? col.GetComponentInChildren<IDamageable>();
-                if (dmg != null) { dmg.TakeDamage(atk.Damage); continue; }
-
-                var pHealth = col.GetComponent<PlayerHealth>() ?? col.GetComponentInParent<PlayerHealth>();
-                if (pHealth != null) { pHealth.TakeDamage(atk.Damage); continue; }
-
-                var mb = col.GetComponent<MonoBehaviour>() ?? col.GetComponentInParent<MonoBehaviour>();
-                if (mb != null)
-                {
-                    MethodInfo mi = mb.GetType().GetMethod("TakeDamage", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                    if (mi != null) { mi.Invoke(mb, new object[] { atk.Damage }); continue; }
-                }
+                var mi = mb.GetType().GetMethod("TakeDamage", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+                if (mi != null) mi.Invoke(mb, new object[] { atk.Damage });
             }
         }
     }
+
 
     bool TryAskPlayerToConsumeParry(PlayerController pc, int incomingDamage)
     {
@@ -713,10 +743,10 @@ public class JangsanbeomBoss : MonoBehaviour
     // ---------- Utils ----------
     Vector2 GetAttackWorldPos(AttackData atk)
     {
-        float dir = facingRight ? 1f : -1f;
+        float sign = VisualSign();
         Vector2 origin = atk.OriginOverride ? (Vector2)atk.OriginOverride.position : (Vector2)transform.position;
-        Vector2 off = atk.Offset; off.x *= dir;
-        float ang = (atk.Angle * dir) * Mathf.Deg2Rad;
+        Vector2 off = atk.Offset; off.x *= sign;
+        float ang = (atk.Angle * sign) * Mathf.Deg2Rad;
         float c = Mathf.Cos(ang), s = Mathf.Sin(ang);
         Vector2 rot = new(off.x * c - off.y * s, off.x * s + off.y * c);
         return origin + rot;
@@ -752,13 +782,14 @@ public class JangsanbeomBoss : MonoBehaviour
 
     void ApplyFlipToPolygonColliders(bool faceRight)
     {
+        bool mirror = VisualSign() < 0f;
         for (int k = 0; k < _polyColliders.Count; k++)
         {
             var poly = _polyColliders[k];
             if (!poly) continue;
             var orig = _originalPolyPaths[k];
             poly.pathCount = orig.Length;
-            bool mirror = !faceRight;
+
             for (int i = 0; i < orig.Length; i++)
             {
                 var src = orig[i];
@@ -793,10 +824,8 @@ public class JangsanbeomBoss : MonoBehaviour
     // ===== Animation Events: Dash / Locks / I-Frames / Relative motion =====
     public void Anim_DashStart() { _dashActive = true; _animLockMove = true; _animLockFlip = true; busy = true; }
     public void Anim_DashEnd() { _dashActive = false; _animLockMove = false; _animLockFlip = false; busy = false; }
-
     public void Anim_SetMoveLock(int on) { _animLockMove = (on != 0); }
     public void Anim_SetFlipLock(int on) { _animLockFlip = (on != 0); }
-
     public void Anim_InvulnOn() { _invulnerable = true; }
     public void Anim_InvulnOff() { _invulnerable = false; }
 
@@ -830,14 +859,13 @@ public class JangsanbeomBoss : MonoBehaviour
     }
 
     // -------- Bounds-based facing helper --------
-    // -------- 바깥 레일: 본체 바운즈 밖이면 즉시 바라보기 --------
     void ForceFaceWhenPlayerOutsideBounds()
     {
         if (_animLockFlip) return;
         if (player == null || bodyCollider == null) return;
 
         var b = bodyCollider.bounds;
-        b.Expand(new Vector3(faceOutsideMarginX * 2f, 0f, 0f)); // 약간 여유
+        b.Expand(new Vector3(faceOutsideMarginX * 2f, 0f, 0f));
 
         float px = player.position.x;
         bool outsideX = (px < b.min.x || px > b.max.x);
@@ -845,12 +873,11 @@ public class JangsanbeomBoss : MonoBehaviour
         if (outsideX)
         {
             bool wantRight = px >= b.center.x;
-            if (wantRight != facingRight)
-            {
-                FlipTo(wantRight);
-                _lastFlipTime = Time.time;
-            }
-            // 히스테리시스 기준 업데이트
+            if (wantRight == facingRight) return; // 이미 정면이면 유지
+
+            FlipTo(wantRight);
+            _lastFlipTime = Time.time;
+
             float refX = (flipTrigger ? GetFlipTriggerWorldX() :
                          (flipPivot ? flipPivot.position.x : transform.position.x));
             float relAfter = player.position.x - refX;
@@ -859,35 +886,121 @@ public class JangsanbeomBoss : MonoBehaviour
         }
     }
 
-
+    // ---------- Gizmos ----------
     void OnDrawGizmos()
     {
         if (!showAttackGizmos) return;
+
+        // 기존: 현재 어택 풀(리스트 첫 번째)만 그림
         var list = Application.isPlaying ? BuildCurrentAttackPool() : attacksPhase1;
-        if (list == null) return;
-
-        for (int i = 0; i < list.Count; i++)
+        if (list != null)
         {
-            var a = list[i];
-            Vector2 pos; float angleDeg;
-            if (Application.isPlaying) { pos = GetAttackWorldPos(a); angleDeg = a.Angle * (facingRight ? 1f : -1f); }
-            else
-            {
-                float dir = (facingRight ? 1f : -1f);
-                Vector2 origin = a.OriginOverride ? (Vector2)a.OriginOverride.position : (Vector2)transform.position;
-                Vector2 off = a.Offset; off.x *= dir;
-                float ang = (a.Angle * dir) * Mathf.Deg2Rad; float c = Mathf.Cos(ang), s = Mathf.Sin(ang);
-                Vector2 rot = new(off.x * c - off.y * s, off.x * s + off.y * c);
-                pos = origin + rot; angleDeg = a.Angle * dir;
-            }
-            Color fill = a.DefaultFake ? gizmoFakeColor : gizmoRealColor;
-            Color wire = new(fill.r, fill.g, fill.b, Mathf.Min(1f, fill.a * 2f));
+            float sign = VisualSignForGizmos();
+            for (int i = 0; i < list.Count; i++)
+                DrawGizmoForAttack(list[i], sign, gizmoRealColor, gizmoFakeColor);
+        }
 
-            var prev = Gizmos.matrix;
-            Gizmos.matrix = Matrix4x4.TRS(new Vector3(pos.x, pos.y, 0), Quaternion.Euler(0, 0, angleDeg), Vector3.one);
-            Gizmos.color = fill; Gizmos.DrawCube(Vector3.zero, new Vector3(a.Size.x, a.Size.y, 0.01f));
-            Gizmos.color = wire; Gizmos.DrawWireCube(Vector3.zero, new Vector3(a.Size.x, a.Size.y, 0.01f) * 1.001f);
-            Gizmos.matrix = prev;
+        // ★ 추가: 대쉬 어택 기즈모를 별도 색상으로 명확히 그림
+        if (dashAttack != null)
+        {
+            float sign = VisualSignForGizmos();
+            Color dashFill = new Color(0.2f, 0.6f, 1f, 0.18f);
+            Color dashWire = new Color(0.2f, 0.6f, 1f, 0.36f);
+            DrawGizmoForAttack(dashAttack, sign, dashFill, dashWire);
         }
     }
+
+    // 공통 그리기 유틸
+    void DrawGizmoForAttack(AttackData a, float sign, Color fill, Color wire)
+    {
+        if (a == null) return;
+
+        Vector2 origin = a.OriginOverride ? (Vector2)a.OriginOverride.position : (Vector2)transform.position;
+        Vector2 off = a.Offset; off.x *= sign;
+
+        float angRad = (a.Angle * sign) * Mathf.Deg2Rad;
+        float c = Mathf.Cos(angRad), s = Mathf.Sin(angRad);
+        Vector2 rot = new(off.x * c - off.y * s, off.x * s + off.y * c);
+
+        Vector2 pos = origin + rot;
+        float angleDeg = a.Angle * sign;
+
+        var prev = Gizmos.matrix;
+        Gizmos.matrix = Matrix4x4.TRS(new Vector3(pos.x, pos.y, 0), Quaternion.Euler(0, 0, angleDeg), Vector3.one);
+        Gizmos.color = fill; Gizmos.DrawCube(Vector3.zero, new Vector3(a.Size.x, a.Size.y, 0.01f));
+        Gizmos.color = wire; Gizmos.DrawWireCube(Vector3.zero, new Vector3(a.Size.x, a.Size.y, 0.01f) * 1.001f);
+        Gizmos.matrix = prev;
+    }
+
+    // ---------- Clones (원본 그대로) ----------
+    void TrySpawnCloneIfNeeded()
+
+
+    {
+
+        if (!allowCloneSpawns) return;
+
+        // 아래 기존 방어로직도 그대로 남겨두세요
+        for (int i = _clones.Count - 1; i >= 0; i--)
+            if (_clones[i] == null) _clones.RemoveAt(i);
+
+        if (maxClones <= 0) return;   // 2차 게이트
+        if (_cloneCooldownTimer > 0f) return;
+        if (clonePrefab == null) return;
+
+
+        // 정리
+        for (int i = _clones.Count - 1; i >= 0; i--)
+            if (_clones[i] == null) _clones.RemoveAt(i);
+
+        if (_clones.Count >= maxClones) return;
+        if (_cloneCooldownTimer > 0f) return;
+        if (clonePrefab == null) return;
+
+        // 위치
+        Vector2 basePos = transform.position;
+        Vector2 spawnPos = basePos + UnityEngine.Random.insideUnitCircle.normalized * cloneSpawnRadius;
+        if (lockCloneY) spawnPos.y = cloneFixedY;
+
+        // 프리팹 생성
+        var go = Instantiate(clonePrefab, spawnPos, Quaternion.identity);
+
+        // 보스 컴포넌트 가져오기
+        var cloneBoss = go.GetComponent<JangsanbeomBoss>();
+        if (cloneBoss == null)
+        {
+            Debug.LogWarning("[Boss] Clone prefab has no JangsanbeomBoss. Add it or use option B.");
+            Destroy(go);
+            return;
+        }
+
+        // 기본 참조 세팅
+        cloneBoss.player = this.player;
+
+        // 클론 구성(라이트 모드)
+        var cfg = go.GetComponent<BossCloneConfig>();
+        if (cfg == null) cfg = go.AddComponent<BossCloneConfig>();
+        cfg.cloneMaxHp = Mathf.Max(1, cloneInitialHp);
+        cfg.disablePhase2 = true;
+        cfg.disableCloneSpawns = true;       // 클론이 또 클론 안 만들게
+        cfg.disablePhase2Intro = true;
+        cfg.disableRewardsOnDeath = true;
+        cfg.clearMapRoots = true;
+        cfg.hideGizmosInPlay = true;
+
+        // 시선 상속
+        if (cloneInheritFlip) cloneBoss.FlipTo(this.facingRight);
+
+        // 내부 리스트는 안 씀(옵션 B용 남겨둠)
+        _clones.Add(null); // 더미로 개수만 관리(원 코드 의존 시 필요 없으면 제거)
+        _cloneCooldownTimer = cloneSpawnCooldown;
+    }
+    List<AttackData> BuildPhase2AttackPoolForClone()
+    {
+        var list = new List<AttackData>(8);
+        foreach (var a in attacksPhase2) if (a != null && a.AllowInPhase2) list.Add(a);
+        foreach (var a in attacksPhase1) if (a != null && a.AllowInPhase2) list.Add(a);
+        return list;
+    }
+    public void OnCloneDied(JangsanbeomClone who) { _clones.Remove(who); }
 }

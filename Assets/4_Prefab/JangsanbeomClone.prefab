@@ -182,6 +182,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: acce9f3aef10763449dbe2d6b6bdfd01, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  allowCloneSpawns: 0
+  isCloneInstance: 1
   dashAttack:
     Name: Dash
     Offset: {x: 4, y: -2}
@@ -460,7 +462,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fce40a1a43ea0324c979d5a6a559c983, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  maxHp: 20
+  maxHp: 5
   currentHp: 0
   hpBar: {fileID: 0}
   hpText: {fileID: 0}

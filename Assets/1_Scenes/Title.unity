@@ -169,30 +169,30 @@ MonoBehaviour:
   bgmSource: {fileID: 774094809}
   sfxSource: {fileID: 471007868}
   uiSource: {fileID: 202917676}
-  titleBGM: {fileID: 0}
-  gameplayBGM: {fileID: 0}
-  bossBGM: {fileID: 0}
-  phase2BGM: {fileID: 0}
-  playerAttackSFX: {fileID: 0}
-  playerParrySFX: {fileID: 0}
-  playerDashSFX: {fileID: 0}
-  playerJumpSFX: {fileID: 8300000, guid: 054846843b9a3a042b9972842ba6d851, type: 3}
-  playerHurtSFX: {fileID: 0}
+  titleBGM: {fileID: 8300000, guid: 3894173b07e34a5498c08046831eeec5, type: 3}
+  gameplayBGM: {fileID: 8300000, guid: e1bd2894c75d41446b67a36ac8ce2793, type: 3}
+  bossBGM: {fileID: 8300000, guid: 06b3a6fa6e4f5c848b8ea1a28000f1d3, type: 3}
+  phase2BGM: {fileID: 8300000, guid: 776858d2be12eac4a95414b848c2a6b8, type: 3}
+  playerAttackSFX: {fileID: 8300000, guid: b786858d7f352254a9fab5f0014dde63, type: 3}
+  playerParrySFX: {fileID: 8300000, guid: 2cfb12a7599f89f4da96923a48e091eb, type: 3}
+  playerDashSFX: {fileID: 8300000, guid: 27d436001fd997d40808d53ebe53d5ba, type: 3}
+  playerJumpSFX: {fileID: 8300000, guid: ffb8e1b6b80f81e4eb9c927d0820d271, type: 3}
+  playerHurtSFX: {fileID: 8300000, guid: 54c2e637d0bfbdf41ae6cc23b13127e7, type: 3}
   talismanFireSFX: {fileID: 0}
   talismanImpactSFX: {fileID: 0}
-  bossAttackSFX: {fileID: 0}
-  bossPhase2SFX: {fileID: 0}
-  bossHurtSFX: {fileID: 0}
-  bossDeathSFX: {fileID: 0}
-  buttonClickSFX: {fileID: 8300000, guid: f525d139e875e4c428b2f94186b94de4, type: 3}
-  menuOpenSFX: {fileID: 8300000, guid: 525693169c511544d9f7c90fb741ac73, type: 3}
-  menuCloseSFX: {fileID: 8300000, guid: 525693169c511544d9f7c90fb741ac73, type: 3}
+  bossAttackSFX: {fileID: 8300000, guid: c84e64183c723d046a2d03c907915e89, type: 3}
+  bossPhase2SFX: {fileID: 8300000, guid: 69efea5be700182418aaa32329c0fe01, type: 3}
+  bossHurtSFX: {fileID: 8300000, guid: 1c9a0c9b2bed29a4bb3f30c770afe13a, type: 3}
+  bossDeathSFX: {fileID: 8300000, guid: f0b5e437370e8504cb39c2131e09d789, type: 3}
+  buttonClickSFX: {fileID: 8300000, guid: e5cb66c6a6a7e7a4d9c8fda801397664, type: 3}
+  menuOpenSFX: {fileID: 8300000, guid: b076165718d74104a9a9027b8a4ff935, type: 3}
+  menuCloseSFX: {fileID: 8300000, guid: b076165718d74104a9a9027b8a4ff935, type: 3}
   masterVolume: 1
-  bgmVolume: 0.7
-  sfxVolume: 1
-  uiVolume: 0.8
+  bgmVolume: 0.5
+  sfxVolume: 0.8
+  uiVolume: 1
   defaultFadeTime: 1
-  quickFadeTime: 0.3
+  quickFadeTime: 0.1
 --- !u!1 &179522451
 GameObject:
   m_ObjectHideFlags: 0

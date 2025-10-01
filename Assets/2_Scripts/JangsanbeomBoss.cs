@@ -125,6 +125,10 @@ public class JangsanbeomBoss : MonoBehaviour
     [Tooltip("애니 이벤트가 없다면 이 시간으로 폴백(초). 0이면 즉시 종료 X")]
     public float phase2IntroFallbackDuration = 1.5f;
 
+    [Header("BGM Settings")]
+    [Tooltip("보스 시작 시 즉시 BGM 전환 (플레이어 감지 전)")]
+    public bool startBGMImmediately = false;
+
     // ---------- Dash / Animation Locks ----------
     [Header("Dash / Animation Locks")]
     public string trig_Dash = "Dash";   // 애니메이터에 동일 이름 트리거 생성해서 사용
@@ -150,6 +154,7 @@ public class JangsanbeomBoss : MonoBehaviour
     bool _inPhase2 = false;
     bool _phase2IntroPlaying = false;
     bool _invulnerable = false;
+    bool _bossBGMStarted = false; // 보스 BGM이 시작되었는지 추적
 
     // health poll
     float _lastKnownHp = -1f, _lastKnownMaxHp = -1f;
@@ -260,6 +265,17 @@ public class JangsanbeomBoss : MonoBehaviour
         UpdateHealthCacheImmediate();
         UpdatePhaseFlagsFromHealth();
         ApplyPhaseMapRoots(false); // 현재 페이즈에 맞춰 맵 세팅
+
+        // 즉시 BGM 전환 옵션
+        if (startBGMImmediately && !_bossBGMStarted && !_inPhase2)
+        {
+            Debug.Log("[Boss] Starting boss BGM immediately");
+            if (AudioManager.Instance != null)
+            {
+                AudioManager.Instance.PlayBossBGM();
+                _bossBGMStarted = true;
+            }
+        }
 
         if (player != null)
         {
@@ -405,7 +421,12 @@ public class JangsanbeomBoss : MonoBehaviour
         // 2페이즈 BGM 전환
         if (AudioManager.Instance != null)
         {
+            Debug.Log("[Boss] Switching to Phase 2 BGM");
             AudioManager.Instance.PlayPhase2BGM();
+        }
+        else
+        {
+            Debug.LogError("[Boss] AudioManager.Instance is null when switching to Phase 2 BGM!");
         }
 
         // **핵심**: 인트로 맵을 켜기 전에 Phase2 플래그를 true로 먼저 설정
@@ -544,6 +565,17 @@ public class JangsanbeomBoss : MonoBehaviour
                 float d = Mathf.Abs(player.position.x - transform.position.x);
                 if (d <= aggroRange && pool.Count > 0)
                 {
+                    // 보스 BGM 시작 (1페이즈에서만)
+                    if (!_bossBGMStarted && !_inPhase2)
+                    {
+                        Debug.Log("[Boss] Starting boss BGM (Phase 1)");
+                        if (AudioManager.Instance != null)
+                        {
+                            AudioManager.Instance.PlayBossBGM();
+                            _bossBGMStarted = true;
+                        }
+                    }
+                    
                     if (UnityEngine.Random.Range(0, 100) < 60)
                         StartAttackByIndex(0, pool);
                 }

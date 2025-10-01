@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-public class UIButtonEffect : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
+public class UIButtonEffect : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerClickHandler
 {
     private Button button;
     private Vector3 originalScale;
@@ -16,13 +16,20 @@ public class UIButtonEffect : MonoBehaviour, IPointerEnterHandler, IPointerExitH
     public void OnPointerEnter(PointerEventData eventData)
     {
         transform.localScale = originalScale * 1.1f;
-        // »ö ¹Ù²Ù°í ½ÍÀ¸¸é button.image.color = Color.yellow; °°Àº ½ÄÀ¸·Î
+        // ë²„íŠ¼ í˜¸ë²„ ì‚¬ìš´ë“œ ì¬ìƒ
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlayMenuOpen();
     }
 
     public void OnPointerExit(PointerEventData eventData)
     {
         transform.localScale = originalScale;
-        // »ö µÇµ¹¸®±â
+    }
+
+    public void OnPointerClick(PointerEventData eventData)
+    {
+        // ë²„íŠ¼ í´ë¦­ ì‚¬ìš´ë“œ ì´ˆê³ ì† ì¬ìƒ (ì§€ì—° ìµœì†Œí™”)
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlayUISFXInstant(AudioManager.Instance.buttonClickSFX);
     }
 }
-

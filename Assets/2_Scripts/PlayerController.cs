@@ -172,9 +172,9 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
         {
             if (canDash && !isDashing && !isParrying && !isAttacking && attackLockTimer <= 0f)
             {
-                // 대시 사운드 재생
+                // 대시 사운드 초고속 재생
                 if (AudioManager.Instance != null)
-                    AudioManager.Instance.PlayPlayerDash();
+                    AudioManager.Instance.PlaySFXInstant(AudioManager.Instance.playerDashSFX);
                 StartCoroutine(DoDash());
             }
         }
@@ -183,9 +183,9 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
         {
             if (canParry && !isParrying && !isDashing && attackLockTimer <= 0f)
             {
-                // 패링 사운드 재생
+                // 패링 사운드 초고속 재생
                 if (AudioManager.Instance != null)
-                    AudioManager.Instance.PlayPlayerParry();
+                    AudioManager.Instance.PlaySFXInstant(AudioManager.Instance.playerParrySFX);
                 StartCoroutine(DoParry());
             }
         }
@@ -195,9 +195,9 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
             bool grounded = Physics2D.OverlapCircle(groundCheck.position, groundCheckRadius, groundLayer);
             if (grounded && !isDashing && !isParrying)
             {
-                // 점프 사운드 재생
+                // 점프 사운드 초고속 재생
                 if (AudioManager.Instance != null)
-                    AudioManager.Instance.PlayPlayerJump();
+                    AudioManager.Instance.PlaySFXInstant(AudioManager.Instance.playerJumpSFX);
                 Vector2 v = rb.linearVelocity;
                 v.y = jumpForce;
                 rb.linearVelocity = v;
@@ -280,6 +280,26 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
         int idx = Mathf.Clamp(comboIndex - 1, 0, comboLockDurations.Length - 1);
         attackLockTimer = comboLockDurations[idx];
 
+        // 공격 사운드를 초고속 재생 (애니메이션 이벤트보다 먼저)
+        if (AudioManager.Instance != null)
+        {
+            if (AudioManager.Instance.playerAttackSFX != null)
+            {
+                AudioManager.Instance.PlaySFXInstant(AudioManager.Instance.playerAttackSFX);
+                Debug.Log("[PlayerController] Attack sound played instantly");
+            }
+            else
+            {
+                Debug.LogWarning("[PlayerController] playerAttackSFX is null in AudioManager!");
+                // 폴백: 기존 메서드 사용
+                AudioManager.Instance.PlayPlayerAttack();
+            }
+        }
+        else
+        {
+            Debug.LogError("[PlayerController] AudioManager.Instance is null!");
+        }
+
         if (animator != null)
         {
             switch (comboIndex)
@@ -300,9 +320,7 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
 
         if (attackPoint == null) { Debug.LogWarning("[PlayerController] attackPoint null"); return; }
 
-        // 공격 사운드 재생
-        if (AudioManager.Instance != null)
-            AudioManager.Instance.PlayPlayerAttack();
+        // 공격 사운드는 StartAttack에서 이미 재생됨 (중복 제거)
 
         Collider2D[] hits = Physics2D.OverlapCircleAll(attackPoint.position, range, enemyLayer);
         foreach (var col in hits)
@@ -480,9 +498,9 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
             if (consumed) return;
         }
 
-        // 피격 사운드 재생
+        // 피격 사운드 초고속 재생
         if (AudioManager.Instance != null)
-            AudioManager.Instance.PlayPlayerHurt();
+            AudioManager.Instance.PlaySFXInstant(AudioManager.Instance.playerHurtSFX);
 
         Debug.Log($"[Player] Took {amount} damage.");
         if (healthComponent != null)

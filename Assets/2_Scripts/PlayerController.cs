@@ -1,15 +1,22 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using System;
 
 // PlayerController — 패링/스페셜/호환성 보강판 (디버그 UI 포함)
 // 변경: 패링 성공 카운트는 시간 경과로 자동 초기화되지 않음.
 //       오직 ParrySpecial 발동(소모) 시에만 parrySuccessCount를 0으로 초기화.
 [RequireComponent(typeof(Rigidbody2D))]
 [RequireComponent(typeof(Animator))]
-public class PlayerController : MonoBehaviour, IDamageable
+
+
+public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider // <== IParryStreakProvider 구현
 {
     [HideInInspector] public bool ExternalRangedOverride;
+
+
+    public int CurrentParryStreak => parrySuccessCount;
+    public event Action<int> OnParryStreakChanged;
 
     [Header("Movement")]
     public float moveSpeed = 5f;
@@ -399,6 +406,8 @@ public class PlayerController : MonoBehaviour, IDamageable
 
             // 실제 패링 성공 처리 (카운트 증가 등)
             parrySuccessCount++;
+            OnParryStreakChanged?.Invoke(parrySuccessCount); // <== 추가
+
             lastParrySuccessTime = Time.time;
             Debug.Log($"[Player] Parry success #{parrySuccessCount}");
 
@@ -461,6 +470,7 @@ public class PlayerController : MonoBehaviour, IDamageable
         // **스페셜을 소비했을 때만 카운트 초기화**
         parrySuccessCount = 0;
         lastParrySuccessTime = -999f;
+        OnParryStreakChanged?.Invoke(parrySuccessCount); // <== 추가
 
         // 잠깐 유지 후 잠금 해제
         yield return new WaitForSeconds(0.25f);

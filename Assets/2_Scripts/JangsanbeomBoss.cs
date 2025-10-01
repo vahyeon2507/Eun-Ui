@@ -8,6 +8,14 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public class JangsanbeomBoss : MonoBehaviour
 {
+    // ====== Clone / Light Mode (이중 가드용) ======
+    [Header("Clone / Light Mode")]
+    [Tooltip("원본 보스만 true. 클론은 Awake에서 자동으로 false로 전환됩니다.")]
+    public bool allowCloneSpawns = true;     // 호출부 1차 가드
+    [Tooltip("디버그 표기용. Awake에서 BossCloneConfig 감지되면 true.")]
+    public bool isCloneInstance = false;
+
+    // ====== Attack Data ======
     [Serializable]
     public class AttackData
     {
@@ -22,8 +30,8 @@ public class JangsanbeomBoss : MonoBehaviour
         [Header("Editor Visuals")]
         public GameObject TelegraphPrefab;
         public float TelegraphTime = 0f;
-        public float cloneSpawnOffsetX = 3.0f;   // 보스 x 기준 옆으로
-        public float cloneSpawnOffsetY = 0.71f;
+        public float cloneSpawnOffsetX = 3.0f;   // (미사용) 유지
+        public float cloneSpawnOffsetY = 0.71f;  // (미사용) 유지
         public bool DefaultFake = false;
         public Sprite FakeSprite;
         public float FakeSpriteDuration = 0.18f;
@@ -34,48 +42,59 @@ public class JangsanbeomBoss : MonoBehaviour
         public bool AllowInPhase2 = true;
 
         [Header("Phase2: Fake → Real")]
-        [Tooltip("2페이즈에서 이 공격의 '페이크' 연출도 실제 대미지를 주도록 처리")]
         public bool Phase2_FakeDealsDamage = true;
     }
 
-    // ---------- Refs ----------
+    // ====== Dash Attack ======
+    [Header("Dash Attack")]
+    public AttackData dashAttack;
+
+    public void OnDashHitFrame()
+    {
+        if (debugDamage) Debug.Log("[Boss] OnDashHitFrame()");
+        if (dashAttack != null) { PerformAttackOnce(dashAttack, true); return; }
+        var pool = BuildCurrentAttackPool();
+        if (pool.Count > 0) PerformAttackOnce(pool[0], true);
+    }
+
+    // ====== Refs ======
     [Header("Refs")]
     public Transform player;
     public Animator animator;
     public SpriteRenderer spriteRenderer;
     public Rigidbody2D rb;
 
-    // ---------- Health / Phase ----------
+    // ====== Health / Phase ======
     [Header("Health / Phase")]
     public MonoBehaviour bossHealthComponent;
     public float MaxHealth = 100f;
     public float CurrentHealth = 100f;
     [Range(0f, 1f)] public float Phase2HealthThreshold = 0.66f;
 
+    [Header("Damage Gates")]
+    public bool requirePlayerTag = false;           // (현재 로직은 태그 미사용)
+    public bool blockOutgoingDamageWhileInvuln = false;
+    public bool debugDamage = false;
+
     [Header("Map Roots")]
-    public GameObject Phase1MapRoot;
-    public GameObject Phase2IntroMapRoot;   // 변신 연출 동안 표시
-    public GameObject Phase2MapRoot;        // 본격 2페이즈
+    public GameObject Phase1MapRoot, Phase2IntroMapRoot, Phase2MapRoot;
 
     [Header("Phase 2 Positioning")]
-    [Tooltip("2페이즈 진입 시 순간이동할 위치(있으면 우선)")]
     public Transform phase2CenterPoint;
-    [Tooltip("phase2CenterPoint가 없을 때 사용할 좌표")]
     public Vector2 phase2CenterFallback = Vector2.zero;
-    [Tooltip("2페이즈 진입 시 중앙으로 순간이동")]
     public bool teleportToCenterOnPhase2 = true;
-    [Tooltip("2페이즈에서는 보스를 고정(이동 금지)")]
     public bool lockMovementInPhase2 = true;
 
     [Header("Player detection (no hitbox prefab)")]
-    public LayerMask playerLayer;
+    [Tooltip("현재 히트는 OverlapBoxAll(마스크 없이)로 처리함. 이 필드는 사용하지 않음.")]
+    public LayerMask playerLayer;  // 참고용
     public string playerTag = "Player";
 
-    // ---------- Flip ----------
+    // ====== Flip ======
     [Header("Visual & Flip")]
-    public Transform graphicsRoot;
-    public BoxCollider2D flipTrigger;
-    public Transform flipPivot;
+    public Transform graphicsRoot;     // 애니메이션 루트(권장)
+    public BoxCollider2D flipTrigger;  // 스프라이트와 겹칠 때 기준선으로 사용 (뒤로 약간 물려 배치)
+    public Transform flipPivot;        // 보조 피벗
     public float flipPivotDeadzone = 0.6f;
 
     [Header("Flip tuning")]
@@ -85,7 +104,15 @@ public class JangsanbeomBoss : MonoBehaviour
     public bool enforceVisualFlip = true;
     public bool debugFlip = false;
 
-    // ---------- Movement / AI ----------
+    [Header("Orientation")]
+    [Tooltip("원본 스프라이트 기본이 오른쪽이면 true, 왼쪽이면 false")]
+    public bool spriteFacesRight = true;
+
+    [Header("Facing (bounds-based)")]
+    public Collider2D bodyCollider;
+    public float faceOutsideMarginX = 0.2f;
+
+    // ====== Movement / AI ======
     [Header("AI / Movement")]
     public float followSpeed = 2f;
     public float followMinDistanceX = 1.2f;
@@ -117,22 +144,27 @@ public class JangsanbeomBoss : MonoBehaviour
     public string trig_ClawTelegraph = "ClawTelegraph";
     public string trig_ClawExecute = "ClawExecute";
     public string trig_ClawFakeExecute = "ClawFakeExecute";
-    public string trig_EnterPhase2 = "EnterPhase2";  // 변신 트리거(선택)
+    public string trig_EnterPhase2 = "EnterPhase2";
 
     [Header("Phase2 Intro")]
-    [Tooltip("변신 애니 시작~종료 동안 무적")]
     public bool phase2IntroInvulnerable = true;
-    [Tooltip("애니 이벤트가 없다면 이 시간으로 폴백(초). 0이면 즉시 종료 X")]
     public float phase2IntroFallbackDuration = 1.5f;
 
-    // ---------- Dash / Animation Locks ----------
+    // ====== Dash / Animation Locks ======
     [Header("Dash / Animation Locks")]
+<<<<<<< HEAD
     public string trig_Dash = "Dash";   // 애니메이터에 동일 이름 트리거 생성해서 사용
     // bool _dashActive = false; // 사용하지 않는 변수 - 주석 처리
     bool _animLockMove = false;         // 애니메이션으로 이동 잠금
     bool _animLockFlip = false;         // 애니메이션으로 플립 잠금
+=======
+    public string trig_Dash = "Dash";
+    bool _dashActive = false;
+    bool _animLockMove = false;
+    bool _animLockFlip = false;
+>>>>>>> main
 
-    // internals
+    // ====== Internals ======
     Vector3 _rootOriginalScale, _graphicsOriginalScale;
     float _lastFlipTime = -10f;
     int _prevTriggerSide = 0;
@@ -142,8 +174,8 @@ public class JangsanbeomBoss : MonoBehaviour
     float _flipTriggerOriginalLocalX = 0f;
     bool _flipTriggerIsChild = false;
 
-    List<PolygonCollider2D> _polyColliders = new();
-    List<Vector2[][]> _originalPolyPaths = new();
+    readonly List<PolygonCollider2D> _polyColliders = new();
+    readonly List<Vector2[][]> _originalPolyPaths = new();
     Vector3 _lastPosition;
 
     // phase state
@@ -155,83 +187,94 @@ public class JangsanbeomBoss : MonoBehaviour
     float _lastKnownHp = -1f, _lastKnownMaxHp = -1f;
     float _healthPollInterval = 0.2f, _healthPollTimer = 0f;
 
-    // ▼ Phase2 Clones
+    // ====== Phase2 Clones ======
     [Header("Phase2 Clones")]
     public bool lockCloneY = true;
     public float cloneFixedY = 0.71f;
-    public JangsanbeomClone clonePrefab;   // 분신 프리팹
-    public int maxClones = 1;              // 최대 동시 분신 수
-    public float cloneSpawnCooldown = 6f;  // 분신 소환 쿨타임
-    public float cloneSpawnRadius = 6f;    // 본체 기준 랜덤 스폰 반경
-    public int cloneInitialHp = 5;         // 분신 체력(낮게)
-    public bool cloneInheritFlip = true;   // 스폰 시 본체 바라보는 방향 따라갈지
+    public GameObject clonePrefab;
+    public int maxClones = 1;
+    public float cloneSpawnCooldown = 6f;
+    public float cloneSpawnRadius = 6f; // (원랜덤 스폰에서 쓰던 값, 유지)
+    public int cloneInitialHp = 5;
+    public bool cloneInheritFlip = true;
+
+    [Header("Bell Signal (Phase2)")]
+    public List<BellRinger> bellRingers = new();   // 맵의 종들 등록
+    [Tooltip("종이 하나라도 울리는 동안은 분신 공격/스폰 금지")]
+    public bool blockAttacksWhileAnyBellRinging = true;
+    [Tooltip("종이 먼저 울리고 난 뒤 분신 스폰까지의 리드 타임")]
+    public float bellLeadTime = 0.08f;
+
+    // 내부 상태
+    Coroutine _pendingBellSpawn;
+
+    // ====== One-Shot Clone 추가 설정 ======
+    [Header("One-Shot Clone Config")]
+    [Tooltip("원샷 분신 사용 여부(페이드인→한 번 공격→페이드아웃)")]
+    public bool useOneShotClones = true;
+    [Tooltip("플레이어 바로 앞(보스 쪽)으로 띄울 X 오프셋")]
+    public float oneShotFrontOffsetX = 1.2f;
+    [Tooltip("등장 페이드 인 시간")]
+    public float oneShotFadeIn = 0.12f;
+    [Tooltip("공격 전 아주 짧은 딜레이(텔레그래프 대용)")]
+    public float oneShotPreDelay = 0.06f;
+    [Tooltip("공격 후 제거까지 대기")]
+    public float oneShotDespawnDelay = 0.05f;
+    [Tooltip("사라질 때 페이드 아웃 시간")]
+    public float oneShotFadeOut = 0.18f;
+    [Tooltip("스폰 시 원보스의 바라보는 방향을 상속")]
+    public bool oneShotInheritFlip = true;
 
     float _cloneCooldownTimer = 0f;
-    readonly List<JangsanbeomClone> _clones = new();
+    readonly List<JangsanbeomClone> _clones = new();   // 프로젝트에 존재하는 타입 그대로 유지
 
-    // ▼ 분신 스폰 로직
-    void TrySpawnCloneIfNeeded()
-    {
-        // 정리: null 로스트 제거
-        for (int i = _clones.Count - 1; i >= 0; i--)
-            if (_clones[i] == null) _clones.RemoveAt(i);
-
-        if (_clones.Count >= maxClones) return;
-        if (_cloneCooldownTimer > 0f) return;
-        if (clonePrefab == null) return;
-
-        // 스폰 위치: 본체 주변 원형 랜덤
-        Vector2 basePos = transform.position;
-        Vector2 spawnPos = basePos + UnityEngine.Random.insideUnitCircle.normalized * cloneSpawnRadius;
-        if (lockCloneY) spawnPos.y = cloneFixedY;
-
-        var clone = Instantiate(clonePrefab, spawnPos, Quaternion.identity);
-
-        // 초기화: 플레이어/공격 세트/확률 등 복사
-        clone.owner = this;
-        clone.player = this.player;
-        clone.enableFakePhase2 = this.enableFakePhase2;
-        clone.fakeChancePhase2 = this.fakeChancePhase2;
-        clone.attacks = BuildPhase2AttackPoolForClone();
-        clone.maxHp = Mathf.Max(1, cloneInitialHp);
-        clone.currentHp = clone.maxHp;
-        clone.allowDropRewards = false;
-        if (cloneInheritFlip) clone.FaceRight(this.facingRight);
-
-        _clones.Add(clone);
-        _cloneCooldownTimer = cloneSpawnCooldown;
-    }
-
-    // 분신이 사용할 공격 풀: 2페이즈에서 허용된 공격만
-    List<JangsanbeomBoss.AttackData> BuildPhase2AttackPoolForClone()
-    {
-        var list = new List<JangsanbeomBoss.AttackData>(8);
-        foreach (var a in attacksPhase2) if (a != null && a.AllowInPhase2) list.Add(a);
-        foreach (var a in attacksPhase1) if (a != null && a.AllowInPhase2) list.Add(a);
-        return list;
-    }
-
-    // 분신 사망 콜백
-    public void OnCloneDied(JangsanbeomClone who)
-    {
-        _clones.Remove(who);
-    }
-
+    // ====== Unity ======
     void Reset()
     {
         spriteRenderer = GetComponentInChildren<SpriteRenderer>();
-        animator = GetComponent<Animator>();
+        animator = GetComponentInChildren<Animator>();
         rb = GetComponent<Rigidbody2D>();
+    }
+
+    // 외부에서 임시로 원점만 바꿔 한 번 쏘고 싶은 경우용(유틸)
+    public void PerformAttackOnceFrom(AttackData atk, Transform originOverride, bool applyDamage)
+    {
+        if (atk == null) return;
+        var bak = atk.OriginOverride;
+        atk.OriginOverride = originOverride;
+        PerformAttackOnce(atk, applyDamage);
+        atk.OriginOverride = bak;
     }
 
     void Awake()
     {
+        // 분신 마커 감지 → 라이트 모드로 전환
+        var cloneCfg = GetComponent<BossCloneConfig>();
+        if (cloneCfg != null)
+        {
+            isCloneInstance = true;
+
+            // 스폰 루프 근본 차단
+            allowCloneSpawns = !cloneCfg.disableCloneSpawns;
+            maxClones = 0;             // 안전망
+            clonePrefab = null;        // 안전망
+
+            // 2페이즈 자체 방지
+            if (cloneCfg.disablePhase2) Phase2HealthThreshold = -1f;
+            if (cloneCfg.disablePhase2Intro) { phase2IntroInvulnerable = false; phase2IntroFallbackDuration = 0f; }
+
+            // HP 경량화
+            MaxHealth = Mathf.Max(1, cloneCfg.cloneMaxHp);
+            CurrentHealth = MaxHealth;
+        }
+
         if (spriteRenderer == null) spriteRenderer = GetComponentInChildren<SpriteRenderer>();
-        if (animator == null) animator = GetComponent<Animator>();
+        if (animator == null) animator = GetComponentInChildren<Animator>();
         if (rb == null) rb = GetComponent<Rigidbody2D>();
         if (rb) { rb.bodyType = RigidbodyType2D.Kinematic; rb.simulated = true; }
 
-        _rootOriginalScale = transform.localScale; _rootOriginalScale.x = Mathf.Abs(_rootOriginalScale.x);
+        _rootOriginalScale = transform.localScale;
+        _rootOriginalScale.x = Mathf.Abs(_rootOriginalScale.x);
         transform.localScale = _rootOriginalScale;
 
         if (graphicsRoot)
@@ -259,7 +302,7 @@ public class JangsanbeomBoss : MonoBehaviour
 
         UpdateHealthCacheImmediate();
         UpdatePhaseFlagsFromHealth();
-        ApplyPhaseMapRoots(false); // 현재 페이즈에 맞춰 맵 세팅
+        ApplyPhaseMapRoots(false);
 
         if (player != null)
         {
@@ -267,6 +310,9 @@ public class JangsanbeomBoss : MonoBehaviour
                        : (flipPivot ? player.position.x - flipPivot.position.x
                                     : player.position.x - transform.position.x);
             _prevTriggerSide = (rel > flipTriggerHysteresis) ? 1 : (rel < -flipTriggerHysteresis ? -1 : 0);
+
+            // 시작 시 플레이어 쪽을 보도록 보정
+            FlipTo(player.position.x >= transform.position.x);
         }
     }
 
@@ -274,7 +320,10 @@ public class JangsanbeomBoss : MonoBehaviour
     {
         if (player == null) return;
 
-        // follow(2페이즈 / 인트로 동안은 이동 금지)
+        // 1차 가드: 바깥 레일 기준 정면 유지
+        ForceFaceWhenPlayerOutsideBounds();
+
+        // Follow
         float dx = player.position.x - transform.position.x;
         bool isMoving = false;
         bool blockMove = busy || _phase2IntroPlaying || (_inPhase2 && lockMovementInPhase2) || _animLockMove;
@@ -284,44 +333,67 @@ public class JangsanbeomBoss : MonoBehaviour
             float step = followSpeed * Time.deltaTime;
             float prevX = transform.position.x;
             var p = transform.position;
-            p.x = Mathf.MoveTowards(transform.position.x,
-                player.position.x - Mathf.Sign(dx) * followMinDistanceX, step);
+            p.x = Mathf.MoveTowards(transform.position.x, player.position.x - Mathf.Sign(dx) * followMinDistanceX, step);
             transform.position = p;
             isMoving = Mathf.Abs(p.x - prevX) > 0.0001f;
         }
 
-        // 2페이즈일 때만 분신 스폰 로직
-        if (_inPhase2 && !_phase2IntroPlaying)
+        // 스폰 호출부 1차 가드
+        if (_inPhase2 && !_phase2IntroPlaying
+            && allowCloneSpawns
+            && maxClones > 0
+            && clonePrefab != null)
         {
             if (_cloneCooldownTimer > 0f) _cloneCooldownTimer -= Time.deltaTime;
             TrySpawnCloneIfNeeded();
         }
 
-        // 애니 파라미터 세팅
         if (animator && !string.IsNullOrEmpty(animParam_MoveBool))
             SafeSetBool(animParam_MoveBool, isMoving);
 
-        // flip (애니 락 중이면 비활성화)
+        // 안쪽 레일(겹침) 히스테리시스 플립
         if (!_animLockFlip && (Time.time - _lastFlipTime > flipCooldown))
         {
-            if (flipTrigger)
+            if (player != null && bodyCollider != null)
             {
-                float triggerX = GetFlipTriggerWorldX();
-                float rel = player.position.x - triggerX;
-                int cur = (rel > flipTriggerHysteresis) ? 1 : (rel < -flipTriggerHysteresis ? -1 : 0);
-                if (cur != _prevTriggerSide && cur != 0) { FlipTo(rel > 0f); _lastFlipTime = Time.time; }
-            }
-            else if (flipPivot)
-            {
-                float rel = player.position.x - flipPivot.position.x;
-                int cur = (rel > flipPivotDeadzone) ? 1 : (rel < -flipPivotDeadzone ? -1 : 0);
-                if (cur != _prevTriggerSide && cur != 0) { FlipTo(rel > 0f); _lastFlipTime = Time.time; }
-            }
-            else
-            {
-                float rel = player.position.x - transform.position.x;
-                int cur = (rel > 0f) ? 1 : (rel < 0f ? -1 : 0);
-                if (cur != _prevTriggerSide) { FlipTo(rel > 0f); _lastFlipTime = Time.time; }
+                var b = bodyCollider.bounds;
+                b.Expand(new Vector3(faceOutsideMarginX * 2f, 0f, 0f));
+                bool insideBodyX = (player.position.x >= b.min.x && player.position.x <= b.max.x);
+
+                if (insideBodyX)
+                {
+                    if (flipTrigger)
+                    {
+                        float triggerX = GetFlipTriggerWorldX();
+                        float rel = player.position.x - triggerX;
+                        int cur = (rel > flipTriggerHysteresis) ? 1 : (rel < -flipTriggerHysteresis ? -1 : 0);
+                        if (cur != 0 && cur != _prevTriggerSide)
+                        {
+                            FlipTo(rel > 0f);
+                            _lastFlipTime = Time.time;
+                        }
+                    }
+                    else if (flipPivot)
+                    {
+                        float rel = player.position.x - flipPivot.position.x;
+                        int cur = (rel > flipPivotDeadzone) ? 1 : (rel < -flipPivotDeadzone ? -1 : 0);
+                        if (cur != 0 && cur != _prevTriggerSide)
+                        {
+                            FlipTo(rel > 0f);
+                            _lastFlipTime = Time.time;
+                        }
+                    }
+                    else
+                    {
+                        float rel = player.position.x - transform.position.x;
+                        int cur = (rel > 0f) ? 1 : (rel < 0f ? -1 : 0);
+                        if (cur != _prevTriggerSide)
+                        {
+                            FlipTo(rel > 0f);
+                            _lastFlipTime = Time.time;
+                        }
+                    }
+                }
             }
         }
 
@@ -337,12 +409,8 @@ public class JangsanbeomBoss : MonoBehaviour
 
     void LateUpdate()
     {
-        if (transform.localScale.x != _rootOriginalScale.x)
-        { var s = transform.localScale; s.x = _rootOriginalScale.x; transform.localScale = s; }
-
         if (enforceVisualFlip) ApplyVisualFlipNow();
 
-        // ✅ 이동 잠금 상태면 Speed=0
         bool blockMove = busy || _phase2IntroPlaying || (_inPhase2 && lockMovementInPhase2) || _animLockMove;
 
         if (animator && !string.IsNullOrEmpty(animParam_MoveSpeed))
@@ -354,7 +422,7 @@ public class JangsanbeomBoss : MonoBehaviour
         _lastPosition = transform.position;
     }
 
-    // ---------- Phase ----------
+    // ====== Phase ======
     void UpdateHealthCacheImmediate()
     {
         if (bossHealthComponent != null)
@@ -367,6 +435,7 @@ public class JangsanbeomBoss : MonoBehaviour
         CurrentHealth = Mathf.Clamp(CurrentHealth, 0f, Mathf.Max(1f, MaxHealth));
         _lastKnownHp = CurrentHealth; _lastKnownMaxHp = MaxHealth;
     }
+
     float TryGetFloatMember(object obj, params string[] names)
     {
         if (obj == null) return float.NaN;
@@ -394,13 +463,14 @@ public class JangsanbeomBoss : MonoBehaviour
         if (MaxHealth <= 0f) return;
         float perc = CurrentHealth / MaxHealth;
         bool goPhase2 = perc <= Phase2HealthThreshold;
-        if (goPhase2 && !_inPhase2) EnterPhase2();   // Enter에서 _inPhase2 = true 로 바꿈
+        if (goPhase2 && !_inPhase2) EnterPhase2();
         _inPhase2 = goPhase2;
     }
 
     void EnterPhase2()
     {
         if (debugFlip) Debug.Log("[Boss] Entering Phase 2!");
+<<<<<<< HEAD
 
         // 2페이즈 BGM 전환
         if (AudioManager.Instance != null)
@@ -409,9 +479,10 @@ public class JangsanbeomBoss : MonoBehaviour
         }
 
         // **핵심**: 인트로 맵을 켜기 전에 Phase2 플래그를 true로 먼저 설정
+=======
+>>>>>>> main
         _inPhase2 = true;
 
-        // 순간이동(옵션)
         if (teleportToCenterOnPhase2)
         {
             Vector3 target = phase2CenterPoint ? phase2CenterPoint.position
@@ -429,14 +500,9 @@ public class JangsanbeomBoss : MonoBehaviour
 
         _phase2IntroPlaying = true;
         if (phase2IntroInvulnerable) _invulnerable = true;
-
-        // 인트로 맵 켜기 (이제 _inPhase2 == true 상태)
         ApplyPhaseMapRoots(true);
-
-        // 애니메이터 트리거(선택)
         SafeSetTrigger(trig_EnterPhase2);
 
-        // 폴백 타이머
         if (phase2IntroFallbackDuration > 0f)
             StartCoroutine(Phase2IntroFallback(phase2IntroFallbackDuration));
     }
@@ -447,23 +513,20 @@ public class JangsanbeomBoss : MonoBehaviour
         EndPhase2Intro();
     }
 
-    // 애니메이션 이벤트용
     public void OnPhase2IntroStart()
     {
-        _inPhase2 = true; // 안전 보강
+        _inPhase2 = true;
         _phase2IntroPlaying = true;
         if (phase2IntroInvulnerable) _invulnerable = true;
         ApplyPhaseMapRoots(true);
     }
-    public void OnPhase2IntroEnd()
-    {
-        EndPhase2Intro();
-    }
+    public void OnPhase2IntroEnd() { EndPhase2Intro(); }
+
     void EndPhase2Intro()
     {
         _phase2IntroPlaying = false;
         _invulnerable = false;
-        ApplyPhaseMapRoots(false); // 본격 2페이즈 맵으로
+        ApplyPhaseMapRoots(false);
     }
 
     void ApplyPhaseMapRoots(bool intro)
@@ -473,23 +536,39 @@ public class JangsanbeomBoss : MonoBehaviour
         if (Phase2MapRoot) Phase2MapRoot.SetActive(_inPhase2 && !intro);
     }
 
-    // ---------- Flip ----------
+    // ====== Flip / Visual ======
+    float FacingSign() => facingRight ? 1f : -1f;
+    float VisualSign() => (facingRight ? 1f : -1f) * (spriteFacesRight ? 1f : -1f);
+
+    float VisualSignForGizmos()
+    {
+        if (Application.isPlaying) return VisualSign();
+        if (graphicsRoot) { float sx = graphicsRoot.localScale.x; return Mathf.Approximately(sx, 0f) ? 1f : Mathf.Sign(sx); }
+        if (spriteRenderer)
+        {
+            int srFlipSign = spriteRenderer.flipX ? -1 : 1;
+            int baseSign = spriteFacesRight ? 1 : -1;
+            return srFlipSign * baseSign;
+        }
+        return 1f;
+    }
+
     public void FlipTo(bool faceRight)
     {
         facingRight = faceRight;
-        transform.localScale = _rootOriginalScale;
 
         if (graphicsRoot)
         {
-            var s = _graphicsOriginalScale;
-            s.x = _graphicsOriginalScale.x * (faceRight ? 1f : -1f);
+            var s = graphicsRoot.localScale;
+            float sign = faceRight ? 1f : -1f;
+            s.x = Mathf.Abs(s.x) * (spriteFacesRight ? sign : -sign);
             graphicsRoot.localScale = s;
             if (spriteRenderer) spriteRenderer.flipX = false;
         }
         else
         {
             if (!spriteRenderer) spriteRenderer = GetComponentInChildren<SpriteRenderer>();
-            if (spriteRenderer) spriteRenderer.flipX = !faceRight;
+            if (spriteRenderer) spriteRenderer.flipX = spriteFacesRight ? !faceRight : faceRight;
             else FlipAllSpriteRenderers(faceRight);
         }
 
@@ -498,11 +577,12 @@ public class JangsanbeomBoss : MonoBehaviour
         if (flipTrigger && _flipTriggerIsChild)
         {
             var lp = flipTrigger.transform.localPosition;
-            lp.x = _flipTriggerOriginalLocalX * (faceRight ? 1f : -1f);
+            lp.x = _flipTriggerOriginalLocalX * VisualSign();
             flipTrigger.transform.localPosition = lp;
         }
 
-        float refX = (flipTrigger ? GetFlipTriggerWorldX() : (flipPivot ? flipPivot.position.x : transform.position.x));
+        float refX = (flipTrigger ? GetFlipTriggerWorldX()
+                                  : (flipPivot ? flipPivot.position.x : transform.position.x));
         float relAfter = player ? player.position.x - refX : 0f;
         _prevTriggerSide = (relAfter > flipTriggerHysteresis) ? 1 : (relAfter < -flipTriggerHysteresis ? -1 : 0);
     }
@@ -511,29 +591,38 @@ public class JangsanbeomBoss : MonoBehaviour
     {
         if (graphicsRoot)
         {
-            float wantX = (facingRight ? Mathf.Abs(_graphicsOriginalScale.x) : -Mathf.Abs(_graphicsOriginalScale.x));
-            if (graphicsRoot.localScale.x != wantX)
-            { var s = _graphicsOriginalScale; s.x = wantX; graphicsRoot.localScale = s; }
+            var s = graphicsRoot.localScale;
+            float sign = facingRight ? 1f : -1f;
+            float want = Mathf.Abs(s.x) * (spriteFacesRight ? sign : -sign);
+            if (!Mathf.Approximately(s.x, want)) { s.x = want; graphicsRoot.localScale = s; }
         }
-        else FlipAllSpriteRenderers(facingRight);
+        else
+        {
+            if (spriteRenderer) spriteRenderer.flipX = spriteFacesRight ? !facingRight : facingRight;
+            else foreach (var sr in GetComponentsInChildren<SpriteRenderer>(true))
+                    sr.flipX = spriteFacesRight ? !facingRight : facingRight;
+        }
     }
+
     void FlipAllSpriteRenderers(bool faceRight)
     {
-        foreach (var sr in GetComponentsInChildren<SpriteRenderer>(true)) sr.flipX = !faceRight;
+        foreach (var sr in GetComponentsInChildren<SpriteRenderer>(true))
+            sr.flipX = spriteFacesRight ? !faceRight : faceRight;
     }
+
     float GetFlipTriggerWorldX()
     {
         if (!flipTrigger) return transform.position.x;
         if (_flipTriggerIsChild)
         {
-            float localX = _flipTriggerOriginalLocalX * (facingRight ? 1f : -1f);
+            float localX = _flipTriggerOriginalLocalX * VisualSign();
             Vector3 world = transform.TransformPoint(new Vector3(localX, flipTrigger.transform.localPosition.y, 0f));
             return world.x;
         }
         return flipTrigger.bounds.center.x;
     }
 
-    // ---------- AI / Attacks ----------
+    // ====== AI / Attacks ======
     IEnumerator AIBehavior()
     {
         while (true)
@@ -571,11 +660,9 @@ public class JangsanbeomBoss : MonoBehaviour
     {
         if (busy) return;
         pool ??= BuildCurrentAttackPool();
-
         AttackData atk = null;
         if (pool != null && index >= 0 && index < pool.Count) atk = pool[index];
         if (atk == null) atk = new AttackData();
-
         StartCoroutine(ClawRoutine_Generic(atk));
     }
 
@@ -591,7 +678,7 @@ public class JangsanbeomBoss : MonoBehaviour
             if (enableFakePhase1)
             {
                 isFakeVisual = UnityEngine.Random.value < fakeChancePhase1 || atk.DefaultFake;
-                if (isFakeVisual) applyDamage = false; // 1페이즈 페이크는 대미지 X
+                if (isFakeVisual) applyDamage = false;
             }
         }
         else
@@ -599,7 +686,7 @@ public class JangsanbeomBoss : MonoBehaviour
             if (enableFakePhase2)
             {
                 isFakeVisual = UnityEngine.Random.value < fakeChancePhase2 || atk.DefaultFake;
-                applyDamage = isFakeVisual ? atk.Phase2_FakeDealsDamage : true; // 2페이즈 페이크 실체화 옵션
+                applyDamage = isFakeVisual ? atk.Phase2_FakeDealsDamage : true;
             }
         }
 
@@ -620,7 +707,6 @@ public class JangsanbeomBoss : MonoBehaviour
         busy = false;
     }
 
-    // 애니 이벤트 훅 (클로 공격)
     public void OnClawHitFrame()
     {
         var pool = BuildCurrentAttackPool(); if (pool.Count > 0) PerformAttackOnce(pool[0], true);
@@ -630,9 +716,11 @@ public class JangsanbeomBoss : MonoBehaviour
         var pool = BuildCurrentAttackPool(); if (pool.Count > 0) { var a = pool[0]; bool dmg = _inPhase2 ? a.Phase2_FakeDealsDamage : false; PerformAttackOnce(a, dmg); }
     }
 
+    // ====== 공통 히트 처리(마스크/태그 의존 X) ======
     void PerformAttackOnce(AttackData atk, bool applyDamage)
     {
         if (!applyDamage) return;
+<<<<<<< HEAD
         if (_invulnerable) return; // 변신/무적 중엔 공격 무시(원하면 제거)
 
         // 보스 공격 사운드 재생
@@ -640,42 +728,44 @@ public class JangsanbeomBoss : MonoBehaviour
             AudioManager.Instance.PlayBossAttack();
 
         if (playerLayer == 0) { Debug.LogWarning("[Boss] playerLayer not set."); return; }
+=======
+>>>>>>> main
 
         Vector2 center = GetAttackWorldPos(atk);
-        float dirSign = facingRight ? 1f : -1f;
-        float worldAngle = atk.Angle * dirSign;
+        float worldAngle = atk.Angle * VisualSign();
 
-        var hits = Physics2D.OverlapBoxAll(center, atk.Size, worldAngle, playerLayer);
-        var set = new HashSet<Collider2D>();
+        // 마스크 없이 전부 겹침 검사
+        var hits = Physics2D.OverlapBoxAll(center, atk.Size, worldAngle);
 
+        var seen = new HashSet<Collider2D>();
         foreach (var col in hits)
         {
-            if (!col || set.Contains(col)) continue;
-            set.Add(col);
-            if (!string.IsNullOrEmpty(playerTag) && !col.CompareTag(playerTag)) continue;
+            if (!col || seen.Contains(col)) continue;
+            seen.Add(col);
 
-            var pc = col.GetComponent<PlayerController>() ?? col.GetComponentInParent<PlayerController>() ?? col.GetComponentInChildren<PlayerController>();
-            if (pc != null)
+            // 플레이어 컴포넌트가 있어야만 대미지
+            var pc = col.GetComponent<PlayerController>() ??
+                     col.GetComponentInParent<PlayerController>() ??
+                     col.GetComponentInChildren<PlayerController>();
+            if (pc == null) continue;
+
+            if (pc.IsParrying && TryAskPlayerToConsumeParry(pc, atk.Damage)) continue;
+
+            var dmg = col.GetComponent<IDamageable>() ??
+                      col.GetComponentInParent<IDamageable>() ??
+                      col.GetComponentInChildren<IDamageable>();
+            if (dmg != null) { dmg.TakeDamage(atk.Damage); continue; }
+
+            var pHealth = col.GetComponent<PlayerHealth>() ??
+                          col.GetComponentInParent<PlayerHealth>() ??
+                          col.GetComponentInChildren<PlayerHealth>();
+            if (pHealth != null) { pHealth.TakeDamage(atk.Damage); continue; }
+
+            var mb = col.GetComponent<MonoBehaviour>() ?? col.GetComponentInParent<MonoBehaviour>();
+            if (mb != null)
             {
-                if (pc.IsParrying)
-                {
-                    bool consumed = TryAskPlayerToConsumeParry(pc, atk.Damage);
-                    if (consumed) continue;
-                    else continue;
-                }
-
-                var dmg = col.GetComponent<IDamageable>() ?? col.GetComponentInParent<IDamageable>() ?? col.GetComponentInChildren<IDamageable>();
-                if (dmg != null) { dmg.TakeDamage(atk.Damage); continue; }
-
-                var pHealth = col.GetComponent<PlayerHealth>() ?? col.GetComponentInParent<PlayerHealth>();
-                if (pHealth != null) { pHealth.TakeDamage(atk.Damage); continue; }
-
-                var mb = col.GetComponent<MonoBehaviour>() ?? col.GetComponentInParent<MonoBehaviour>();
-                if (mb != null)
-                {
-                    MethodInfo mi = mb.GetType().GetMethod("TakeDamage", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                    if (mi != null) { mi.Invoke(mb, new object[] { atk.Damage }); continue; }
-                }
+                MethodInfo mi = mb.GetType().GetMethod("TakeDamage", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                if (mi != null) mi.Invoke(mb, new object[] { atk.Damage });
             }
         }
     }
@@ -704,13 +794,13 @@ public class JangsanbeomBoss : MonoBehaviour
         return false;
     }
 
-    // ---------- Utils ----------
+    // ====== Utils ======
     Vector2 GetAttackWorldPos(AttackData atk)
     {
-        float dir = facingRight ? 1f : -1f;
+        float sign = VisualSign();
         Vector2 origin = atk.OriginOverride ? (Vector2)atk.OriginOverride.position : (Vector2)transform.position;
-        Vector2 off = atk.Offset; off.x *= dir;
-        float ang = (atk.Angle * dir) * Mathf.Deg2Rad;
+        Vector2 off = atk.Offset; off.x *= sign;
+        float ang = (atk.Angle * sign) * Mathf.Deg2Rad;
         float c = Mathf.Cos(ang), s = Mathf.Sin(ang);
         Vector2 rot = new(off.x * c - off.y * s, off.x * s + off.y * c);
         return origin + rot;
@@ -746,25 +836,30 @@ public class JangsanbeomBoss : MonoBehaviour
 
     void ApplyFlipToPolygonColliders(bool faceRight)
     {
+        bool mirror = VisualSign() < 0f;
         for (int k = 0; k < _polyColliders.Count; k++)
         {
             var poly = _polyColliders[k];
             if (!poly) continue;
             var orig = _originalPolyPaths[k];
             poly.pathCount = orig.Length;
-            bool mirror = !faceRight;
+
             for (int i = 0; i < orig.Length; i++)
             {
                 var src = orig[i];
                 var dst = new Vector2[src.Length];
                 if (!mirror) Array.Copy(src, dst, src.Length);
-                else { for (int j = 0; j < src.Length; j++) dst[j] = new Vector2(-src[j].x, src[j].y); Array.Reverse(dst); }
+                else
+                {
+                    for (int j = 0; j < src.Length; j++) dst[j] = new Vector2(-src[j].x, src[j].y);
+                    Array.Reverse(dst);
+                }
                 poly.SetPath(i, dst);
             }
         }
     }
 
-    // ---------- Safe Animator helpers ----------
+    // ====== Safe Animator helpers ======
     void SafeSetTrigger(string name)
     {
         if (!animator || string.IsNullOrEmpty(name)) return;
@@ -784,13 +879,18 @@ public class JangsanbeomBoss : MonoBehaviour
             if (p.name == name && p.type == AnimatorControllerParameterType.Float) { animator.SetFloat(name, v); return; }
     }
 
+<<<<<<< HEAD
     // ===== Animation Events: Dash / Locks / I-Frames / Relative motion =====
     public void Anim_DashStart() { /* _dashActive = true; */ _animLockMove = true; _animLockFlip = true; busy = true; }
     public void Anim_DashEnd() { /* _dashActive = false; */ _animLockMove = false; _animLockFlip = false; busy = false; }
 
+=======
+    // ====== Animation Events ======
+    public void Anim_DashStart() { _dashActive = true; _animLockMove = true; _animLockFlip = true; busy = true; }
+    public void Anim_DashEnd() { _dashActive = false; _animLockMove = false; _animLockFlip = false; busy = false; }
+>>>>>>> main
     public void Anim_SetMoveLock(int on) { _animLockMove = (on != 0); }
     public void Anim_SetFlipLock(int on) { _animLockFlip = (on != 0); }
-
     public void Anim_InvulnOn() { _invulnerable = true; }
     public void Anim_InvulnOff() { _invulnerable = false; }
 
@@ -823,34 +923,223 @@ public class JangsanbeomBoss : MonoBehaviour
         else transform.position += delta;
     }
 
+    // ====== Bounds-based facing helper ======
+    void ForceFaceWhenPlayerOutsideBounds()
+    {
+        if (_animLockFlip) return;
+        if (player == null || bodyCollider == null) return;
+
+        var b = bodyCollider.bounds;
+        b.Expand(new Vector3(faceOutsideMarginX * 2f, 0f, 0f));
+
+        float px = player.position.x;
+        bool outsideX = (px < b.min.x || px > b.max.x);
+
+        if (outsideX)
+        {
+            bool wantRight = px >= b.center.x;
+            if (wantRight == facingRight) return; // 이미 정면이면 유지
+
+            FlipTo(wantRight);
+            _lastFlipTime = Time.time;
+
+            float refX = (flipTrigger ? GetFlipTriggerWorldX()
+                         : (flipPivot ? flipPivot.position.x : transform.position.x));
+            float relAfter = player.position.x - refX;
+            _prevTriggerSide = (relAfter > flipTriggerHysteresis) ? 1 :
+                               (relAfter < -flipTriggerHysteresis ? -1 : 0);
+        }
+    }
+
+    // ====== Gizmos ======
     void OnDrawGizmos()
     {
         if (!showAttackGizmos) return;
+
+        // 현재 풀
         var list = Application.isPlaying ? BuildCurrentAttackPool() : attacksPhase1;
-        if (list == null) return;
-
-        for (int i = 0; i < list.Count; i++)
+        if (list != null)
         {
-            var a = list[i];
-            Vector2 pos; float angleDeg;
-            if (Application.isPlaying) { pos = GetAttackWorldPos(a); angleDeg = a.Angle * (facingRight ? 1f : -1f); }
-            else
-            {
-                float dir = (facingRight ? 1f : -1f);
-                Vector2 origin = a.OriginOverride ? (Vector2)a.OriginOverride.position : (Vector2)transform.position;
-                Vector2 off = a.Offset; off.x *= dir;
-                float ang = (a.Angle * dir) * Mathf.Deg2Rad; float c = Mathf.Cos(ang), s = Mathf.Sin(ang);
-                Vector2 rot = new(off.x * c - off.y * s, off.x * s + off.y * c);
-                pos = origin + rot; angleDeg = a.Angle * dir;
-            }
-            Color fill = a.DefaultFake ? gizmoFakeColor : gizmoRealColor;
-            Color wire = new(fill.r, fill.g, fill.b, Mathf.Min(1f, fill.a * 2f));
+            float sign = VisualSignForGizmos();
+            for (int i = 0; i < list.Count; i++)
+                DrawGizmoForAttack(list[i], sign, gizmoRealColor, new Color(gizmoRealColor.r, gizmoRealColor.g, gizmoRealColor.b, Mathf.Min(1f, gizmoRealColor.a * 2f)));
+        }
 
-            var prev = Gizmos.matrix;
-            Gizmos.matrix = Matrix4x4.TRS(new Vector3(pos.x, pos.y, 0), Quaternion.Euler(0, 0, angleDeg), Vector3.one);
-            Gizmos.color = fill; Gizmos.DrawCube(Vector3.zero, new Vector3(a.Size.x, a.Size.y, 0.01f));
-            Gizmos.color = wire; Gizmos.DrawWireCube(Vector3.zero, new Vector3(a.Size.x, a.Size.y, 0.01f) * 1.001f);
-            Gizmos.matrix = prev;
+        // 대쉬 기즈모(파란색 톤)
+        if (dashAttack != null)
+        {
+            float sign = VisualSignForGizmos();
+            Color dashFill = new Color(0.2f, 0.6f, 1f, 0.18f);
+            Color dashWire = new Color(0.2f, 0.6f, 1f, 0.36f);
+            DrawGizmoForAttack(dashAttack, sign, dashFill, dashWire);
         }
     }
+
+    void DrawGizmoForAttack(AttackData a, float sign, Color fill, Color wire)
+    {
+        if (a == null) return;
+
+        Vector2 origin = a.OriginOverride ? (Vector2)a.OriginOverride.position : (Vector2)transform.position;
+        Vector2 off = a.Offset; off.x *= sign;
+
+        float angRad = (a.Angle * sign) * Mathf.Deg2Rad;
+        float c = Mathf.Cos(angRad), s = Mathf.Sin(angRad);
+        Vector2 rot = new(off.x * c - off.y * s, off.x * s + off.y * c);
+
+        Vector2 pos = origin + rot;
+        float angleDeg = a.Angle * sign;
+
+        var prev = Gizmos.matrix;
+        Gizmos.matrix = Matrix4x4.TRS(new Vector3(pos.x, pos.y, 0), Quaternion.Euler(0, 0, angleDeg), Vector3.one);
+        Gizmos.color = fill; Gizmos.DrawCube(Vector3.zero, new Vector3(a.Size.x, a.Size.y, 0.01f));
+        Gizmos.color = wire; Gizmos.DrawWireCube(Vector3.zero, new Vector3(a.Size.x, a.Size.y, 0.01f) * 1.001f);
+        Gizmos.matrix = prev;
+    }
+
+    // ====== Clones (Double-Guard) ======
+    void TrySpawnCloneIfNeeded()
+    {
+        // ★ 하드 게이트
+        if (!allowCloneSpawns || maxClones <= 0 || clonePrefab == null) return;
+
+        // null 정리
+        for (int i = _clones.Count - 1; i >= 0; i--)
+            if (_clones[i] == null) _clones.RemoveAt(i);
+
+        // 상한/쿨다운/예약 중복 가드
+        if (_clones.Count >= maxClones) return;
+        if (_cloneCooldownTimer > 0f) return;
+        if (_pendingBellSpawn != null) return; // 이미 종 울리고 스폰 예약됨
+
+        // === 스폰 위치: 플레이어 "바로 앞"(보스 방향 쪽) ===
+        Vector2 basePos = transform.position;
+        float dirToBoss = Mathf.Sign(transform.position.x - player.position.x); // 플레이어→보스 방향(+/-1)
+        Vector2 spawnPos = new Vector2(
+            player.position.x + dirToBoss * oneShotFrontOffsetX,
+            lockCloneY ? cloneFixedY : basePos.y
+        );
+
+        // === 종 울림 선행 & 스폰 예약 ===
+        if (!PreSignalBellAndSchedule(spawnPos))
+        {
+            // 종이 울리는 중이면 스폰 시도하지 않음(혼동 금지)
+            return;
+        }
+
+        // 리드타임 동안 추가 시도를 막기 위해 바로 쿨다운 시작
+        if (_cloneCooldownTimer <= 0f) _cloneCooldownTimer = cloneSpawnCooldown;
+    }
+
+    bool PreSignalBellAndSchedule(Vector2 spawnPos)
+    {
+        // 종이 하나라도 울리는 중이면 금지
+        if (blockAttacksWhileAnyBellRinging && bellRingers != null)
+        {
+            for (int i = 0; i < bellRingers.Count; i++)
+            {
+                var r = bellRingers[i];
+                if (r && r.IsRinging) return false;
+            }
+        }
+
+        // 가까운 "대기 중" 종을 선택해 울린다
+        BellRinger best = null;
+        float bestDist = float.MaxValue;
+
+        if (bellRingers != null && bellRingers.Count > 0)
+        {
+            for (int i = 0; i < bellRingers.Count; i++)
+            {
+                var r = bellRingers[i];
+                if (r == null || r.IsRinging) continue;
+                float dx = r.transform.position.x - spawnPos.x;
+                float dy = r.transform.position.y - spawnPos.y;
+                float d = Mathf.Abs(dx) + Mathf.Abs(dy); // L1 거리(가볍게)
+                if (d < bestDist) { best = r; bestDist = d; }
+            }
+
+            // 쓸 수 있는 종이 없다면 공격 명령을 내리지 않는다(혼동 방지)
+            if (best == null) return false;
+
+            // 종 울리기 시도 (실패 시 스폰 안 함)
+            if (!best.TryRing(Mathf.Max(0.01f, bellLeadTime))) return false;
+
+            // 리드타임 뒤 스폰 예약
+            if (_pendingBellSpawn != null) StopCoroutine(_pendingBellSpawn);
+            _pendingBellSpawn = StartCoroutine(SpawnAfterBellDelay(spawnPos, bellLeadTime));
+            return true;
+        }
+        else
+        {
+            // 종을 쓰지 않는 씬이라면 바로 스폰
+            SpawnCloneNowAt(spawnPos);
+            return true;
+        }
+    }
+
+    IEnumerator SpawnAfterBellDelay(Vector2 spawnPos, float delay)
+    {
+        yield return new WaitForSeconds(Mathf.Max(0.01f, delay));
+        SpawnCloneNowAt(spawnPos);
+        _pendingBellSpawn = null;
+    }
+
+    void SpawnCloneNowAt(Vector2 spawnPos)
+    {
+        // 생성
+        var go = Instantiate(clonePrefab, spawnPos, Quaternion.identity);
+
+        // 라이트 모드 설정
+        var cloneBoss = go.GetComponent<JangsanbeomBoss>();
+        if (cloneBoss != null)
+        {
+            cloneBoss.player = this.player;
+
+            var cfg = go.GetComponent<BossCloneConfig>();
+            if (cfg == null) cfg = go.AddComponent<BossCloneConfig>();
+            cfg.cloneMaxHp = Mathf.Max(1, cloneInitialHp);
+            cfg.disablePhase2 = true;
+            cfg.disableCloneSpawns = true;     // 클론이 또 스폰 못 하게
+            cfg.disablePhase2Intro = true;
+            cfg.disableRewardsOnDeath = true;
+            cfg.clearMapRoots = true;
+            cfg.hideGizmosInPlay = true;
+
+            if (cloneInheritFlip) cloneBoss.FlipTo(this.facingRight);
+        }
+
+        var jsbClone = go.GetComponent<JangsanbeomClone>();
+        if (jsbClone != null) _clones.Add(jsbClone);
+
+        // 원샷 분신 모드(이미 구현해둔 스크립트)
+        if (useOneShotClones)
+        {
+            var oneShot = go.GetComponent<JangsanbeomOneShotClone>();
+            if (!oneShot) oneShot = go.AddComponent<JangsanbeomOneShotClone>();
+            oneShot.Init(
+                owner: this,
+                selfBoss: cloneBoss,
+                player: this.player,
+                preDelay: oneShotPreDelay,
+                fadeIn: oneShotFadeIn,
+                fadeOut: oneShotFadeOut,
+                despawnDelay: oneShotDespawnDelay,
+                inheritFlip: oneShotInheritFlip
+            );
+        }
+
+        // 쿨다운(이미 걸려있으면 덮어쓰지 않음)
+        if (_cloneCooldownTimer <= 0f) _cloneCooldownTimer = cloneSpawnCooldown;
+    }
+
+
+    List<AttackData> BuildPhase2AttackPoolForClone()
+    {
+        var list = new List<AttackData>(8);
+        foreach (var a in attacksPhase2) if (a != null && a.AllowInPhase2) list.Add(a);
+        foreach (var a in attacksPhase1) if (a != null && a.AllowInPhase2) list.Add(a);
+        return list;
+    }
+
+    public void OnCloneDied(JangsanbeomClone who) { _clones.Remove(who); }
 }

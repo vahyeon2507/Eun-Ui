@@ -14,13 +14,13 @@ public class JangsanbeomClone : MonoBehaviour, IDamageable
     public Rigidbody2D rb;
 
     [Header("Visual Flip (optional)")]
-    public Transform graphicsRoot;                 // 비워도 OK. 있으면 여기만 좌우반전
+    public Transform graphicsRoot; // 여기에 애니메이션 키 찍으면 안전
     public bool spriteFacesRight = true;
     public bool enforceVisualFlip = true;
 
     [Header("Flip Trigger / Pivot (본체와 동일)")]
-    public BoxCollider2D flipTrigger;             // 자식 박스 콜라이더 추천
-    public Transform flipPivot;                   // 없으면 자기 transform.x 사용
+    public BoxCollider2D flipTrigger;
+    public Transform flipPivot;
     public float flipPivotDeadzone = 0.6f;
     public float flipTriggerHysteresis = 0.05f;
     public float flipCooldown = 0.12f;
@@ -61,10 +61,48 @@ public class JangsanbeomClone : MonoBehaviour, IDamageable
     readonly List<PolygonCollider2D> _polys = new();
     readonly List<Vector2[][]> _polyPaths = new();
 
-    // flip-trigger bookkeeping (child offset 반전용)
     float _flipTriggerOriginalLocalX = 0f;
     bool _flipTriggerIsChild = false;
     int _prevTriggerSide = 0;
+
+    bool _animLockMove, _animLockFlip, _invuln;
+
+    public void EVT_DashStart() { _animLockMove = true; _animLockFlip = true; }
+    public void EVT_DashEnd() { _animLockMove = false; _animLockFlip = false; }
+
+    public void EVT_MoveBy(string spec)
+    {
+        // 보스랑 동일 규칙으로 이동시키고 싶으면 보스의 파서를 재사용하거나,
+        // 여기서 간단히 처리해도 됩니다. 가장 간단한 버전:
+        // spec: "dx,dy[,local|world][,face]"
+        if (string.IsNullOrEmpty(spec)) return;
+        var p = spec.Split(',');
+        if (p.Length < 2) return;
+        float dx = float.Parse(p[0]); float dy = float.Parse(p[1]);
+        bool useLocal = false, useFacing = false;
+        for (int i = 2; i < p.Length; i++)
+        {
+            var s = p[i].Trim().ToLowerInvariant();
+            if (s == "local") useLocal = true;
+            else if (s == "world") useLocal = false;
+            else if (s == "face" || s == "signed") useFacing = true;
+        }
+        if (useFacing) dx *= (/*clone의 바라보는 방향*/ transform.localScale.x >= 0 ? 1f : -1f);
+        var delta = new Vector3(dx, dy, 0);
+        if (useLocal) transform.position = transform.TransformPoint(delta);
+        else transform.position += delta;
+    }
+
+    public void EVT_DashHit()
+    {
+        // ★ 보스의 대쉬 히트 로직을 그대로 재사용 (원점은 클론)
+        owner?.PerformAttackOnceFrom(owner.dashAttack, this.transform, true);
+    }
+
+    // (옵션) 필요하면 락/무적도 구현
+    public void EVT_SetMoveLock(bool on) { _animLockMove = on; }
+    public void EVT_SetFlipLock(bool on) { _animLockFlip = on; }
+    public void EVT_Invuln(bool on) { _invuln = on; }
 
     void Reset()
     {
@@ -102,10 +140,8 @@ public class JangsanbeomClone : MonoBehaviour, IDamageable
         if (player == null && owner != null) player = owner.player;
         _lastPos = transform.position;
 
-        // 초기 바라보는 방향 보정
         if (player != null) FaceRight(player.position.x >= transform.position.x);
 
-        // 플립 방향 히스테리시스 초기화
         if (player != null)
         {
             float rel = player.position.x - GetFlipReferenceX();
@@ -119,7 +155,6 @@ public class JangsanbeomClone : MonoBehaviour, IDamageable
     {
         if (player == null) return;
 
-        // 이동
         bool isMoving = false;
         float dx = player.position.x - transform.position.x;
         if (!_busy && Mathf.Abs(dx) > followMinDistanceX && Mathf.Abs(dx) < aggroRange)
@@ -128,11 +163,11 @@ public class JangsanbeomClone : MonoBehaviour, IDamageable
             var p = transform.position;
             p.x = Mathf.MoveTowards(p.x, player.position.x - Mathf.Sign(dx) * followMinDistanceX, step);
             transform.position = p;
-            isMoving = Mathf.Abs(transform.position.x - _lastPos.x) > 0.0001f;
+            isMoving = Mathf.Abs(p.x - _lastPos.x) > 0.0001f;
         }
-        SafeSetBool(animParam_MoveBool, isMoving);
+        if (animator && !string.IsNullOrEmpty(animParam_MoveBool))
+            animator.SetBool(animParam_MoveBool, isMoving);
 
-        // 플립 결정 (트리거 → 피벗 → 자기 위치 순)
         if (Time.time - _lastFlipTime > flipCooldown)
         {
             float refX = GetFlipReferenceX();
@@ -150,19 +185,20 @@ public class JangsanbeomClone : MonoBehaviour, IDamageable
             }
         }
 
-        // 속도 파라미터(공격 중엔 0)
-        float dt = Time.deltaTime;
-        float vx = (!_busy && dt > 0f) ? (transform.position.x - _lastPos.x) / dt : 0f;
-        SafeSetFloat(animParam_MoveSpeed, Mathf.Abs(vx));
-
+        if (animator && !string.IsNullOrEmpty(animParam_MoveSpeed))
+        {
+            float dt = Time.deltaTime;
+            float vx = dt > 0f ? (transform.position.x - _lastPos.x) / dt : 0f;
+            animator.SetFloat(animParam_MoveSpeed, Mathf.Abs(vx));
+        }
         _lastPos = transform.position;
     }
 
     void LateUpdate()
     {
-        // 루트 X는 항상 + 유지
-        if (!Mathf.Approximately(transform.localScale.x, _rootOriginalScale.x))
-        { var s = transform.localScale; s.x = _rootOriginalScale.x; transform.localScale = s; }
+        // ❌ 루트 X 스케일 강제 복구 제거
+        // if (!Mathf.Approximately(transform.localScale.x, _rootOriginalScale.x))
+        // { var s = transform.localScale; s.x = _rootOriginalScale.x; transform.localScale = s; }
 
         if (enforceVisualFlip) ApplyVisualFlipNow();
     }
@@ -183,7 +219,6 @@ public class JangsanbeomClone : MonoBehaviour, IDamageable
         }
     }
 
-    // -------- Flip helpers --------
     float GetFlipReferenceX()
     {
         if (flipTrigger)
@@ -203,24 +238,29 @@ public class JangsanbeomClone : MonoBehaviour, IDamageable
     public void FaceRight(bool right)
     {
         facingRight = right;
-        transform.localScale = _rootOriginalScale;
+        // 루트 스케일은 덮어쓰지 않음 (애니값 보존)
 
-        // 비주얼 반전
         if (graphicsRoot != null)
         {
-            var s = _graphicsOriginalScale;
-            s.x = Mathf.Abs(_graphicsOriginalScale.x) * (spriteFacesRight ? (right ? 1f : -1f) : (right ? -1f : 1f));
+            var s = graphicsRoot.localScale;
+            float sign = right ? 1f : -1f;
+            s.x = Mathf.Abs(s.x) * (spriteFacesRight ? sign : -sign);
             graphicsRoot.localScale = s;
             if (sr) sr.flipX = false;
         }
-        else if (sr != null) sr.flipX = spriteFacesRight ? !right : right;
-        else foreach (var r in GetComponentsInChildren<SpriteRenderer>(true))
+        else if (sr != null)
+        {
+            bool flipX = spriteFacesRight ? !right : right;
+            sr.flipX = flipX;
+        }
+        else
+        {
+            foreach (var r in GetComponentsInChildren<SpriteRenderer>(true))
                 r.flipX = spriteFacesRight ? !right : right;
+        }
 
-        // 폴리곤 콜라이더 반전
         ApplyFlipToPolys(right);
 
-        // child flipTrigger의 X 오프셋도 반전
         if (flipTrigger && _flipTriggerIsChild)
         {
             var lp = flipTrigger.transform.localPosition;
@@ -228,7 +268,6 @@ public class JangsanbeomClone : MonoBehaviour, IDamageable
             flipTrigger.transform.localPosition = lp;
         }
 
-        // 히스테리시스 기준 업데이트
         float relAfter = player ? (player.position.x - GetFlipReferenceX()) : 0f;
         _prevTriggerSide = (relAfter > flipTriggerHysteresis) ? 1 : (relAfter < -flipTriggerHysteresis ? -1 : 0);
     }
@@ -237,9 +276,9 @@ public class JangsanbeomClone : MonoBehaviour, IDamageable
     {
         if (graphicsRoot != null)
         {
-            float wantX = facingRight ? Mathf.Abs(_graphicsOriginalScale.x) : -Mathf.Abs(_graphicsOriginalScale.x);
-            if (!Mathf.Approximately(graphicsRoot.localScale.x, wantX))
-            { var s = _graphicsOriginalScale; s.x = wantX; graphicsRoot.localScale = s; }
+            var s = graphicsRoot.localScale;
+            float wantSign = (spriteFacesRight ? (facingRight ? 1f : -1f) : (facingRight ? -1f : 1f));
+            if (Mathf.Sign(s.x) != wantSign) { s.x = Mathf.Abs(s.x) * wantSign; graphicsRoot.localScale = s; }
         }
         else
         {
@@ -305,7 +344,7 @@ public class JangsanbeomClone : MonoBehaviour, IDamageable
             applyDamage = visualFake ? atk.Phase2_FakeDealsDamage : true;
         }
 
-        SafeSetTrigger(visualFake ? trig_AttackFake : trig_AttackReal);
+        if (animator) animator.SetTrigger(visualFake ? trig_AttackFake : trig_AttackReal);
 
         if (!useAnimationEvents)
         {
@@ -425,25 +464,5 @@ public class JangsanbeomClone : MonoBehaviour, IDamageable
     {
         if (owner != null) owner.OnCloneDied(this);
         Destroy(gameObject);
-    }
-
-    // ---- Safe Animator helpers ----
-    void SafeSetTrigger(string name)
-    {
-        if (!animator || string.IsNullOrEmpty(name)) return;
-        foreach (var p in animator.parameters)
-            if (p.name == name && p.type == AnimatorControllerParameterType.Trigger) { animator.SetTrigger(name); return; }
-    }
-    void SafeSetBool(string name, bool val)
-    {
-        if (!animator || string.IsNullOrEmpty(name)) return;
-        foreach (var p in animator.parameters)
-            if (p.name == name && p.type == AnimatorControllerParameterType.Bool) { animator.SetBool(name, val); return; }
-    }
-    void SafeSetFloat(string name, float v)
-    {
-        if (!animator || string.IsNullOrEmpty(name)) return;
-        foreach (var p in animator.parameters)
-            if (p.name == name && p.type == AnimatorControllerParameterType.Float) { animator.SetFloat(name, v); return; }
     }
 }

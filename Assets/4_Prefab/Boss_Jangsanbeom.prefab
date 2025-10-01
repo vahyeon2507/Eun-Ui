@@ -66,7 +66,7 @@ BoxCollider2D:
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
-  m_Offset: {x: 0, y: 0.76396644}
+  m_Offset: {x: 0.058759212, y: 2.0243587}
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0, y: 0}
@@ -76,7 +76,7 @@ BoxCollider2D:
     drawMode: 0
     adaptiveTiling: 0
   m_AutoTiling: 0
-  m_Size: {x: 1, y: 5.6455336}
+  m_Size: {x: 1.1175165, y: 8.166317}
   m_EdgeRadius: 0
 --- !u!1 &7272233421490376400
 GameObject:
@@ -129,7 +129,27 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: acce9f3aef10763449dbe2d6b6bdfd01, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  player: {fileID: 2186251996989526959, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
+  allowCloneSpawns: 1
+  isCloneInstance: 0
+  dashAttack:
+    Name: Dash
+    Offset: {x: 4, y: -2}
+    Size: {x: 7, y: 2}
+    Angle: 0
+    Damage: 2
+    Lifetime: 0.12
+    TelegraphPrefab: {fileID: 0}
+    TelegraphTime: 0
+    cloneSpawnOffsetX: 3
+    cloneSpawnOffsetY: 0.71
+    DefaultFake: 0
+    FakeSprite: {fileID: 0}
+    FakeSpriteDuration: 0.18
+    OriginOverride: {fileID: 0}
+    AllowInPhase1: 1
+    AllowInPhase2: 1
+    Phase2_FakeDealsDamage: 1
+  player: {fileID: 0}
   animator: {fileID: 265008684467289856}
   spriteRenderer: {fileID: 4289124929252179962}
   rb: {fileID: 1577382608492882019}
@@ -137,6 +157,9 @@ MonoBehaviour:
   MaxHealth: 100
   CurrentHealth: 100
   Phase2HealthThreshold: 0.66
+  requirePlayerTag: 1
+  blockOutgoingDamageWhileInvuln: 1
+  debugDamage: 1
   Phase1MapRoot: {fileID: 0}
   Phase2IntroMapRoot: {fileID: 0}
   Phase2MapRoot: {fileID: 0}
@@ -155,16 +178,19 @@ MonoBehaviour:
   flipTriggerHysteresis: 0.05
   flipCooldown: 0.12
   facingRight: 1
-  enforceVisualFlip: 1
+  enforceVisualFlip: 0
   debugFlip: 0
+  spriteFacesRight: 0
+  bodyCollider: {fileID: 996999645668590922}
+  faceOutsideMarginX: 2
   followSpeed: 2
   followMinDistanceX: 1.2
   aggroRange: 12
   animParam_MoveBool: Move
   animParam_MoveSpeed: Speed
   useAnimationEvents: 1
-  enableFakePhase1: 0
-  fakeChancePhase1: 0
+  enableFakePhase1: 1
+  fakeChancePhase1: 0.25
   enableFakePhase2: 1
   fakeChancePhase2: 0.25
   attacksPhase1:
@@ -202,24 +228,7 @@ MonoBehaviour:
     AllowInPhase1: 1
     AllowInPhase2: 1
     Phase2_FakeDealsDamage: 1
-  attacksPhase2:
-  - Name: s
-    Offset: {x: -2, y: -2}
-    Size: {x: 3, y: 1.5}
-    Angle: 0
-    Damage: 2
-    Lifetime: 0.12
-    TelegraphPrefab: {fileID: 0}
-    TelegraphTime: 0
-    cloneSpawnOffsetX: 3
-    cloneSpawnOffsetY: 0
-    DefaultFake: 0
-    FakeSprite: {fileID: 0}
-    FakeSpriteDuration: 0
-    OriginOverride: {fileID: 0}
-    AllowInPhase1: 1
-    AllowInPhase2: 1
-    Phase2_FakeDealsDamage: 1
+  attacksPhase2: []
   showAttackGizmos: 1
   gizmoRealColor: {r: 1, g: 0, b: 0, a: 0.18}
   gizmoFakeColor: {r: 1, g: 0.85, b: 0.2, a: 0.12}
@@ -229,9 +238,10 @@ MonoBehaviour:
   trig_EnterPhase2: EnterPhase2
   phase2IntroInvulnerable: 1
   phase2IntroFallbackDuration: 1.5
+  trig_Dash: Dash
   lockCloneY: 1
   cloneFixedY: 0.71
-  clonePrefab: {fileID: 2750500252869842319, guid: 7a95fccb560d22f4eb4cdab81a73b158, type: 3}
+  clonePrefab: {fileID: 7272233421490376400, guid: 9a10964d0a5114e42aaa0fa1bf52c872, type: 3}
   maxClones: 1
   cloneSpawnCooldown: 6
   cloneSpawnRadius: 6

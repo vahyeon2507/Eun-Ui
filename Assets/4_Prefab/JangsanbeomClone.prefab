@@ -166,8 +166,8 @@ MonoBehaviour:
   overrideByOwner: 0
   inspectorFadeIn: 0.12
   inspectorPreDelay: 0.5
-  inspectorDespawnDelay: 0.05
-  inspectorFadeOut: 0.18
+  inspectorDespawnDelay: 0.02
+  inspectorFadeOut: 0.17
   inspectorInheritFlip: 1
 --- !u!114 &-12909967684688047
 MonoBehaviour:
@@ -319,6 +319,9 @@ MonoBehaviour:
   cloneSpawnRadius: 6
   cloneInitialHp: 5
   cloneInheritFlip: 1
+  bellRingers: []
+  blockAttacksWhileAnyBellRinging: 1
+  bellLeadTime: 0.08
   useOneShotClones: 1
   oneShotFrontOffsetX: 1.2
   oneShotFadeIn: 0.12
@@ -468,7 +471,7 @@ BoxCollider2D:
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.5}
-    oldSize: {x: 10, y: 7.314453}
+    oldSize: {x: 10, y: 7.3142858}
     newSize: {x: 10, y: 7.314453}
     adaptiveTilingThreshold: 0.5
     drawMode: 0
@@ -547,7 +550,7 @@ PolygonCollider2D:
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.5}
-    oldSize: {x: 10, y: 7.314453}
+    oldSize: {x: 10, y: 7.3142858}
     newSize: {x: 10, y: 7.314453}
     adaptiveTilingThreshold: 0.5
     drawMode: 0

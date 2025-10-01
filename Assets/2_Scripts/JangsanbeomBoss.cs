@@ -191,6 +191,16 @@ public class JangsanbeomBoss : MonoBehaviour
     public int cloneInitialHp = 5;
     public bool cloneInheritFlip = true;
 
+    [Header("Bell Signal (Phase2)")]
+    public List<BellRinger> bellRingers = new();   // 맵의 종들 등록
+    [Tooltip("종이 하나라도 울리는 동안은 분신 공격/스폰 금지")]
+    public bool blockAttacksWhileAnyBellRinging = true;
+    [Tooltip("종이 먼저 울리고 난 뒤 분신 스폰까지의 리드 타임")]
+    public float bellLeadTime = 0.08f;
+
+    // 내부 상태
+    Coroutine _pendingBellSpawn;
+
     // ====== One-Shot Clone 추가 설정 ======
     [Header("One-Shot Clone Config")]
     [Tooltip("원샷 분신 사용 여부(페이드인→한 번 공격→페이드아웃)")]
@@ -954,24 +964,93 @@ public class JangsanbeomBoss : MonoBehaviour
     // ====== Clones (Double-Guard) ======
     void TrySpawnCloneIfNeeded()
     {
-        // ★ 하드 게이트: 여기서도 한 번 더 막기
+        // ★ 하드 게이트
         if (!allowCloneSpawns || maxClones <= 0 || clonePrefab == null) return;
 
         // null 정리
         for (int i = _clones.Count - 1; i >= 0; i--)
             if (_clones[i] == null) _clones.RemoveAt(i);
 
+        // 상한/쿨다운/예약 중복 가드
         if (_clones.Count >= maxClones) return;
         if (_cloneCooldownTimer > 0f) return;
+        if (_pendingBellSpawn != null) return; // 이미 종 울리고 스폰 예약됨
 
         // === 스폰 위치: 플레이어 "바로 앞"(보스 방향 쪽) ===
         Vector2 basePos = transform.position;
-        float dirToBoss = Mathf.Sign(transform.position.x - player.position.x); // 플레이어에서 보스 쪽(+/-1)
+        float dirToBoss = Mathf.Sign(transform.position.x - player.position.x); // 플레이어→보스 방향(+/-1)
         Vector2 spawnPos = new Vector2(
             player.position.x + dirToBoss * oneShotFrontOffsetX,
             lockCloneY ? cloneFixedY : basePos.y
         );
 
+        // === 종 울림 선행 & 스폰 예약 ===
+        if (!PreSignalBellAndSchedule(spawnPos))
+        {
+            // 종이 울리는 중이면 스폰 시도하지 않음(혼동 금지)
+            return;
+        }
+
+        // 리드타임 동안 추가 시도를 막기 위해 바로 쿨다운 시작
+        if (_cloneCooldownTimer <= 0f) _cloneCooldownTimer = cloneSpawnCooldown;
+    }
+
+    bool PreSignalBellAndSchedule(Vector2 spawnPos)
+    {
+        // 종이 하나라도 울리는 중이면 금지
+        if (blockAttacksWhileAnyBellRinging && bellRingers != null)
+        {
+            for (int i = 0; i < bellRingers.Count; i++)
+            {
+                var r = bellRingers[i];
+                if (r && r.IsRinging) return false;
+            }
+        }
+
+        // 가까운 "대기 중" 종을 선택해 울린다
+        BellRinger best = null;
+        float bestDist = float.MaxValue;
+
+        if (bellRingers != null && bellRingers.Count > 0)
+        {
+            for (int i = 0; i < bellRingers.Count; i++)
+            {
+                var r = bellRingers[i];
+                if (r == null || r.IsRinging) continue;
+                float dx = r.transform.position.x - spawnPos.x;
+                float dy = r.transform.position.y - spawnPos.y;
+                float d = Mathf.Abs(dx) + Mathf.Abs(dy); // L1 거리(가볍게)
+                if (d < bestDist) { best = r; bestDist = d; }
+            }
+
+            // 쓸 수 있는 종이 없다면 공격 명령을 내리지 않는다(혼동 방지)
+            if (best == null) return false;
+
+            // 종 울리기 시도 (실패 시 스폰 안 함)
+            if (!best.TryRing(Mathf.Max(0.01f, bellLeadTime))) return false;
+
+            // 리드타임 뒤 스폰 예약
+            if (_pendingBellSpawn != null) StopCoroutine(_pendingBellSpawn);
+            _pendingBellSpawn = StartCoroutine(SpawnAfterBellDelay(spawnPos, bellLeadTime));
+            return true;
+        }
+        else
+        {
+            // 종을 쓰지 않는 씬이라면 바로 스폰
+            SpawnCloneNowAt(spawnPos);
+            return true;
+        }
+    }
+
+    IEnumerator SpawnAfterBellDelay(Vector2 spawnPos, float delay)
+    {
+        yield return new WaitForSeconds(Mathf.Max(0.01f, delay));
+        SpawnCloneNowAt(spawnPos);
+        _pendingBellSpawn = null;
+    }
+
+    void SpawnCloneNowAt(Vector2 spawnPos)
+    {
         // 생성
         var go = Instantiate(clonePrefab, spawnPos, Quaternion.identity);
 
@@ -994,16 +1073,14 @@ public class JangsanbeomBoss : MonoBehaviour
             if (cloneInheritFlip) cloneBoss.FlipTo(this.facingRight);
         }
 
-        // 관리 리스트(있다면)
         var jsbClone = go.GetComponent<JangsanbeomClone>();
         if (jsbClone != null) _clones.Add(jsbClone);
 
-        // === 원샷 분신 모드 부착 ===
+        // 원샷 분신 모드(이미 구현해둔 스크립트)
         if (useOneShotClones)
         {
             var oneShot = go.GetComponent<JangsanbeomOneShotClone>();
             if (!oneShot) oneShot = go.AddComponent<JangsanbeomOneShotClone>();
-
             oneShot.Init(
                 owner: this,
                 selfBoss: cloneBoss,
@@ -1016,8 +1093,10 @@ public class JangsanbeomBoss : MonoBehaviour
             );
         }
 
-        _cloneCooldownTimer = cloneSpawnCooldown;
+        // 쿨다운(이미 걸려있으면 덮어쓰지 않음)
+        if (_cloneCooldownTimer <= 0f) _cloneCooldownTimer = cloneSpawnCooldown;
     }
+
 
     List<AttackData> BuildPhase2AttackPoolForClone()
     {

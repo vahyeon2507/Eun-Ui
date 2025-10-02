@@ -8,6 +8,30 @@ public class HitShape2D : ScriptableObject
 {
     public HitShapeKind kind = HitShapeKind.Box;
 
+    // HitShape2D.cs (핵심만, 기존 필드 유지하면서 enum/프리팹 항목 추가)
+
+    public enum GizmoOverrideKind { None, PrefabSpriteBounds, PrefabColliderOutline }
+
+    public enum HitKind
+    {
+        Box, Capsule, Circle, Arc,
+        PrefabSpriteBounds,   // 프리팹의 SpriteRenderer 바운즈 박스로 그림(미리보기 전용)
+        PrefabColliderOutline // 프리팹의 Collider2D 윤곽선으로 그림(미리보기 전용)
+    }
+
+    [Header("Gizmo Override (optional)")]
+    public GizmoOverrideKind gizmoOverride = GizmoOverrideKind.None; // None이면 기본대로, 나머지는 프리팹 미리보기 강제
+    public bool gizmoHideRuntimeShape = true;                         // 프리팹을 그릴 때 기본(Box/Circle 등) 모양 숨길지
+
+
+
+
+    // --- Prefab 미리보기 옵션 ---
+    public GameObject prefabForGizmo;       // 따라 그리고 싶은 프리팹
+    public bool prefabIncludeChildren = true;
+    public Vector2 prefabBoundsScale = Vector2.one; // 바운즈 스케일 보정
+
+
     [Header("Common")]
     public Vector2 offset = new Vector2(1.5f, 0f);
     [Tooltip("로컬 각도(도). facingRight에 따라 부호 반영 옵션")]
@@ -79,6 +103,7 @@ public class HitShape2D : ScriptableObject
         }
         return 0;
     }
+
 
     // === 기즈모 ===
     public void DrawGizmos(Transform origin, bool facingRight, Color fill, Color wire)

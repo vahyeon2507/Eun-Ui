@@ -20,6 +20,7 @@ public class HitboxTrigger2D : MonoBehaviour
         if (dmg > -1) damage = dmg;
         _active = true; _ttl = duration; _seen.Clear(); gameObject.SetActive(true);
     }
+
     public void Deactivate() { _active = false; _ttl = -1f; }
 
     void Update()

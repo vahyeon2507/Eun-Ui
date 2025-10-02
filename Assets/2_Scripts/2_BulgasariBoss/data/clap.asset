@@ -10,9 +10,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 33065558005a2d448b73ffbf5f64fcf0, type: 3}
-  m_Name: New Attack Definition 2D
+  m_Name: clap
   m_EditorClassIdentifier: 
-  attackName: Punch
+  attackName: clap
   damage: 2
   shapes:
-  - {fileID: 11400000, guid: 021bbc53d62a5294bbc8cac425a49706, type: 2}
+  - {fileID: 11400000, guid: e83ea0c8772e57c4f8277cb81c16b2ea, type: 2}

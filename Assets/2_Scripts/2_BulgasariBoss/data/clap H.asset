@@ -10,14 +10,19 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 446c72c7419583b4eaad066212002457, type: 3}
-  m_Name: New Hit Shape 2D
+  m_Name: clap H
   m_EditorClassIdentifier: 
   kind: 0
-  offset: {x: 1, y: 1}
+  gizmoOverride: 2
+  gizmoHideRuntimeShape: 1
+  prefabForGizmo: {fileID: 6156607856244234202, guid: f3012da6a4b81a64a8b6e3d84fd93a9e, type: 3}
+  prefabIncludeChildren: 0
+  prefabBoundsScale: {x: 0, y: 0}
+  offset: {x: 0, y: 0}
   angleDeg: 0
-  signedByFacing: 1
-  size: {x: 11, y: 11.2}
-  capsuleDirection: 1
+  signedByFacing: 0
+  size: {x: 11, y: 11}
+  capsuleDirection: 0
   radius: 1.5
   arcAngle: 90
   layerMask:

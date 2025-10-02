@@ -1,31 +1,49 @@
-//// BulgasariAnimEvents.cs  (Animator 달린 오브젝트에 부착)
-//using UnityEngine;
+using System;
+using System.Linq;
+using UnityEngine;
 
-//public class BulgasariAnimEvents : MonoBehaviour
-//{
-//    [Header("Hitboxes (자식 콜라이더에 붙인 스크립트)")]
-//    public HitboxTrigger2D hitLeft;
-//    public HitboxTrigger2D hitRight;
-//    public HitboxTrigger2D hitChest;
+[Serializable]
+public struct NamedHitbox
+{
+    public string key;            // "Left","Right","Center","Head"...
+    public HitboxTrigger2D hit;   // 지속 트리거 히트박스(자식 콜라이더에 붙은 스크립트)
+    public Transform origin;      // 원샷 기준(없으면 hit.transform 사용)
+}
 
-//    [Header("옵션: 스윕 보강(손 궤적 따라가게)")]
-//    public BulgasariFollowHit followLeft;
-//    public BulgasariFollowHit followRight;
+public class BulgasariAnimEvents : MonoBehaviour
+{
+    [Header("Anchors / Hitboxes")]
+    public NamedHitbox[] map;
 
-//    [Header("옵션: 원샷 어택 실행용(중앙 충돌 등)")]
-//    public BulgasariAttackHooks hooks;           // 이미 씬에 있지?
-//    public AttackDefinition2D defClapImpact;     // 중앙 원형 1회 타격 등
+    [Header("One-shot Attacks")]
+    public BulgasariAttackHooks hooks;
+    public AttackDefinition2D[] defs;   // 0,1,2...
 
-//    // === Animation Event로 부를 간단 함수들 ===
-//    public void LeftOn(float dur) { if (hitLeft) hitLeft.Activate(dur); }
-//    public void RightOn(float dur) { if (hitRight) hitRight.Activate(dur); }
-//    public void BothHandsOn(float dur) { LeftOn(dur); RightOn(dur); }
-//    public void ChestOn(float dur) { if (hitChest) hitChest.Activate(dur); }
+    NamedHitbox? Find(string key) => map.FirstOrDefault(m => m.key == key);
 
-//    // 손 궤적을 따라가는 지속 판정(필요한 클립에서만 사용)
-//    public void LeftFollow(float dur) { if (followLeft) followLeft.StartFollowHit_Segment(dur); }
-//    public void RightFollow(float dur) { if (followRight) followRight.StartFollowHit_Segment(dur); }
+    // === Animation Events에서 호출할 것들 ===
 
-//    // 중앙 ‘딱’ 한 번 때리기(원형/박스 등 AttackDefinition 실행)
-//    public void ClapImpact() { if (hooks && defClapImpact) hooks.Perform(defClapImpact); }
-//}
+    // 지속 판정 스위치: 해당 앵커 히트박스를 dur초 동안 켠다
+    public void OnAt(string key, float dur)
+    {
+        var m = Find(key); if (m == null || m.Value.hit == null) return;
+        m.Value.hit.Activate(dur);
+    }
+
+    // 원샷: AttackDefinition 인덱스 실행 (originOverride는 앵커)
+    public void Impact(int defIndex, string key = "Center")
+    {
+        if (!hooks || defs == null || defIndex < 0 || defIndex >= defs.Length) return;
+
+        var m = Find(key);
+        Transform origin = (m != null && (m.Value.origin || m.Value.hit))
+                         ? (m.Value.origin ? m.Value.origin : m.Value.hit.transform)
+                         : transform;
+
+        // ★ hooks에 public Perform가 있으면 이 줄 사용
+        hooks.Perform(defs[defIndex], origin);
+
+        // ★ 만약 Perform를 안 만들었다면, 너희 훅의 공개 메서드로 교체:
+        // hooks.Anim_ATK_Index(defIndex); // 이런 식으로
+    }
+}

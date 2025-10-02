@@ -14,7 +14,8 @@ public class PlayerTalismanUnified : MonoBehaviour
     [Header("Input")]
     public KeyCode toggleKey = KeyCode.E;
     public KeyCode cycleKey = KeyCode.Q;
-    public int fireMouseButton = 0;
+    public KeyCode fireKey = KeyCode.D; // 우클릭에서 D키로 변경
+    public int fireMouseButton = 0; // 호환성을 위해 유지
 
     [Header("Charges")]
     public int maxCharges = 2;
@@ -141,13 +142,20 @@ public class PlayerTalismanUnified : MonoBehaviour
 
         if (talismanMode)
         {
-            if (Input.GetKeyDown(cycleKey))
+            // 부적 변경은 이제 TalismanSelectionUI에서 처리
+            // 호환성을 위해 기존 키도 유지 (UI가 없을 때 사용)
+            TalismanSelectionUI uiSystem = FindObjectOfType<TalismanSelectionUI>();
+            if (uiSystem == null || !uiSystem.enabled)
             {
-                current = (TalismanType)(((int)current + 1) % 5);
-                if (logEvents) Debug.Log($"[Talisman] Selected {current}");
+                if (Input.GetKeyDown(cycleKey))
+                {
+                    current = (TalismanType)(((int)current + 1) % 5);
+                    if (logEvents) Debug.Log($"[Talisman] Selected {current} (fallback)");
+                }
             }
 
-            if (Input.GetMouseButtonDown(fireMouseButton))
+            // 발사 키 변경: 우클릭 또는 D키
+            if (Input.GetMouseButtonDown(fireMouseButton) || Input.GetKeyDown(fireKey))
                 TryFire();
         }
 

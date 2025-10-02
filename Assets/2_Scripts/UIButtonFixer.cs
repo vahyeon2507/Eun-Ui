@@ -35,10 +35,32 @@ public class UIButtonFixer : MonoBehaviour
         // 4. 버튼 설정 수정
         FixButtonSettings();
         
-        // 5. GameManager 연결
+        // 5. 버튼 애니메이션 효과 추가
+        AddMissingUIButtonEffects();
+        
+        // 6. GameManager 연결
         ReconnectGameManager();
         
         Debug.Log("=== UI 버튼 문제 수정 완료 ===");
+    }
+    
+    void AddMissingUIButtonEffects()
+    {
+        Button[] buttons = FindObjectsOfType<Button>();
+        int addedCount = 0;
+        
+        foreach (Button button in buttons)
+        {
+            UIButtonEffect effect = button.GetComponent<UIButtonEffect>();
+            if (effect == null)
+            {
+                button.gameObject.AddComponent<UIButtonEffect>();
+                addedCount++;
+                Debug.Log($"[UI수정] 버튼 '{button.name}'에 UIButtonEffect 추가");
+            }
+        }
+        
+        Debug.Log($"[UI수정] {addedCount}개 버튼에 애니메이션 효과 추가 완료");
     }
     
     void FixCanvasSettings()

@@ -658,6 +658,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6093af4b27fc7624d8978b53b9954443, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  hoverScale: 1.1
+  clickScale: 0.95
+  animationSpeed: 8
+  useColorEffect: 0
+  hoverColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
 --- !u!1 &52319520
 GameObject:
   m_ObjectHideFlags: 0
@@ -936,6 +941,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6093af4b27fc7624d8978b53b9954443, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  hoverScale: 1.1
+  clickScale: 0.95
+  animationSpeed: 8
+  useColorEffect: 0
+  hoverColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
 --- !u!114 &168002653
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2314,66 +2324,6 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: -20, y: -20}
   m_Pivot: {x: 0.5, y: 0.5}
---- !u!1 &628988025
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 628988027}
-  - component: {fileID: 628988026}
-  - component: {fileID: 628988028}
-  m_Layer: 0
-  m_Name: GameObject
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &628988026
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 628988025}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 1bc5185653f6f18409ac324c51527415, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  fixOnStart: 1
---- !u!4 &628988027
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 628988025}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -4.3452535, y: 0.28858775, z: 6.482168}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &628988028
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 628988025}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c02104ae3d4334545b6bb806c46b1b97, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  targetButton: {fileID: 0}
-  runDiagnosticOnStart: 1
 --- !u!1 &703885050
 GameObject:
   m_ObjectHideFlags: 0
@@ -2816,6 +2766,8 @@ MonoBehaviour:
   panel: {fileID: 750378926}
   startOffset: {x: 0, y: -200}
   endPosition: {x: 0, y: 0}
+  animationSpeed: 3
+  debugLog: 0
 --- !u!114 &750378929
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3036,6 +2988,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6093af4b27fc7624d8978b53b9954443, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  hoverScale: 1.1
+  clickScale: 0.95
+  animationSpeed: 8
+  useColorEffect: 0
+  hoverColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
 --- !u!1 &806612420
 GameObject:
   m_ObjectHideFlags: 0
@@ -3467,6 +3424,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6093af4b27fc7624d8978b53b9954443, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  hoverScale: 1.1
+  clickScale: 0.95
+  animationSpeed: 8
+  useColorEffect: 0
+  hoverColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
 --- !u!114 &1013158096
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3613,6 +3575,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6093af4b27fc7624d8978b53b9954443, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  hoverScale: 1.1
+  clickScale: 0.95
+  animationSpeed: 8
+  useColorEffect: 0
+  hoverColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
 --- !u!114 &1033245278
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4809,6 +4776,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6093af4b27fc7624d8978b53b9954443, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  hoverScale: 1.1
+  clickScale: 0.95
+  animationSpeed: 8
+  useColorEffect: 0
+  hoverColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
 --- !u!1 &1489547931
 GameObject:
   m_ObjectHideFlags: 0
@@ -5667,6 +5639,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6093af4b27fc7624d8978b53b9954443, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  hoverScale: 1.1
+  clickScale: 0.95
+  animationSpeed: 8
+  useColorEffect: 0
+  hoverColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
 --- !u!114 &1724383995
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5679,6 +5656,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6093af4b27fc7624d8978b53b9954443, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  hoverScale: 1.1
+  clickScale: 0.95
+  animationSpeed: 8
+  useColorEffect: 0
+  hoverColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
 --- !u!1 &1733525078
 GameObject:
   m_ObjectHideFlags: 0
@@ -6104,6 +6086,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6093af4b27fc7624d8978b53b9954443, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  hoverScale: 1.1
+  clickScale: 0.95
+  animationSpeed: 8
+  useColorEffect: 0
+  hoverColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
 --- !u!114 &1776198664
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -7120,6 +7107,8 @@ MonoBehaviour:
   panel: {fileID: 2040325351}
   startOffset: {x: -100, y: 0}
   endPosition: {x: 0, y: 0}
+  animationSpeed: 3
+  debugLog: 0
 --- !u!114 &2040325354
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -7347,4 +7336,3 @@ SceneRoots:
   - {fileID: 506309612}
   - {fileID: 984181333}
   - {fileID: 1733525082}
-  - {fileID: 628988027}

@@ -1,35 +1,179 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
+using System.Collections;
 
-public class UIButtonEffect : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
+public class UIButtonEffect : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerDownHandler, IPointerUpHandler
 {
+    [Header("Ïï†ÎãàÎ©îÏù¥ÏÖò ÏÑ§Ï†ï")]
+    public float hoverScale = 1.1f;
+    public float clickScale = 0.95f;
+    public float animationSpeed = 8f;
+    
+    [Header("ÏÉâÏÉÅ Ìö®Í≥º")]
+    public bool useColorEffect = false;
+    public Color hoverColor = Color.yellow;
+    
     private Button button;
+    private Image buttonImage;
     private Vector3 originalScale;
+    private Color originalColor;
+    private bool isHovering = false;
+    private bool isPressed = false;
+    
+    private Coroutine currentAnimation;
 
     void Awake()
     {
-        button = GetComponent<Button>();
-        originalScale = transform.localScale;
+        Initialize();
     }
 
     void Start()
     {
-        button = GetComponent<Button>();
-        originalScale = transform.localScale;
+        Initialize();
     }
-
+    
+    void Initialize()
+    {
+        if (button == null)
+        {
+            button = GetComponent<Button>();
+            originalScale = transform.localScale;
+        }
+        
+        if (buttonImage == null && useColorEffect)
+        {
+            buttonImage = GetComponent<Image>();
+            if (buttonImage != null)
+                originalColor = buttonImage.color;
+        }
+        
+        // Î≤ÑÌäºÏù¥ ÎπÑÌôúÏÑ±ÌôîÎêòÏñ¥ ÏûàÏúºÎ©¥ Ìö®Í≥º ÎπÑÌôúÏÑ±Ìôî
+        if (button != null && !button.interactable)
+        {
+            enabled = false;
+        }
+    }
 
     public void OnPointerEnter(PointerEventData eventData)
     {
-        transform.localScale = originalScale * 1.1f;
-        // ªˆ πŸ≤Ÿ∞Ì ΩÕ¿∏∏È button.image.color = Color.yellow; ∞∞¿∫ Ωƒ¿∏∑Œ
+        if (button != null && !button.interactable) return;
+        
+        isHovering = true;
+        AnimateToScale(originalScale * hoverScale);
+        
+        if (useColorEffect && buttonImage != null)
+        {
+            buttonImage.color = hoverColor;
+        }
     }
 
     public void OnPointerExit(PointerEventData eventData)
     {
+        if (button != null && !button.interactable) return;
+        
+        isHovering = false;
+        if (!isPressed)
+        {
+            AnimateToScale(originalScale);
+            
+            if (useColorEffect && buttonImage != null)
+            {
+                buttonImage.color = originalColor;
+            }
+        }
+    }
+    
+    public void OnPointerDown(PointerEventData eventData)
+    {
+        if (button != null && !button.interactable) return;
+        
+        isPressed = true;
+        AnimateToScale(originalScale * clickScale);
+    }
+    
+    public void OnPointerUp(PointerEventData eventData)
+    {
+        if (button != null && !button.interactable) return;
+        
+        isPressed = false;
+        
+        if (isHovering)
+        {
+            AnimateToScale(originalScale * hoverScale);
+        }
+        else
+        {
+            AnimateToScale(originalScale);
+            
+            if (useColorEffect && buttonImage != null)
+            {
+                buttonImage.color = originalColor;
+            }
+        }
+    }
+    
+    void AnimateToScale(Vector3 targetScale)
+    {
+        if (currentAnimation != null)
+        {
+            StopCoroutine(currentAnimation);
+        }
+        
+        currentAnimation = StartCoroutine(ScaleAnimation(targetScale));
+    }
+    
+    IEnumerator ScaleAnimation(Vector3 targetScale)
+    {
+        Vector3 startScale = transform.localScale;
+        float elapsedTime = 0f;
+        float duration = 1f / animationSpeed;
+        
+        while (elapsedTime < duration)
+        {
+            elapsedTime += Time.unscaledDeltaTime;
+            float progress = elapsedTime / duration;
+            
+            // EaseOut Ìö®Í≥º
+            progress = 1f - Mathf.Pow(1f - progress, 3f);
+            
+            transform.localScale = Vector3.Lerp(startScale, targetScale, progress);
+            yield return null;
+        }
+        
+        transform.localScale = targetScale;
+        currentAnimation = null;
+    }
+    
+    void OnDisable()
+    {
+        // ÎπÑÌôúÏÑ±ÌôîÎê† Îïå ÏõêÎûò ÏÉÅÌÉúÎ°ú Î≥µÏõê
+        if (currentAnimation != null)
+        {
+            StopCoroutine(currentAnimation);
+            currentAnimation = null;
+        }
+        
         transform.localScale = originalScale;
-        // ªˆ µ«µπ∏Æ±‚
+        
+        if (useColorEffect && buttonImage != null)
+        {
+            buttonImage.color = originalColor;
+        }
+        
+        isHovering = false;
+        isPressed = false;
+    }
+    
+    [ContextMenu("Ìö®Í≥º ÌÖåÏä§Ìä∏")]
+    public void TestEffect()
+    {
+        OnPointerEnter(null);
+        Invoke(nameof(TestEffectEnd), 1f);
+    }
+    
+    void TestEffectEnd()
+    {
+        OnPointerExit(null);
     }
 }
-

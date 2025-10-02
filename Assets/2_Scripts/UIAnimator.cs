@@ -7,9 +7,13 @@ public class UIAnimator : MonoBehaviour
     [SerializeField] private CanvasGroup canvasGroup;
     [SerializeField] private RectTransform panel;
 
-    [Header("½½¶óÀÌµå À§Ä¡ ¼³Á¤")]
-    [SerializeField] private Vector2 startOffset = new Vector2(0, -200f); // ½ÃÀÛ ¿ÀÇÁ¼Â
-    [SerializeField] private Vector2 endPosition = Vector2.zero;         // ÃÖÁ¾ µµÂø À§Ä¡
+    [Header("ìŠ¬ë¼ì´ë“œ ìœ„ì¹˜ ì„¤ì •")]
+    [SerializeField] private Vector2 startOffset = new Vector2(0, -200f); // ì‹œì‘ ì˜¤í”„ì…‹
+    [SerializeField] private Vector2 endPosition = Vector2.zero;         // ìµœì¢… ëª©í‘œ ìœ„ì¹˜
+
+    [Header("ì• ë‹ˆë©”ì´ì…˜ ì„¤ì •")]
+    public float animationSpeed = 3f;
+    public bool debugLog = false;
 
     private Vector2 startPosition;
 
@@ -18,7 +22,7 @@ public class UIAnimator : MonoBehaviour
         if (canvasGroup == null) canvasGroup = GetComponent<CanvasGroup>();
         if (panel == null) panel = GetComponent<RectTransform>();
 
-        // ÆĞ³Î ±âº» À§Ä¡¸¦ endPositionÀ¸·Î ÀúÀå (Inspector¿¡¼­ ¿øÇÏ´Â ÁÂÇ¥ ÁöÁ¤)
+        // íŒ¨ë„ ê¸°ë³¸ ìœ„ì¹˜ë¥¼ endPositionìœ¼ë¡œ ì„¤ì • (Inspectorì—ì„œ ì›í•˜ëŠ” ì¢Œí‘œ ì„¤ì •)
         if (endPosition == Vector2.zero)
             endPosition = panel.anchoredPosition;
     }
@@ -27,26 +31,29 @@ public class UIAnimator : MonoBehaviour
     {
         gameObject.SetActive(true);
         StartCoroutine(PlayShowAnim());
+        if (debugLog) Debug.Log($"[UIAnimator] {gameObject.name} í‘œì‹œ ì‹œì‘");
     }
 
     public void Hide()
     {
         StartCoroutine(PlayHideAnim());
+        if (debugLog) Debug.Log($"[UIAnimator] {gameObject.name} ìˆ¨ê¹€ ì‹œì‘");
     }
 
     IEnumerator PlayShowAnim()
     {
-        // ÃÊ±â À§Ä¡ = ÃÖÁ¾ À§Ä¡ + ¿ÀÇÁ¼Â
+        // ì´ˆê¸° ìœ„ì¹˜ = ìµœì¢… ìœ„ì¹˜ + ì˜¤í”„ì…‹
         startPosition = endPosition + startOffset;
 
         panel.localScale = Vector3.one * 0.9f;
         panel.anchoredPosition = startPosition;
         canvasGroup.alpha = 0f;
+        canvasGroup.interactable = false; // ì• ë‹ˆë©”ì´ì…˜ ì¤‘ ìƒí˜¸ì‘ìš© ë°©ì§€
 
         float t = 0f;
         while (t < 1f)
         {
-            t += Time.unscaledDeltaTime * 3f;
+            t += Time.unscaledDeltaTime * animationSpeed;
             float eased = Mathf.SmoothStep(0, 1, t);
 
             panel.localScale = Vector3.Lerp(Vector3.one * 0.9f, Vector3.one * 1.05f, eased);
@@ -57,15 +64,20 @@ public class UIAnimator : MonoBehaviour
         }
 
         panel.localScale = Vector3.one;
+        canvasGroup.interactable = true; // ì• ë‹ˆë©”ì´ì…˜ ì™„ë£Œ í›„ ìƒí˜¸ì‘ìš© í—ˆìš©
+        
+        if (debugLog) Debug.Log($"[UIAnimator] {gameObject.name} í‘œì‹œ ì• ë‹ˆë©”ì´ì…˜ ì™„ë£Œ");
     }
 
     IEnumerator PlayHideAnim()
     {
+        canvasGroup.interactable = false; // ì• ë‹ˆë©”ì´ì…˜ ì¤‘ ìƒí˜¸ì‘ìš© ë°©ì§€
+        
         float t = 0f;
         Vector3 startScale = panel.localScale;
         while (t < 1f)
         {
-            t += Time.unscaledDeltaTime * 3f;
+            t += Time.unscaledDeltaTime * animationSpeed;
             float eased = Mathf.SmoothStep(0, 1, t);
 
             panel.localScale = Vector3.Lerp(startScale, Vector3.one * 0.9f, eased);
@@ -75,7 +87,35 @@ public class UIAnimator : MonoBehaviour
         }
 
         gameObject.SetActive(false);
+        
+        if (debugLog) Debug.Log($"[UIAnimator] {gameObject.name} ìˆ¨ê¹€ ì• ë‹ˆë©”ì´ì…˜ ì™„ë£Œ");
+    }
+    
+    [ContextMenu("í‘œì‹œ í…ŒìŠ¤íŠ¸")]
+    public void TestShow()
+    {
+        Show();
+    }
+    
+    [ContextMenu("ìˆ¨ê¹€ í…ŒìŠ¤íŠ¸")]
+    public void TestHide()
+    {
+        Hide();
+    }
+    
+    [ContextMenu("ì¦‰ì‹œ í‘œì‹œ")]
+    public void ShowInstant()
+    {
+        gameObject.SetActive(true);
+        panel.localScale = Vector3.one;
+        panel.anchoredPosition = endPosition;
+        canvasGroup.alpha = 1f;
+        canvasGroup.interactable = true;
+    }
+    
+    [ContextMenu("ì¦‰ì‹œ ìˆ¨ê¹€")]
+    public void HideInstant()
+    {
+        gameObject.SetActive(false);
     }
 }
-
-

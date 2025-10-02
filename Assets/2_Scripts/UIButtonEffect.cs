@@ -13,6 +13,13 @@ public class UIButtonEffect : MonoBehaviour, IPointerEnterHandler, IPointerExitH
         originalScale = transform.localScale;
     }
 
+    void Start()
+    {
+        button = GetComponent<Button>();
+        originalScale = transform.localScale;
+    }
+
+
     public void OnPointerEnter(PointerEventData eventData)
     {
         transform.localScale = originalScale * 1.1f;

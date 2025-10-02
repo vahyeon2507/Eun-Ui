@@ -7,8 +7,7 @@ public class WhoDestroyedMe : MonoBehaviour
     {
 #if UNITY_EDITOR
         Debug.LogError($"[WhoDestroyedMe] {name} is being Destroyed!\n{Environment.StackTrace}", this);
-        // ¿¡µğÅÍ ÀÏ½ÃÁ¤Áö·Î Äİ½ºÅÃ È®ÀÎ ½±°Ô
-        Debug.Break();
+        // Debug.Break() ì œê±° - ê²Œì„ ì‹¤í–‰ì„ ë°©í•´í•˜ì§€ ì•Šë„ë¡
 #else
         Debug.LogError($"[WhoDestroyedMe] {name} is being Destroyed!");
 #endif
@@ -16,7 +15,7 @@ public class WhoDestroyedMe : MonoBehaviour
 
     void OnDisable()
     {
-        // ºñÈ°¼ºÈ­¸¸ µÇ´Â °æ¿ìµµ ·Î±ë
+        // ï¿½ï¿½È°ï¿½ï¿½È­ï¿½ï¿½ ï¿½Ç´ï¿½ ï¿½ï¿½ìµµ ï¿½Î±ï¿½
         Debug.LogWarning($"[WhoDestroyedMe] {name} got disabled (not destroyed).", this);
     }
 }

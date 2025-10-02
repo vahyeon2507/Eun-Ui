@@ -4120,6 +4120,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   dimImage: {fileID: 667382412}
+  targetAlpha: 0.5
+  fadeDuration: 0.25
 --- !u!114 &667382412
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -7873,11 +7875,11 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 82065799}
+  - {fileID: 641456835}
   - {fileID: 1930701006}
   - {fileID: 1538902521}
   - {fileID: 238531827}
   - {fileID: 1189223608}
-  - {fileID: 641456835}
   m_Father: {fileID: 1785110270}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -9521,7 +9523,6 @@ SceneRoots:
   - {fileID: 261804031}
   - {fileID: 6104389184371960637}
   - {fileID: 569183109}
-  - {fileID: 398597878}
   - {fileID: 578411760}
   - {fileID: 157878495}
   - {fileID: 2129917343}
@@ -9536,3 +9537,4 @@ SceneRoots:
   - {fileID: 655563744}
   - {fileID: 885852618}
   - {fileID: 596296954}
+  - {fileID: 398597878}

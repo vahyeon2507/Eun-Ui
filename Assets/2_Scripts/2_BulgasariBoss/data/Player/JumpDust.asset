@@ -19,6 +19,8 @@ MonoBehaviour:
   follow: 0
   followDuration: 0.2
   followRotation: 0
+  mirrorByFacing: 1
+  mirrorMode: 1
   autoDestroy: 0.4
   sortingLayerOverride: 
   orderInLayerOverride: 0

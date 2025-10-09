@@ -17,9 +17,11 @@ MonoBehaviour:
   offset: {x: 0.5, y: 0.7}
   signedByFacing: 1
   follow: 0
-  followDuration: 0.2
+  followDuration: 0.1
   followRotation: 0
-  autoDestroy: 0.5
+  mirrorByFacing: 1
+  mirrorMode: 1
+  autoDestroy: 0.4
   sortingLayerOverride: 
   orderInLayerOverride: 0
   sfx: {fileID: 0}

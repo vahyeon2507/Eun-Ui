@@ -10,12 +10,52 @@ public class BulgasariAttackHooks : MonoBehaviour
 {
 
     // ===== Refs =====
-    public BulgasariBoss boss;
-    public Transform attackOriginCenter;   // ±âº» ±âÁØ (¾øÀ¸¸é transform)
-    public Transform attackOriginLeft;     // (¼±ÅÃ) ¿ŞÆÈ/¿ŞÂÊ ¾ŞÄ¿
-    public Transform attackOriginRight;    // (¼±ÅÃ) ¿À¸¥ÆÈ/¿À¸¥ÂÊ ¾ŞÄ¿
 
-    // ===== Legacy (¿É¼Ç) : ¸®½ºÆ®°¡ ºñ¾úÀ» ¶§ ÀÚµ¿ µî·Ï¿ë =====
+    public IEnumerable<string> GetAttackIds()
+    {
+        // ë„¤ê°€ ì“°ëŠ” í…Œì´ë¸” íƒ€ì…ì— ë§ì¶°ì„œ ìˆœíšŒ
+        foreach (var e in attackDefs)            // ì˜ˆ: List<AttackIdDef> attackDefs;
+            if (!string.IsNullOrEmpty(e.id))
+                yield return e.id;
+    }
+
+    // 3) ì§ì ‘ ì‹¤í–‰ìš©(ì• ë‹ˆ ì—†ì´ ì¦‰ì‹œ íˆíŠ¸ ë°œìƒ)
+    public void ExecById(string id)
+    {
+        if (!TryGetDefById(id, out var def)) return;
+        Perform(def); // ê¸°ì¡´ Perform(AttackDefinition2D def, Transform originOverride = null)
+    }
+
+   public bool TryGetDefById(string id, out AttackDefinition2D def)
+{
+    def = null;
+    if (string.IsNullOrEmpty(id) || attackDefs == null) return false;
+
+    foreach (var e in attackDefs) // e : DefEntry (struct)
+    {
+        // structëŠ” null ë¹„êµ ë¶ˆê°€ â†’ default(struct)ì¸ì§€ ê²€ì‚¬
+        if (EqualityComparer<DefEntry>.Default.Equals(e, default)) 
+            continue;
+
+        // ID ì¼ì¹˜ + ì‹¤ì œ Def ì¡´ì¬
+        if (e.id == id && e.def != null)
+        {
+            def = e.def;
+            return true;                 // â† boolì„ ë¦¬í„´í•´ì•¼ í•¨
+        }
+    }
+    return false;
+}
+
+    
+
+    public bool HasAttackId(string id) => TryGetDefById(id, out _);
+    public BulgasariBoss boss;
+    public Transform attackOriginCenter;   // ï¿½âº» ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ transform)
+    public Transform attackOriginLeft;     // (ï¿½ï¿½ï¿½ï¿½) ï¿½ï¿½ï¿½ï¿½/ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ä¿
+    public Transform attackOriginRight;    // (ï¿½ï¿½ï¿½ï¿½) ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½/ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ä¿
+
+    // ===== Legacy (ï¿½É¼ï¿½) : ï¿½ï¿½ï¿½ï¿½Æ®ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½Úµï¿½ ï¿½ï¿½Ï¿ï¿½ =====
     [Header("Legacy (optional, for bootstrap)")]
     public AttackDefinition2D thorn;
     public AttackDefinition2D defSweep;
@@ -27,10 +67,10 @@ public class BulgasariAttackHooks : MonoBehaviour
     public enum GizmoMode { Off, SelectedID, All }
     public GizmoMode gizmoMode = GizmoMode.SelectedID;
 
-    [Tooltip("SelectedID ¸ğµåÀÏ ¶§ º¼ °ø°İ ID")]
+    [Tooltip("SelectedID ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ID")]
     public string gizmoAttackId = "Thorn";
 
-    [Tooltip("¿øÇÑ´Ù¸é ¾ŞÄ¿µµ ÁöÁ¤ (¿¹: Left / Right / Center). ºó °ªÀÌ¸é ID¿¡ ¸ÅÄªµÈ ¾ŞÄ¿ »ç¿ë")]
+    [Tooltip("ï¿½ï¿½ï¿½Ñ´Ù¸ï¿½ ï¿½ï¿½Ä¿ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½: Left / Right / Center). ï¿½ï¿½ ï¿½ï¿½ï¿½Ì¸ï¿½ IDï¿½ï¿½ ï¿½ï¿½Äªï¿½ï¿½ ï¿½ï¿½Ä¿ ï¿½ï¿½ï¿½")]
     public string gizmoAnchorKey = "";
 
     public Color gizmoFill = new(1f, 0.2f, 0.2f, 0.12f);
@@ -41,19 +81,19 @@ public class BulgasariAttackHooks : MonoBehaviour
     public struct AnchorEntry
     {
         public string key;                 // "Left","Right","Center","SpineL"...
-        public HitboxTrigger2D hit;        // Áö¼Ó Æ®¸®°Å(ÀÖÀ¸¸é)
-        public Transform originOverride;   // ¿ø¼¦ ±âÁØ(¾øÀ¸¸é hit.transform/Center »ç¿ë)
+        public HitboxTrigger2D hit;        // ï¿½ï¿½ï¿½ï¿½ Æ®ï¿½ï¿½ï¿½ï¿½(ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½)
+        public Transform originOverride;   // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½(ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ hit.transform/Center ï¿½ï¿½ï¿½)
     }
     [Header("Anchors / Hitboxes")]
     public List<AnchorEntry> anchors = new();
 
-    // BulgasariAttackHooks.cs ³»ºÎ (±âÁ¸ ÄÚµå ±×´ë·Î µÎ°í ¾Æ·¡¸¸ Ãß°¡)
+    // BulgasariAttackHooks.cs ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ ï¿½Úµï¿½ ï¿½×´ï¿½ï¿½ ï¿½Î°ï¿½ ï¿½Æ·ï¿½ï¿½ï¿½ ï¿½ß°ï¿½)
 
-    // ÀÎ½ºÆåÅÍ ±âº» Áö¼Ó½Ã°£(¾øÀ¸¸é ÀÌ °ª »ç¿ë)
+    // ï¿½Î½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½âº» ï¿½ï¿½ï¿½Ó½Ã°ï¿½(ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½)
     [Header("OnAt Defaults")]
     public float defaultOnAtDuration = 0.20f;
 
-    // ³»ºÎ °øÅë
+    // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     void OnAt_Internal(string key, float dur)
     {
         var a = FindAnchor(key);
@@ -65,14 +105,14 @@ public class BulgasariAttackHooks : MonoBehaviour
         a.Value.hit.Activate(Mathf.Max(0f, dur));
     }
 
-    // 1) Å°¸¸ ¹Ş´Â ¹öÀü(Áö¼Ó½Ã°£Àº ±âº»°ª »ç¿ë) ¡æ ÀÌº¥Æ®¿¡¼­ ¹®ÀÚ¿­ 1°³¸¸
+    // 1) Å°ï¿½ï¿½ ï¿½Ş´ï¿½ ï¿½ï¿½ï¿½ï¿½(ï¿½ï¿½ï¿½Ó½Ã°ï¿½ï¿½ï¿½ ï¿½âº»ï¿½ï¿½ ï¿½ï¿½ï¿½) ï¿½ï¿½ ï¿½Ìºï¿½Æ®ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ú¿ï¿½ 1ï¿½ï¿½ï¿½ï¿½
     public void Anim_OnAt_Key(string key)
     {
         OnAt_Internal(key, defaultOnAtDuration);
     }
 
-    // 2) "key,duration" ÇÑ ÁÙ·Î ¹Ş´Â ¹öÀü ¡æ ÀÌº¥Æ®¿¡¼­ ¹®ÀÚ¿­ 1°³¸¸
-    // ¿¹) Anim_OnAt_Spec("Left,0.35")
+    // 2) "key,duration" ï¿½ï¿½ ï¿½Ù·ï¿½ ï¿½Ş´ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½Ìºï¿½Æ®ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ú¿ï¿½ 1ï¿½ï¿½ï¿½ï¿½
+    // ï¿½ï¿½) Anim_OnAt_Spec("Left,0.35")
     public void Anim_OnAt_Spec(string spec)
     {
         if (string.IsNullOrWhiteSpace(spec)) return;
@@ -83,20 +123,20 @@ public class BulgasariAttackHooks : MonoBehaviour
     }
 
 
-    // ===== Attack Table (ID ¡æ Definition) =====
+    // ===== Attack Table (ID ï¿½ï¿½ Definition) =====
     [Serializable]
     public struct DefEntry
     {
-        public string id;                  // "Thorn","Sweep","Slam"... ÀÓÀÇ ¹®ÀÚ¿­
-        public AttackDefinition2D def;     // ½ÇÇàÇÒ ¾îÅÃ µ¥ÀÌÅÍ
-        public Transform originOverride;   // ÀÌ °ø°İ Àü¿ë ±âÁØÁ¡(º¸Åë ºñ¿ò)
-        public int defaultBurst;        // ¿¬Å¸ ±âº» È½¼ö(0/1ÀÌ¸é ´Ü¹ß)
-        public float defaultInterval;     // ¿¬Å¸ ±âº» °£°İ(ÃÊ)
+        public string id;                  // "Thorn","Sweep","Slam"... ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ú¿ï¿½
+        public AttackDefinition2D def;     // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+        public Transform originOverride;   // ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½(ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½)
+        public int defaultBurst;        // ï¿½ï¿½Å¸ ï¿½âº» È½ï¿½ï¿½(0/1ï¿½Ì¸ï¿½ ï¿½Ü¹ï¿½)
+        public float defaultInterval;     // ï¿½ï¿½Å¸ ï¿½âº» ï¿½ï¿½ï¿½ï¿½(ï¿½ï¿½)
     }
-    [Header("Attack Table (ID ¡æ Def)")]
+    [Header("Attack Table (ID ï¿½ï¿½ Def)")]
     public List<DefEntry> attackDefs = new();
 
-    // ====== °øÅë ½ÇÇà ======
+    // ====== ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ======
     public void Perform(AttackDefinition2D def, Transform originOverride = null)
     {
         if (!def) return;
@@ -109,13 +149,13 @@ public class BulgasariAttackHooks : MonoBehaviour
 
         HitExec2D.ExecuteAttack(def, origin, facingRight, col =>
         {
-            // ÆĞ¸µ ¿ì¼± ¼Òºñ
+            // ï¿½Ğ¸ï¿½ ï¿½ì¼± ï¿½Òºï¿½
             var pc = col.GetComponent<PlayerController>() ??
                      col.GetComponentInParent<PlayerController>() ??
                      col.GetComponentInChildren<PlayerController>();
             if (pc != null && pc.IsParrying && pc.ConsumeHitboxIfParrying(col)) return;
 
-            // ´ë¹ÌÁö Àü´Ş
+            // ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
             var dmg = col.GetComponent<IDamageable>() ??
                       col.GetComponentInParent<IDamageable>() ??
                       col.GetComponentInChildren<IDamageable>();
@@ -127,9 +167,9 @@ public class BulgasariAttackHooks : MonoBehaviour
 
 
 
-    // ====== ¾Ö´Ï¸ŞÀÌ¼Ç ÀÌº¥Æ® API (È®ÀåÇü) ======
+    // ====== ï¿½Ö´Ï¸ï¿½ï¿½Ì¼ï¿½ ï¿½Ìºï¿½Æ® API (È®ï¿½ï¿½ï¿½ï¿½) ======
 
-    // A) Áö¼Ó ÆÇÁ¤ ½ºÀ§Ä¡: ÇØ´ç ¾ŞÄ¿ÀÇ È÷Æ®¹Ú½º¸¦ durÃÊ ÄÒ´Ù
+    // A) ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Ä¡: ï¿½Ø´ï¿½ ï¿½ï¿½Ä¿ï¿½ï¿½ ï¿½ï¿½Æ®ï¿½Ú½ï¿½ï¿½ï¿½ durï¿½ï¿½ ï¿½Ò´ï¿½
     public void Anim_OnAt(string key, float dur)
     {
         var a = FindAnchor(key);
@@ -141,7 +181,7 @@ public class BulgasariAttackHooks : MonoBehaviour
         a.Value.hit.Activate(dur);
     }
 
-    // B) ¿ø¼¦ 1È¸: ÀÎ½ºÆåÅÍ Å×ÀÌºíÀÇ "°ø°İID"¸¦ ½ÇÇà
+    // B) ï¿½ï¿½ï¿½ï¿½ 1È¸: ï¿½Î½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ìºï¿½ï¿½ï¿½ "ï¿½ï¿½ï¿½ï¿½ID"ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     public void Anim_ATK_ID(string id)
     {
         var de = FindDef(id);
@@ -151,14 +191,14 @@ public class BulgasariAttackHooks : MonoBehaviour
             return;
         }
 
-        // °°Àº ÀÌ¸§ÀÇ ¾ŞÄ¿°¡ ÀÖÀ¸¸é ±× ±âÁØÀ» ÀÚµ¿ »ç¿ë
+        // ï¿½ï¿½ï¿½ï¿½ ï¿½Ì¸ï¿½ï¿½ï¿½ ï¿½ï¿½Ä¿ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Úµï¿½ ï¿½ï¿½ï¿½
         var a = FindAnchor(id);
         var origin = ResolveOrigin(de.Value, a, null);
         Perform(de.Value.def, origin);
     }
 
-    // C) ¿ø¼¦ ¿¬Å¸: "id,È½¼ö,°£°İ[,¾ŞÄ¿Å°]" (È½¼ö/°£°İ »ı·« ½Ã Å×ÀÌºí ±âº»°ª)
-    //   ¿¹) "Thorn,4,0.07"  /  "Thorn"  /  "Thorn,3,0.05,Left"
+    // C) ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Å¸: "id,È½ï¿½ï¿½,ï¿½ï¿½ï¿½ï¿½[,ï¿½ï¿½Ä¿Å°]" (È½ï¿½ï¿½/ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½Ìºï¿½ ï¿½âº»ï¿½ï¿½)
+    //   ï¿½ï¿½) "Thorn,4,0.07"  /  "Thorn"  /  "Thorn,3,0.05,Left"
     public void Anim_ATK_Burst(string spec)
     {
         if (string.IsNullOrWhiteSpace(spec)) return;
@@ -186,7 +226,7 @@ public class BulgasariAttackHooks : MonoBehaviour
         StartCoroutine(BurstRoutine(de.Value.def, origin, count, interval));
     }
 
-    // D) ¿ø¼¦: Æ¯Á¤ ¾ŞÄ¿Å°¸¦ ¸í½ÃÇØ¼­ ½ÇÇàÇÏ°í ½ÍÀ» ¶§
+    // D) ï¿½ï¿½ï¿½ï¿½: Æ¯ï¿½ï¿½ ï¿½ï¿½Ä¿Å°ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ø¼ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï°ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½
     public void Anim_ATK_ID_At(string id, string key)
     {
         var de = FindDef(id);
@@ -206,7 +246,7 @@ public class BulgasariAttackHooks : MonoBehaviour
         }
     }
 
-    // ====== È£È¯¿ë(±âÁ¸ ÀÌº¥Æ® ÀÌ¸§ À¯Áö) ======
+    // ====== È£È¯ï¿½ï¿½(ï¿½ï¿½ï¿½ï¿½ ï¿½Ìºï¿½Æ® ï¿½Ì¸ï¿½ ï¿½ï¿½ï¿½ï¿½) ======
     public void Anim_ATK_DoublePunch() => Anim_ATK_ID("Thorn");
     public void Anim_ATK_Sweep() => Anim_ATK_ID("Sweep");
     public void Anim_ATK_Slam() => Anim_ATK_ID("Slam");
@@ -229,7 +269,7 @@ public class BulgasariAttackHooks : MonoBehaviour
                 var origin = ResolveOrigin(de, a, gizmoAnchorKey);
                 HitExec2D.DrawGizmos(de.def, origin, facingRight, gizmoFill, gizmoWire);
             }
-            // ·¹°Å½Ã 3Á¾µµ º¸Á¶·Î
+            // ï¿½ï¿½ï¿½Å½ï¿½ 3ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
             var legacyOrigin = attackOriginCenter ? attackOriginCenter : transform;
             HitExec2D.DrawGizmos(thorn, legacyOrigin, facingRight, gizmoFill, gizmoWire);
             HitExec2D.DrawGizmos(defSweep, legacyOrigin, facingRight, gizmoFill, gizmoWire);
@@ -247,7 +287,7 @@ public class BulgasariAttackHooks : MonoBehaviour
                 HitExec2D.DrawGizmos(deOpt.Value.def, origin, facingRight, gizmoFill, gizmoWire);
                 return;
             }
-            // ·¹°Å½Ã ¸íÄªµµ Çã¿ë
+            // ï¿½ï¿½ï¿½Å½ï¿½ ï¿½ï¿½Äªï¿½ï¿½ ï¿½ï¿½ï¿½
             AttackDefinition2D legacy = (gizmoAttackId == "Thorn") ? thorn :
                                         (gizmoAttackId == "Sweep") ? defSweep :
                                         (gizmoAttackId == "Slam") ? defSlam : null;
@@ -276,7 +316,7 @@ public class BulgasariAttackHooks : MonoBehaviour
     {
         if (de.originOverride) return de.originOverride;
 
-        // ¿ì¼±¼øÀ§: ¸í½Ã Å° ¡æ °°Àº ÀÌ¸§ ¾ŞÄ¿ ¡æ ¾ŞÄ¿ÀÇ hit/override ¡æ Center
+        // ï¿½ì¼±ï¿½ï¿½ï¿½ï¿½: ï¿½ï¿½ï¿½ï¿½ Å° ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ì¸ï¿½ ï¿½ï¿½Ä¿ ï¿½ï¿½ ï¿½ï¿½Ä¿ï¿½ï¿½ hit/override ï¿½ï¿½ Center
         if (anchorMaybe != null)
         {
             var a = anchorMaybe.Value;
@@ -284,7 +324,7 @@ public class BulgasariAttackHooks : MonoBehaviour
             if (a.hit) return a.hit.transform;
         }
 
-        // º°µµ Å°·Î Á÷Á¢ Ã£±â (À§¿¡¼­ ¸ø Ã£¾ÒÀ» ¶§)
+        // ï¿½ï¿½ï¿½ï¿½ Å°ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ Ã£ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ Ã£ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½)
         if (!string.IsNullOrEmpty(keyOverride))
         {
             var a2 = FindAnchor(keyOverride);
@@ -302,12 +342,12 @@ public class BulgasariAttackHooks : MonoBehaviour
 
     void BootstrapLegacyDefaults()
     {
-        // ±âº» ¾ŞÄ¿ ÀÚµ¿ Ãß°¡ (ºñ¾îÀÖÀ» ¶§¸¸)
+        // ï¿½âº» ï¿½ï¿½Ä¿ ï¿½Úµï¿½ ï¿½ß°ï¿½ (ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
         AddDefaultAnchor("Center", attackOriginCenter);
         AddDefaultAnchor("Left", attackOriginLeft);
         AddDefaultAnchor("Right", attackOriginRight);
 
-        // °ø°İ Å×ÀÌºí ºñ¾úÀ¸¸é ·¹°Å½Ã ÇÊµå·Î 1È¸ ºÎÆ®½ºÆ®·¦
+        // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ìºï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Å½ï¿½ ï¿½Êµï¿½ï¿½ 1È¸ ï¿½ï¿½Æ®ï¿½ï¿½Æ®ï¿½ï¿½
         if (attackDefs == null) attackDefs = new List<DefEntry>();
         if (attackDefs.Count == 0)
         {
@@ -333,7 +373,7 @@ public class BulgasariAttackHooks : MonoBehaviour
 #if UNITY_EDITOR
     void OnValidate()
     {
-        // Å° °ø¹é Á¤¸®
+        // Å° ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
         for (int i = 0; i < anchors.Count; i++)
         {
             anchors[i] = new AnchorEntry

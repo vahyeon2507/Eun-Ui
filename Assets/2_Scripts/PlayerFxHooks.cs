@@ -9,7 +9,7 @@ public class PlayerFxHooks : MonoBehaviour
 
     [Header("Anchors")] public List<AnchorEntry> anchors = new();
     [Header("Fx Library")] public List<FxEntry> fxList = new();
-    [Header("Audio (optional)")] public AudioSource audioSource;
+    [Header("Audio")] public AudioSource audioSource;
 
     Dictionary<string, Transform> _anchorMap;
     Dictionary<string, FxDefinition2D> _fxMap;
@@ -29,43 +29,48 @@ public class PlayerFxHooks : MonoBehaviour
     {
         if (!_fxMap.TryGetValue(fxId, out var def) || !def || !def.prefab) return;
 
-        // 앵커 찾기
+        // 앵커
         Transform anchor = anchorOverride;
         if (!anchor && !string.IsNullOrEmpty(anchorKey)) _anchorMap.TryGetValue(anchorKey, out anchor);
         if (!anchor) anchor = transform;
 
-        // 생성 위치 계산(월드)
+        // 좌/우 부호
         float sign = (transform.localScale.x >= 0f) ? 1f : -1f;
+
+        // 월드 스폰 위치
         Vector2 off = def.offset;
         if (def.signedByFacing) off.x *= sign;
         Vector3 spawnPos = anchor.position + (Vector3)off;
 
         // 생성
-        GameObject go = Instantiate(def.prefab, spawnPos, def.followRotation ? anchor.rotation : Quaternion.identity);
+        var go = Instantiate(def.prefab, spawnPos, def.followRotation ? anchor.rotation : Quaternion.identity);
 
+        // ====== 미러링 적용 ======
+        ApplyMirrorOnce(go, def, sign, parentWillMirror: def.follow == FxDefinition2D.FollowMode.Attach);
+
+        // ====== 붙임/팔로우 모드 ======
         switch (def.follow)
         {
             case FxDefinition2D.FollowMode.Attach:
-                // 자식으로 붙여서 끝까지 따라가기(로컬 오프셋 사용)
                 go.transform.SetParent(anchor, worldPositionStays: true);
-                // 로컬 오프셋은 부호 곱할 필요 없음(부모 플립에 의해 월드에서 반전됨)
+                // 부모가 좌우 플립을 가져가므로 로컬 오프셋만 그대로 주면 됨
                 go.transform.localPosition = def.offset;
                 if (def.followRotation) go.transform.localRotation = Quaternion.identity;
                 break;
 
             case FxDefinition2D.FollowMode.SoftFollow:
-                // 자식으로 붙이지 않고 duration 동안만 추적
                 var flw = go.AddComponent<_FxAnchorFollower>();
-                flw.Setup(anchor, def.offset, def.signedByFacing, def.followRotation, def.followDuration, transform);
+                flw.Setup(anchor, def.offset, def.signedByFacing, def.followRotation,
+                          def.followDuration, transform,
+                          def.mirrorByFacing, def.mirrorMode);
                 break;
 
             case FxDefinition2D.FollowMode.None:
             default:
-                // 아무것도 안 함(생성 좌표 고정)
                 break;
         }
 
-        // 정렬(선택)
+        // 정렬
         if (!string.IsNullOrEmpty(def.sortingLayerOverride))
             foreach (var sr in go.GetComponentsInChildren<SpriteRenderer>(true))
             { sr.sortingLayerName = def.sortingLayerOverride; sr.sortingOrder = def.orderInLayerOverride; }
@@ -83,6 +88,29 @@ public class PlayerFxHooks : MonoBehaviour
     public void Anim_PlayFx(string fxId) => PlayFx(fxId);
     public void Anim_PlayFxAt(string fxId, string anchorKey) => PlayFx(fxId, anchorKey);
 
+    // --- helper: 한 번만 미러링 적용(Attach가 아닌 경우) ---
+    void ApplyMirrorOnce(GameObject go, FxDefinition2D def, float sign, bool parentWillMirror)
+    {
+        if (!def.mirrorByFacing) return;
+
+        // Attach면 부모(Player)가 좌우 플립을 가져가므로 자식에서 따로 뒤집을 필요 없음
+        if (parentWillMirror) return;
+
+        if (sign >= 0f) return; // 오른쪽 보고 있으면 그대로
+
+        if (def.mirrorMode == FxDefinition2D.MirrorMode.ScaleX)
+        {
+            var s = go.transform.localScale;
+            s.x = Mathf.Abs(s.x) * -1f;
+            go.transform.localScale = s;
+        }
+        else // FlipSpriteRenderer
+        {
+            foreach (var sr in go.GetComponentsInChildren<SpriteRenderer>(true))
+                sr.flipX = !sr.flipX; // 기본이 오른쪽 바라보는 에셋 가정
+        }
+    }
+
 #if UNITY_EDITOR
     void OnDrawGizmosSelected()
     {
@@ -95,7 +123,8 @@ public class PlayerFxHooks : MonoBehaviour
 }
 
 /// <summary>
-/// 자식으로 붙이지 않고, 지정 시간 동안만 앵커를 따라가게 하는 보조 컴포넌트
+/// 자식으로 붙이지 않고, 지정 시간 동안만 앵커를 따라가며
+/// 좌/우 뒤집기도 매 프레임 갱신
 /// </summary>
 class _FxAnchorFollower : MonoBehaviour
 {
@@ -104,11 +133,23 @@ class _FxAnchorFollower : MonoBehaviour
     bool _signed, _rot;
     float _remain;
 
-    public void Setup(Transform anchor, Vector2 offset, bool signedByFacing, bool followRotation, float duration, Transform rootForFacing)
+    bool _mirror;
+    FxDefinition2D.MirrorMode _mirrorMode;
+    Vector3 _initialScale;
+    SpriteRenderer[] _srs;
+
+    public void Setup(Transform anchor, Vector2 offset, bool signedByFacing, bool followRotation,
+                      float duration, Transform rootForFacing,
+                      bool mirrorByFacing, FxDefinition2D.MirrorMode mirrorMode)
     {
         _anchor = anchor; _offset = offset; _signed = signedByFacing; _rot = followRotation;
         _remain = Mathf.Max(0f, duration);
-        _rootForFacing = rootForFacing; // 보통 플레이어 루트(좌우 플립 판단용)
+        _rootForFacing = rootForFacing;
+
+        _mirror = mirrorByFacing;
+        _mirrorMode = mirrorMode;
+        _initialScale = transform.localScale;
+        _srs = GetComponentsInChildren<SpriteRenderer>(true);
     }
 
     void LateUpdate()
@@ -119,9 +160,26 @@ class _FxAnchorFollower : MonoBehaviour
         float sign = 1f;
         if (_signed && _rootForFacing) sign = (_rootForFacing.localScale.x >= 0f) ? 1f : -1f;
 
+        // 위치 추적
         Vector3 target = _anchor.position + (Vector3)new Vector2(_offset.x * sign, _offset.y);
         transform.position = target;
         if (_rot) transform.rotation = _anchor.rotation;
+
+        // 좌/우 미러링 갱신
+        if (_mirror && _rootForFacing)
+        {
+            if (_mirrorMode == FxDefinition2D.MirrorMode.ScaleX)
+            {
+                var s = _initialScale;
+                s.x *= (_rootForFacing.localScale.x >= 0f) ? 1f : -1f;
+                transform.localScale = s;
+            }
+            else
+            {
+                bool flip = (_rootForFacing.localScale.x < 0f);
+                for (int i = 0; i < _srs.Length; i++) if (_srs[i]) _srs[i].flipX = flip;
+            }
+        }
 
         _remain -= Time.deltaTime;
     }

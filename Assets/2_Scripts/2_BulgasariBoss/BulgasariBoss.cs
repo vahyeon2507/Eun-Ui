@@ -1,25 +1,25 @@
 using System;
 using System.Collections;
-using System.Reflection;
 using System.Collections.Generic;
+using System.Reflection;
 using UnityEngine;
 
-
-
+/// <summary>
+/// Bulgasari boss â€“ íŒ¨ë§ ìŠ¤í˜ì…œ â€œì ì¤‘ ì‹œâ€ ê·¸ë¡œê¸° í™•ì • ë²„ì „
+/// - 4íšŒ íŒ¨ë§ ë‹¬ì„± ì‹œ: 'ë³´ë¥˜' ìƒíƒœë¡œ ë¬´ì¥
+/// - ë³´ë¥˜ ì‹œê°„ ë‚´ ì²« í”¼ê²©ì´ ë“¤ì–´ì˜¤ë©´: ê·¸ë¡œê¸° ON
+/// </summary>
 [DisallowMultipleComponent]
 public class BulgasariBoss : MonoBehaviour, IDamageable
 {
-    int _prevStreak = 0; // <== Ãß°¡
-
     [Header("Refs")]
     public Animator animator;
-    public MonoBehaviour healthReceiver; // ³»ºÎ º¸½º Ã¼·Â ÄÄÆ÷³ÍÆ®(¼±ÅÃ)
+    public MonoBehaviour healthReceiver; // ì²´ë ¥ ì»´í¬ë„ŒíŠ¸(ì„ íƒ)
     public Transform player;
 
     [Header("Damage Mitigation")]
-    [Range(0f, 0.95f)] public float baseDamageMitigation = 0.6f; // 60% °æ°¨(=40%¸¸ ¹ŞÀ½)
-    [Tooltip("±×·Î±â Áß¿¡´Â °æ°¨ÀÌ ÀÌ °ªÀ¸·Î °­Á¦µÊ(º¸Åë 0)")]
-    [Range(0f, 0.95f)] public float groggyMitigation = 0f;
+    [Range(0f, 0.95f)] public float baseDamageMitigation = 0.6f; // í‰ì‹œ ê²½ê°
+    [Range(0f, 0.95f)] public float groggyMitigation = 0f;       // ê·¸ë¡œê¸° ê²½ê°(ë³´í†µ 0)
 
     [Header("Groggy")]
     public float groggyDuration = 4.0f;
@@ -27,21 +27,36 @@ public class BulgasariBoss : MonoBehaviour, IDamageable
     public string animTrigGroggyOff = "GroggyOff";
     public bool debugLog;
 
-    [Header("Parry Streak")]
-    public MonoBehaviour parryProvider; // IParryStreakProvider ±¸ÇöÃ¼¸¦ ±â´ë
-    public string reflectionParryProp = "CurrentParryStreak"; // Æú¹é¿ë ÀÌ¸§
+    [Header("Parry / Special Link")]
+    [Tooltip("í”Œë ˆì´ì–´(ë˜ëŠ” ê³µê¸‰ì). IParryStreakProvider êµ¬í˜„ì²´ê±°ë‚˜, ë¦¬í”Œë ‰ì…˜ìœ¼ë¡œ ìŠ¤íŠ¸ë¦­ ê°’ì„ í´ë§í•¨.")]
+    public MonoBehaviour parryProvider;
+    [Tooltip("ë¦¬í”Œë ‰ì…˜ìœ¼ë¡œ ì½ì„ ì†ì„±/í•„ë“œëª… ìš°ì„ ìˆœìœ„ ë§¨ ì•")]
+    public string reflectionParryProp = "CurrentParryStreak";
     public int parryNeeded = 4;
     public bool useReflectionPollIfNoProvider = true;
     public float reflectPollInterval = 0.1f;
 
-    float _currentMitigation;      // 0~0.95
+    [Header("Special Confirm Settings")]
+    [Tooltip("ìŠ¤í˜ì…œ â€˜ì ì¤‘â€™ìœ¼ë¡œ í™•ì¸í•  ìˆ˜ ìˆëŠ” ì‹œê°„ì°½(ì´ˆ). 4íšŒ íŒ¨ë§ ë‹¬ì„± ìˆœê°„ë¶€í„° ì¹´ìš´íŠ¸.")]
+    public float specialConfirmWindow = 1.0f;
+    [Tooltip("í™•ì¸ íƒ€ê²©(ìŠ¤í˜ì…œ)ì— í•œí•´, ê·¸ íƒ€ê²©ë¶€í„° ê²½ê° 0%(=ê·¸ë¡œê¸° ê²½ê°)ë¡œ ê³„ì‚°í• ì§€ ì—¬ë¶€.")]
+    public bool specialHitGetsFullDamage = true;
+
+    // ===== Internals =====
+    float _currentMitigation;
     bool _groggy;
-    int _lastHandledStreakGroup = -1; // (streak/parryNeeded)ÀÇ ±×·ì ÀÎµ¦½º
     Coroutine _groggyCo;
+
+    int _prevStreak = 0;
+    int _lastHandledStreakGroup = -1;
     float _reflectTimer;
 
-    // health forwarding(¼±ÅÃ)
-    MethodInfo _miTakeDamage; IDamageable _idmg;
+    bool _groggyPending = false;
+    float _groggyPendingUntil = 0f;
+
+    // health forwarding(ì„ íƒ)
+    MethodInfo _miTakeDamage;
+    IDamageable _idmg;
 
     void Reset()
     {
@@ -53,20 +68,17 @@ public class BulgasariBoss : MonoBehaviour, IDamageable
     {
         _currentMitigation = baseDamageMitigation;
 
-        // ÇÇÇØ Àü´Ş °æ·Î È®º¸: IDamageable > ¸®ÇÃ·º¼Ç(TakeDamage)
+        // ì²´ë ¥ ìœ„ì„: IDamageable > ë¦¬í”Œë ‰ì…˜(TakeDamage)
         _idmg = healthReceiver as IDamageable ?? GetComponent<IDamageable>();
         if (healthReceiver && _idmg == null)
         {
             _miTakeDamage = healthReceiver.GetType().GetMethod(
                 "TakeDamage",
                 BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-                null,
-                new Type[] { typeof(int) },
-                null
-            );
+                null, new Type[] { typeof(int) }, null);
         }
 
-        // ÆĞ¸µ streak ÀÌº¥Æ® ±¸µ¶ ½Ãµµ
+        // ì´ë²¤íŠ¸ êµ¬ë… (í”„ë¡œì íŠ¸ì— IParryStreakProviderê°€ ì´ë¯¸ ìˆìŒ)
         var prov = parryProvider as IParryStreakProvider;
         if (prov != null)
         {
@@ -83,14 +95,22 @@ public class BulgasariBoss : MonoBehaviour, IDamageable
 
     void Update()
     {
-        // Æú¹é: ¸®ÇÃ·º¼Ç Æú¸µ
+        // ë³´ë¥˜ íƒ€ì„ì•„ì›ƒ
+        if (_groggyPending && Time.time > _groggyPendingUntil)
+        {
+            if (debugLog) Debug.Log("[Bulgasari] Groggy pending expired");
+            _groggyPending = false;
+        }
+
+        // (ì˜µì…˜) ë¦¬í”Œë ‰ì…˜ í´ë§
         if (useReflectionPollIfNoProvider && !(parryProvider is IParryStreakProvider) && parryProvider != null)
         {
             _reflectTimer -= Time.deltaTime;
             if (_reflectTimer <= 0f)
             {
                 _reflectTimer = reflectPollInterval;
-                int val = TryGetInt(parryProvider, reflectionParryProp, "ParryStreak", "ParryCount", "CurrentParry", "ComboParry", "parrySuccessCount");
+                int val = TryGetInt(parryProvider, reflectionParryProp,
+                    "ParryStreak", "ParryCount", "CurrentParry", "ComboParry", "parrySuccessCount");
                 if (val >= 0) OnParryChanged(val);
             }
         }
@@ -99,41 +119,62 @@ public class BulgasariBoss : MonoBehaviour, IDamageable
     // ====== IDamageable ======
     public void TakeDamage(int amount)
     {
-        int final = Mathf.Max(0, Mathf.CeilToInt(amount * (1f - _currentMitigation)));
-        if (_groggy && debugLog) Debug.Log($"[Bulgasari] GROGGY! incoming:{amount} ¡æ final:{final}");
+        // ìŠ¤í˜ì…œ ì ì¤‘ ë³´ë¥˜ ì¤‘ì´ë©´, ì´ íƒ€ê²©ì„ ìŠ¤í˜ì…œë¡œ ê°„ì£¼(ìœˆë„ìš° ë‚´ ì²« íˆíŠ¸)
+        bool confirmThisHit = _groggyPending && Time.time <= _groggyPendingUntil;
+
+        float mitigation = _currentMitigation;
+        if (_groggy) mitigation = groggyMitigation;
+        else if (confirmThisHit && specialHitGetsFullDamage) mitigation = groggyMitigation;
+
+        int final = Mathf.Max(0, Mathf.CeilToInt(amount * (1f - mitigation)));
+
         if (_idmg != null && !(ReferenceEquals(_idmg, this)))
         {
             _idmg.TakeDamage(final);
-            return;
         }
-        if (healthReceiver != null && _miTakeDamage != null)
+        else if (healthReceiver != null && _miTakeDamage != null)
         {
             _miTakeDamage.Invoke(healthReceiver, new object[] { final });
-            return;
         }
-        // ÃÖÈÄ Æú¹é: ±×³É ·Î±×·Î ´ëÃ¼
-        if (debugLog) Debug.Log($"[Bulgasari] TakeDamage {final}");
+        else
+        {
+            if (debugLog) Debug.Log($"[Bulgasari] TakeDamage {final}");
+        }
+
+        // íƒ€ê²©ìœ¼ë¡œ ê·¸ë¡œê¸° í™•ì •
+        if (confirmThisHit)
+        {
+            _groggyPending = false;
+            EnterGroggy();
+        }
     }
 
-    // ====== Parry ¿¬µ¿ ======
+    // ====== Parry ìŠ¤íŠ¸ë¦­ ìˆ˜ì‹  ======
     void OnParryChanged(int streak)
     {
         if (parryNeeded <= 0) parryNeeded = 4;
 
-        // ¡é¡é¡é »õ·Î Ãß°¡: °¨¼Ò(=¸®¼Â) °¨Áö ¡æ ±×·ì ÃÊ±âÈ­
-        if (streak < _prevStreak)
-            _lastHandledStreakGroup = -1;
+        // í•˜í–¥(ëŠê¹€) ê°ì§€ ì‹œ ê·¸ë£¹ ë¦¬ì…‹
+        if (streak < _prevStreak) _lastHandledStreakGroup = -1;
         _prevStreak = streak;
 
         bool thresholdHit = streak > 0 && (streak % parryNeeded == 0);
         if (!thresholdHit) return;
 
-        int group = streak / parryNeeded; // 4¡æ1, 8¡æ2 ...
-        if (group != _lastHandledStreakGroup)
-        {
-            _lastHandledStreakGroup = group;
-            EnterGroggy();
-        }
+        int group = streak / parryNeeded; // 4â†’1, 8â†’2 ...
+        if (group == _lastHandledStreakGroup) return;
+
+        _lastHandledStreakGroup = group;
+
+        // ì´ì „: ë°”ë¡œ ê·¸ë¡œê¸° â†’ ë³€ê²½: â€˜ë³´ë¥˜â€™ë§Œ ì¼œê³ , ì ì¤‘ìœ¼ë¡œ í™•ì •
+        ArmGroggyPending();
+    }
+
+    void ArmGroggyPending()
+    {
+        _groggyPending = true;
+        _groggyPendingUntil = Time.time + Mathf.Max(0.05f, specialConfirmWindow);
+        if (debugLog) Debug.Log($"[Bulgasari] Groggy pending armed for {specialConfirmWindow:0.00}s");
     }
 
     void EnterGroggy()
@@ -165,9 +206,9 @@ public class BulgasariBoss : MonoBehaviour, IDamageable
         foreach (var n in names)
         {
             var p = t.GetProperty(n, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            if (p != null && (p.PropertyType == typeof(int))) return (int)p.GetValue(obj);
+            if (p != null && p.PropertyType == typeof(int)) return (int)p.GetValue(obj);
             var f = t.GetField(n, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            if (f != null && (f.FieldType == typeof(int))) return (int)f.GetValue(obj);
+            if (f != null && f.FieldType == typeof(int)) return (int)f.GetValue(obj);
         }
         return -1;
     }

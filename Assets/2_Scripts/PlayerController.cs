@@ -21,6 +21,8 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     [Header("Movement")]
     public float moveSpeed = 5f;
     public float jumpForce = 12f;
+
+    public PlayerFxHooks fx;   // 인스펙터에 Drag
     public Transform groundCheck;
     public LayerMask groundLayer;
 
@@ -192,9 +194,14 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
                 Vector2 v = rb.linearVelocity;
                 v.y = jumpForce;
                 rb.linearVelocity = v;
+
+                if (fx) fx.PlayFx("JumpDust", "Feet");
             }
+
         }
     }
+
+
 
     void HandleMovement()
     {
@@ -320,6 +327,8 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     // --------------------------------------------------------
     IEnumerator DoDash()
     {
+        if (fx) fx.PlayFx("DashStart", "Body");   // 시작 폭발
+
         canDash = false;
         isDashing = true;
         if (animator != null) animator.SetTrigger(animDashTrigger);

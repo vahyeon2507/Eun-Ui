@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 7934983340314922128}
   - component: {fileID: -5822390206705199542}
   m_Layer: 0
-  m_Name: Clap
+  m_Name: Clap 1
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

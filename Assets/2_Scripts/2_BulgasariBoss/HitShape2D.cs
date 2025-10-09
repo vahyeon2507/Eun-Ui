@@ -1,169 +1,273 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public enum HitShapeKind { Box, Circle, Capsule, ArcSector }
-
-[CreateAssetMenu(menuName = "Combat/HitShape2D")]
+[CreateAssetMenu(menuName = "Combat/Hit Shape 2D")]
 public class HitShape2D : ScriptableObject
 {
-    public HitShapeKind kind = HitShapeKind.Box;
+    // === ê³µí†µ ===
+    public LayerMask layerMask = ~0; // Everything
 
-    // HitShape2D.cs (ÇÙ½É¸¸, ±âÁ¸ ÇÊµå À¯ÁöÇÏ¸é¼­ enum/ÇÁ¸®ÆÕ Ç×¸ñ Ãß°¡)
+    // ì–´ë–¤ ì†ŒìŠ¤ì˜ ê¸°í•˜ë¥¼ ì“¸ì§€
+    public enum GeometryMode { Kind, Prefab }
+    [Header("Mode")]
+    public GeometryMode mode = GeometryMode.Kind;
 
-    public enum GizmoOverrideKind { None, PrefabSpriteBounds, PrefabColliderOutline }
+    // ----------------------------
+    // KIND ëª¨ë“œ (ê¸°ì¡´ ë°©ì‹)
+    // ----------------------------
+    public enum Kind { Box, Capsule, Circle, Arc }
+    [Header("Kind Mode")]
+    public Kind kind = Kind.Box;
 
-    public enum HitKind
-    {
-        Box, Capsule, Circle, Arc,
-        PrefabSpriteBounds,   // ÇÁ¸®ÆÕÀÇ SpriteRenderer ¹Ù¿îÁî ¹Ú½º·Î ±×¸²(¹Ì¸®º¸±â Àü¿ë)
-        PrefabColliderOutline // ÇÁ¸®ÆÕÀÇ Collider2D À±°û¼±À¸·Î ±×¸²(¹Ì¸®º¸±â Àü¿ë)
-    }
+    public Vector2 kindOffset = Vector2.zero;
+    public float kindAngleDeg = 0f;
+    public bool kindSignedByFacing = true;
 
-    [Header("Gizmo Override (optional)")]
-    public GizmoOverrideKind gizmoOverride = GizmoOverrideKind.None; // NoneÀÌ¸é ±âº»´ë·Î, ³ª¸ÓÁö´Â ÇÁ¸®ÆÕ ¹Ì¸®º¸±â °­Á¦
-    public bool gizmoHideRuntimeShape = true;                         // ÇÁ¸®ÆÕÀ» ±×¸± ¶§ ±âº»(Box/Circle µî) ¸ğ¾ç ¼û±æÁö
+    // Box
+    public Vector2 boxSize = new(1, 1);
 
-
-
-
-    // --- Prefab ¹Ì¸®º¸±â ¿É¼Ç ---
-    public GameObject prefabForGizmo;       // µû¶ó ±×¸®°í ½ÍÀº ÇÁ¸®ÆÕ
-    public bool prefabIncludeChildren = true;
-    public Vector2 prefabBoundsScale = Vector2.one; // ¹Ù¿îÁî ½ºÄÉÀÏ º¸Á¤
-
-
-    [Header("Common")]
-    public Vector2 offset = new Vector2(1.5f, 0f);
-    [Tooltip("·ÎÄÃ °¢µµ(µµ). facingRight¿¡ µû¶ó ºÎÈ£ ¹İ¿µ ¿É¼Ç")]
-    public float angleDeg = 0f;
-    public bool signedByFacing = true;
-
-    [Header("Box / Capsule")]
-    public Vector2 size = new Vector2(3f, 1.2f);
+    // Capsule
+    public Vector2 capsuleSize = new(1, 1);
     public CapsuleDirection2D capsuleDirection = CapsuleDirection2D.Horizontal;
 
-    [Header("Circle / Arc")]
-    public float radius = 1.5f;
-    [Tooltip("ºÎÃ¤²Ã °¢µµ(µµ)")]
+    // Circle
+    public float circleRadius = 1.5f;
+
+    // Arc(ì›í˜¸) â€” ëŸ°íƒ€ì„ì€ ì›ìœ¼ë¡œ ë§ì¶”ê³  ê°ë„ë¡œ í•„í„°ë§
+    public float arcRadius = 1.5f;
     public float arcAngle = 90f;
 
-    [Header("Filter")]
-    public LayerMask layerMask = ~0;
+    // ----------------------------
+    // PREFAB ëª¨ë“œ (í”„ë¦¬íŒ¹ í¬ê¸°/ëª¨ì–‘ ê¸°ë°˜)
+    // ----------------------------
+    public enum PrefabSource { SpriteBounds, ColliderBounds }
+    [Header("Prefab Mode")]
+    public PrefabSource prefabSource = PrefabSource.SpriteBounds;
+    public GameObject prefab;
+    public bool prefabIncludeChildren = true;
 
-    // === ½ÇÇà ===
-    public int Overlap(Transform origin, bool facingRight, List<Collider2D> resultsBuffer)
+    public Vector2 prefabOffset = Vector2.zero; // í”„ë¦¬íŒ¹ ëª¨ë“œ ì „ìš© ì˜¤í”„ì…‹
+    public float prefabAngleDeg = 0f;
+    public bool prefabSignedByFacing = true;
+
+    [Tooltip("í”„ë¦¬íŒ¹ ë°”ìš´ì¦ˆ í¬ê¸° ë³´ì •")]
+    public Vector2 prefabBoundsScale = Vector2.one;
+
+    // =========================================================
+    // =======  ëŸ°íƒ€ì„ ì¶©ëŒ(Overlap)  ==========================
+    // =========================================================
+    public void Overlap(Transform origin, bool facingRight, List<Collider2D> results)
     {
-        resultsBuffer.Clear();
+        if (!origin || results == null) return;
 
-        float sign = signedByFacing ? (facingRight ? 1f : -1f) : 1f;
-        Vector2 worldCenter = (Vector2)origin.position + Rotate(offset * new Vector2(sign, 1f), angleDeg * sign);
-        float worldAngle = angleDeg * sign;
-
-        switch (kind)
+        if (mode == GeometryMode.Kind)
         {
-            case HitShapeKind.Box:
-                {
-                    var arr = Physics2D.OverlapBoxAll(worldCenter, size, worldAngle, layerMask);
-                    resultsBuffer.AddRange(arr);
-                    return resultsBuffer.Count;
-                }
-            case HitShapeKind.Circle:
-                {
-                    var arr = Physics2D.OverlapCircleAll(worldCenter, radius, layerMask);
-                    resultsBuffer.AddRange(arr);
-                    return resultsBuffer.Count;
-                }
-            case HitShapeKind.Capsule:
-                {
-#if UNITY_2018_2_OR_NEWER
-                    var arr = Physics2D.OverlapCapsuleAll(worldCenter, size, capsuleDirection, worldAngle, layerMask);
-                    resultsBuffer.AddRange(arr);
-                    return resultsBuffer.Count;
-#else
-                // Æú¹é: ¹Ú½º·Î ±Ù»ç
-                var arr = Physics2D.OverlapBoxAll(worldCenter, size, worldAngle, layerMask);
-                resultsBuffer.AddRange(arr);
-                return resultsBuffer.Count;
-#endif
-                }
-            case HitShapeKind.ArcSector:
-                {
-                    var arr = Physics2D.OverlapCircleAll(worldCenter, radius, layerMask);
-                    Vector2 forward = AngleToDir(worldAngle);
-                    for (int i = 0; i < arr.Length; i++)
+            Vector2 center = ComposeCenter(origin, kindOffset, kindAngleDeg, kindSignedByFacing, facingRight, out float worldAngle);
+            switch (kind)
+            {
+                case Kind.Box:
+                    Add(Physics2D.OverlapBoxAll(center, boxSize, worldAngle, layerMask), results);
+                    break;
+                case Kind.Circle:
+                    Add(Physics2D.OverlapCircleAll(center, circleRadius, layerMask), results);
+                    break;
+                case Kind.Capsule:
+                    Add(Physics2D.OverlapCapsuleAll(center, capsuleSize, capsuleDirection, worldAngle, layerMask), results);
+                    break;
+                case Kind.Arc:
+                    // ì›ìœ¼ë¡œ ë¨¼ì € ëª¨ìœ¼ê³  ê°ë„ë¡œ ê±°ë¥´ê¸°
+                    var all = Physics2D.OverlapCircleAll(center, arcRadius, layerMask);
+                    Vector2 forward = Rot(Vector2.right, worldAngle);
+                    foreach (var c in all)
                     {
-                        var col = arr[i]; if (!col) continue;
-                        Vector2 p = col.ClosestPoint(worldCenter);
-                        Vector2 dir = (p - worldCenter).normalized;
-                        float ang = Vector2.Angle(forward, dir);
-                        if (ang <= arcAngle * 0.5f) resultsBuffer.Add(col);
+                        if (!c) continue;
+                        Vector2 v = (Vector2)c.bounds.center - center;
+                        if (v.sqrMagnitude < 0.0001f) { results.Add(c); continue; }
+                        float ang = Vector2.Angle(forward, v);
+                        if (ang <= arcAngle * 0.5f) results.Add(c);
                     }
-                    return resultsBuffer.Count;
-                }
+                    break;
+            }
+            return;
         }
-        return 0;
+
+        // === Prefab ëª¨ë“œ: í”„ë¦¬íŒ¹ ë°”ìš´ì¦ˆë¥¼ íšŒì „ë°•ìŠ¤ë¡œ ì‚¬ìš© ===
+        if (!TryGetPrefabBounds(out Bounds b)) return;
+
+        Vector2 size = Vector2.Scale(new Vector2(b.size.x, b.size.y), prefabBoundsScale);
+        Vector2 centerP = ComposeCenter(origin, prefabOffset, prefabAngleDeg, prefabSignedByFacing, facingRight, out float worldAngP);
+
+        Add(Physics2D.OverlapBoxAll(centerP, size, worldAngP, layerMask), results);
     }
 
-
-    // === ±âÁî¸ğ ===
+    // =========================================================
+    // =======  ì—ë””í„° ê¸°ì¦ˆëª¨  =================================
+    // =========================================================
     public void DrawGizmos(Transform origin, bool facingRight, Color fill, Color wire)
     {
-        float sign = signedByFacing ? (facingRight ? 1f : -1f) : 1f;
-        Vector2 worldCenter = (Vector2)origin.position + Rotate(offset * new Vector2(sign, 1f), angleDeg * sign);
-        float worldAngle = angleDeg * sign;
+        if (!origin) return;
 
+        if (mode == GeometryMode.Kind)
+        {
+            Vector2 center = ComposeCenter(origin, kindOffset, kindAngleDeg, kindSignedByFacing, facingRight, out float worldAngle);
+            switch (kind)
+            {
+                case Kind.Box: DrawBox(center, boxSize, worldAngle, fill, wire); break;
+                case Kind.Circle: DrawCircle(center, circleRadius, fill, wire); break;
+                case Kind.Capsule: DrawCapsuleApprox(center, capsuleSize, capsuleDirection, worldAngle, fill, wire); break;
+                case Kind.Arc: DrawArc(center, arcRadius, arcAngle, worldAngle, wire); break;
+            }
+            return;
+        }
+
+        // Prefab ëª¨ë“œ
+        if (!TryGetPrefabBounds(out Bounds pb)) return;
+
+        Vector2 sizeP = Vector2.Scale(new Vector2(pb.size.x, pb.size.y), prefabBoundsScale);
+        Vector2 centerP = ComposeCenter(origin, prefabOffset, prefabAngleDeg, prefabSignedByFacing, facingRight, out float worldAngP);
+        DrawBox(centerP, sizeP, worldAngP, fill, wire);
+
+#if UNITY_EDITOR
+        // prefabSource = ColliderBoundsë©´ ë³´ì¡° ìœ¤ê³½ì„ ë„ í‘œì‹œ
+        if (prefabSource == PrefabSource.ColliderBounds && prefab)
+        {
+            UnityEditor.Handles.color = wire;
+            var cols = prefabIncludeChildren ? prefab.GetComponentsInChildren<Collider2D>(true)
+                                             : prefab.GetComponents<Collider2D>();
+            foreach (var c in cols)
+            {
+                if (!c) continue;
+
+                if (c is BoxCollider2D bc)
+                {
+                    Vector2 pos2 = centerP + Rot(bc.offset, worldAngP);
+                    Matrix4x4 prev = Gizmos.matrix;
+                    Gizmos.matrix = Matrix4x4.TRS(new Vector3(pos2.x, pos2.y, 0f), Quaternion.Euler(0, 0, worldAngP), Vector3.one);
+                    Gizmos.DrawWireCube(Vector3.zero, new Vector3(bc.size.x, bc.size.y, 0.01f));
+                    Gizmos.matrix = prev;
+                }
+                else if (c is CircleCollider2D cc)
+                {
+                    Vector2 cpos2 = centerP + Rot(cc.offset, worldAngP);
+                    UnityEditor.Handles.DrawWireDisc(new Vector3(cpos2.x, cpos2.y, 0f), Vector3.forward, cc.radius);
+                }
+                else if (c is CapsuleCollider2D cap)
+                {
+                    Vector2 capPos2 = centerP + Rot(cap.offset, worldAngP);
+                    Matrix4x4 prev = Gizmos.matrix;
+                    Gizmos.matrix = Matrix4x4.TRS(new Vector3(capPos2.x, capPos2.y, 0f), Quaternion.Euler(0, 0, worldAngP), Vector3.one);
+                    Gizmos.DrawWireCube(Vector3.zero, new Vector3(cap.size.x, cap.size.y, 0.01f)); // ê°„ë‹¨ ê·¼ì‚¬
+                    Gizmos.matrix = prev;
+                }
+                else if (c is PolygonCollider2D pc)
+                {
+                    for (int i = 0; i < pc.pathCount; i++)
+                    {
+                        var path = pc.GetPath(i);
+                        for (int j = 0; j < path.Length; j++)
+                        {
+                            Vector2 a2 = centerP + Rot(pc.offset + path[j], worldAngP);
+                            Vector2 b2 = centerP + Rot(pc.offset + path[(j + 1) % path.Length], worldAngP);
+                            UnityEditor.Handles.DrawLine(new Vector3(a2.x, a2.y, 0f), new Vector3(b2.x, b2.y, 0f));
+                        }
+                    }
+                }
+            }
+        }
+#endif
+    }
+
+    // =========================================================
+    // =============== ë‚´ë¶€ ìœ í‹¸ =================================
+    // =========================================================
+    static void Add(Collider2D[] arr, List<Collider2D> outList)
+    {
+        if (arr == null) return;
+        for (int i = 0; i < arr.Length; i++) if (arr[i]) outList.Add(arr[i]);
+    }
+
+    static Vector2 Rot(Vector2 v, float deg)
+    {
+        float r = deg * Mathf.Deg2Rad;
+        float c = Mathf.Cos(r), s = Mathf.Sin(r);
+        return new Vector2(v.x * c - v.y * s, v.x * s + v.y * c);
+    }
+
+    Vector2 ComposeCenter(Transform origin, Vector2 offset, float angleDeg, bool signedByFacing, bool facingRight, out float worldAngleDeg)
+    {
+        float sign = (facingRight ? 1f : -1f);
+        float ang = angleDeg * (signedByFacing ? sign : 1f);
+        worldAngleDeg = ang;
+        Vector2 off = offset * (signedByFacing ? sign : 1f);
+        return (Vector2)origin.position + Rot(off, ang);
+    }
+
+    bool TryGetPrefabBounds(out Bounds b)
+    {
+        b = default;
+        if (!prefab) return false;
+
+        if (prefabSource == PrefabSource.SpriteBounds)
+        {
+            var srs = prefabIncludeChildren ? prefab.GetComponentsInChildren<SpriteRenderer>(true)
+                                            : prefab.GetComponents<SpriteRenderer>();
+            if (srs.Length == 0) return false;
+            b = srs[0].bounds;
+            for (int i = 1; i < srs.Length; i++) b.Encapsulate(srs[i].bounds);
+            return true;
+        }
+        else
+        {
+            var cols = prefabIncludeChildren ? prefab.GetComponentsInChildren<Collider2D>(true)
+                                             : prefab.GetComponents<Collider2D>();
+            if (cols.Length == 0) return false;
+            b = cols[0].bounds;
+            for (int i = 1; i < cols.Length; i++) b.Encapsulate(cols[i].bounds);
+            return true;
+        }
+    }
+
+    // --- Gizmo helpers ---
+    void DrawBox(Vector2 center, Vector2 size, float angleDeg, Color fill, Color wire)
+    {
         var prev = Gizmos.matrix;
-        Gizmos.matrix = Matrix4x4.TRS(new Vector3(worldCenter.x, worldCenter.y, 0f), Quaternion.Euler(0, 0, worldAngle), Vector3.one);
-
-        if (kind == HitShapeKind.Box || kind == HitShapeKind.Capsule)
-        {
-            Gizmos.color = fill; Gizmos.DrawCube(Vector3.zero, new Vector3(size.x, size.y, 0.01f));
-            Gizmos.color = wire; Gizmos.DrawWireCube(Vector3.zero, new Vector3(size.x, size.y, 0.01f));
-        }
-        else if (kind == HitShapeKind.Circle)
-        {
-            Gizmos.color = wire; DrawWireCircle(Vector3.zero, radius);
-        }
-        else if (kind == HitShapeKind.ArcSector)
-        {
-            Gizmos.color = wire; DrawWireArc(Vector3.zero, radius, arcAngle);
-        }
-
+        var c3 = new Vector3(center.x, center.y, 0f);
+        Gizmos.matrix = Matrix4x4.TRS(c3, Quaternion.Euler(0, 0, angleDeg), Vector3.one);
+        Gizmos.color = fill; Gizmos.DrawCube(Vector3.zero, new Vector3(size.x, size.y, 0.01f));
+        Gizmos.color = wire; Gizmos.DrawWireCube(Vector3.zero, new Vector3(size.x, size.y, 0.01f) * 1.001f);
         Gizmos.matrix = prev;
     }
 
-    // --- helpers ---
-    static Vector2 Rotate(Vector2 v, float deg)
+    void DrawCircle(Vector2 center, float radius, Color fill, Color wire)
     {
-        float r = deg * Mathf.Deg2Rad; float c = Mathf.Cos(r); float s = Mathf.Sin(r);
-        return new Vector2(v.x * c - v.y * s, v.x * s + v.y * c);
+#if UNITY_EDITOR
+        UnityEditor.Handles.color = wire;
+        UnityEditor.Handles.DrawWireDisc(new Vector3(center.x, center.y, 0f), Vector3.forward, radius);
+#else
+        Gizmos.color = wire;
+        Gizmos.DrawWireSphere(new Vector3(center.x, center.y, 0f), radius);
+#endif
     }
-    static Vector2 AngleToDir(float deg)
+
+    void DrawCapsuleApprox(Vector2 center, Vector2 size, CapsuleDirection2D dir, float angleDeg, Color fill, Color wire)
     {
-        float r = deg * Mathf.Deg2Rad; return new Vector2(Mathf.Cos(r), Mathf.Sin(r));
+        // ê°„ë‹¨í•˜ê²Œ ë°•ìŠ¤ë¡œ ê·¼ì‚¬(ë¯¸ë¦¬ë³´ê¸° ëª©ì )
+        DrawBox(center, size, angleDeg, fill, wire);
     }
-    static void DrawWireCircle(Vector3 c, float r, int seg = 24)
+
+    void DrawArc(Vector2 center, float radius, float angle, float worldAngleDeg, Color wire)
     {
-        Vector3 prev = c + new Vector3(r, 0, 0);
-        for (int i = 1; i <= seg; i++)
-        {
-            float a = (i / (float)seg) * Mathf.PI * 2f;
-            Vector3 p = c + new Vector3(Mathf.Cos(a) * r, Mathf.Sin(a) * r, 0);
-            Gizmos.DrawLine(prev, p); prev = p;
-        }
-    }
-    static void DrawWireArc(Vector3 c, float r, float deg, int seg = 16)
-    {
-        float half = deg * 0.5f;
-        float start = -half * Mathf.Deg2Rad; float end = half * Mathf.Deg2Rad;
-        Vector3 prev = c + new Vector3(Mathf.Cos(start) * r, Mathf.Sin(start) * r, 0);
-        for (int i = 1; i <= seg; i++)
-        {
-            float t = Mathf.Lerp(start, end, i / (float)seg);
-            Vector3 p = c + new Vector3(Mathf.Cos(t) * r, Mathf.Sin(t) * r, 0);
-            Gizmos.DrawLine(prev, p); prev = p;
-        }
-        Gizmos.DrawLine(c, c + new Vector3(Mathf.Cos(start) * r, Mathf.Sin(start) * r, 0));
-        Gizmos.DrawLine(c, c + new Vector3(Mathf.Cos(end) * r, Mathf.Sin(end) * r, 0));
+#if UNITY_EDITOR
+        UnityEditor.Handles.color = wire;
+        float start = worldAngleDeg - angle * 0.5f;
+        Vector2 dir2 = Rot(Vector2.right, start);
+        UnityEditor.Handles.DrawWireArc(
+            new Vector3(center.x, center.y, 0f),
+            Vector3.forward,
+            new Vector3(dir2.x, dir2.y, 0f),
+            angle,
+            radius
+        );
+#endif
     }
 }

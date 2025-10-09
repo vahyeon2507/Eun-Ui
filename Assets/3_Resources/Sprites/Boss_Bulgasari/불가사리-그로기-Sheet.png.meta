@@ -1,16 +1,19 @@
 fileFormatVersion: 2
-guid: 583b41dcc4945ef4c81503d81cfd87d8
+guid: 8e2ea9861db08874e9506f05fea7963e
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 2004273879086508789
-    second: "\uBD88\uAC00\uC0AC\uB9AC-\uC2A4\uD0E0\uB529-Sheet_0"
+      213: 5224718748553500146
+    second: "\uBD88\uAC00\uC0AC\uB9AC-\uADF8\uB85C\uAE30-Sheet_0"
   - first:
-      213: 8291229547425974658
-    second: "\uBD88\uAC00\uC0AC\uB9AC-\uC2A4\uD0E0\uB529-Sheet_1"
+      213: 6678094166936143585
+    second: "\uBD88\uAC00\uC0AC\uB9AC-\uADF8\uB85C\uAE30-Sheet_1"
   - first:
-      213: 6758605772668531113
-    second: "\uBD88\uAC00\uC0AC\uB9AC-\uC2A4\uD0E0\uB529-Sheet_2"
+      213: 1174419612084681944
+    second: "\uBD88\uAC00\uC0AC\uB9AC-\uADF8\uB85C\uAE30-Sheet_2"
+  - first:
+      213: -8007930258715378017
+    second: "\uBD88\uAC00\uC0AC\uB9AC-\uADF8\uB85C\uAE30-Sheet_3"
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -43,7 +46,7 @@ TextureImporter:
   maxTextureSize: 2048
   textureSettings:
     serializedVersion: 2
-    filterMode: 1
+    filterMode: 0
     aniso: 1
     mipBias: 0
     wrapU: 1
@@ -54,7 +57,7 @@ TextureImporter:
   compressionQuality: 50
   spriteMode: 2
   spriteExtrude: 1
-  spriteMeshType: 1
+  spriteMeshType: 0
   alignment: 0
   spritePivot: {x: 0.5, y: 0.5}
   spritePixelsToUnits: 26
@@ -81,7 +84,7 @@ TextureImporter:
     maxTextureSize: 2048
     resizeAlgorithm: 0
     textureFormat: -1
-    textureCompression: 1
+    textureCompression: 0
     compressionQuality: 50
     crunchedCompression: 0
     allowsAlphaSplitting: 0
@@ -91,19 +94,6 @@ TextureImporter:
     forceMaximumCompressionQuality_BC6H_BC7: 0
   - serializedVersion: 4
     buildTarget: Standalone
-    maxTextureSize: 2048
-    resizeAlgorithm: 0
-    textureFormat: -1
-    textureCompression: 1
-    compressionQuality: 50
-    crunchedCompression: 0
-    allowsAlphaSplitting: 0
-    overridden: 0
-    ignorePlatformSupport: 0
-    androidETC2FallbackOverride: 0
-    forceMaximumCompressionQuality_BC6H_BC7: 0
-  - serializedVersion: 4
-    buildTarget: WebGL
     maxTextureSize: 2048
     resizeAlgorithm: 0
     textureFormat: -1
@@ -132,7 +122,7 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: "\uBD88\uAC00\uC0AC\uB9AC-\uC2A4\uD0E0\uB529-Sheet_0"
+      name: "\uBD88\uAC00\uC0AC\uB9AC-\uADF8\uB85C\uAE30-Sheet_0"
       rect:
         serializedVersion: 2
         x: 0
@@ -147,14 +137,14 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 5faab83597c90db10800000000000000
-      internalID: 2004273879086508789
+      spriteID: 2f5dad2250ee18840800000000000000
+      internalID: 5224718748553500146
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: "\uBD88\uAC00\uC0AC\uB9AC-\uC2A4\uD0E0\uB529-Sheet_1"
+      name: "\uBD88\uAC00\uC0AC\uB9AC-\uADF8\uB85C\uAE30-Sheet_1"
       rect:
         serializedVersion: 2
         x: 480
@@ -169,14 +159,36 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 2894c85385d501370800000000000000
-      internalID: 8291229547425974658
+      spriteID: 1e646d4434b5dac50800000000000000
+      internalID: 6678094166936143585
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: "\uBD88\uAC00\uC0AC\uB9AC-\uC2A4\uD0E0\uB529-Sheet_2"
+      name: "\uBD88\uAC00\uC0AC\uB9AC-\uADF8\uB85C\uAE30-Sheet_2"
+      rect:
+        serializedVersion: 2
+        x: 960
+        y: 270
+        width: 480
+        height: 270
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 8dc3f833a606c4010800000000000000
+      internalID: 1174419612084681944
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: "\uBD88\uAC00\uC0AC\uB9AC-\uADF8\uB85C\uAE30-Sheet_3"
       rect:
         serializedVersion: 2
         x: 0
@@ -191,14 +203,14 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 9a1ffc044246bcd50800000000000000
-      internalID: 6758605772668531113
+      spriteID: f9efa278bdd1ed090800000000000000
+      internalID: -8007930258715378017
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: "\uBD88\uAC00\uC0AC\uB9AC-\uC2A4\uD0E0\uB529-Sheet_3"
+      name: "\uBD88\uAC00\uC0AC\uB9AC-\uADF8\uB85C\uAE30-Sheet_4"
       rect:
         serializedVersion: 2
         x: 480
@@ -213,8 +225,30 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: 730b8d9584c30bb47ac2025e33747db0
-      internalID: 211355187
+      spriteID: 754aa4bb5098eec41965143535f490a0
+      internalID: 503347208
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: "\uBD88\uAC00\uC0AC\uB9AC-\uADF8\uB85C\uAE30-Sheet_5"
+      rect:
+        serializedVersion: 2
+        x: 960
+        y: 0
+        width: 480
+        height: 270
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 68920af457a8b7d40b3ce4ad506f7dce
+      internalID: -1537595258
       vertices: []
       indices: 
       edges: []
@@ -223,7 +257,7 @@ TextureImporter:
     customData: 
     physicsShape: []
     bones: []
-    spriteID: 60e756f954d831d40867675be0841345
+    spriteID: 1e8c37978ada9af43a5ff76fe5d9032e
     internalID: 0
     vertices: []
     indices: 
@@ -233,10 +267,12 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      "\uBD88\uAC00\uC0AC\uB9AC-\uC2A4\uD0E0\uB529-Sheet_0": 2004273879086508789
-      "\uBD88\uAC00\uC0AC\uB9AC-\uC2A4\uD0E0\uB529-Sheet_1": 8291229547425974658
-      "\uBD88\uAC00\uC0AC\uB9AC-\uC2A4\uD0E0\uB529-Sheet_2": 6758605772668531113
-      "\uBD88\uAC00\uC0AC\uB9AC-\uC2A4\uD0E0\uB529-Sheet_3": 211355187
+      "\uBD88\uAC00\uC0AC\uB9AC-\uADF8\uB85C\uAE30-Sheet_0": 5224718748553500146
+      "\uBD88\uAC00\uC0AC\uB9AC-\uADF8\uB85C\uAE30-Sheet_1": 6678094166936143585
+      "\uBD88\uAC00\uC0AC\uB9AC-\uADF8\uB85C\uAE30-Sheet_2": 1174419612084681944
+      "\uBD88\uAC00\uC0AC\uB9AC-\uADF8\uB85C\uAE30-Sheet_3": -8007930258715378017
+      "\uBD88\uAC00\uC0AC\uB9AC-\uADF8\uB85C\uAE30-Sheet_4": 503347208
+      "\uBD88\uAC00\uC0AC\uB9AC-\uADF8\uB85C\uAE30-Sheet_5": -1537595258
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

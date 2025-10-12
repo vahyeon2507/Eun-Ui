@@ -3,7 +3,7 @@ using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using System.Collections;
 
-public class UIButtonEffect : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerDownHandler, IPointerUpHandler
+public class UIButtonEffect : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
 {
     [Header("애니메이션 설정")]
     public float hoverScale = 1.1f;
@@ -25,7 +25,7 @@ public class UIButtonEffect : MonoBehaviour, IPointerEnterHandler, IPointerExitH
 
     void Awake()
     {
-        Initialize();
+        Initialize();   
     }
 
     void Start()
@@ -57,15 +57,8 @@ public class UIButtonEffect : MonoBehaviour, IPointerEnterHandler, IPointerExitH
 
     public void OnPointerEnter(PointerEventData eventData)
     {
-        if (button != null && !button.interactable) return;
-        
-        isHovering = true;
-        AnimateToScale(originalScale * hoverScale);
-        
-        if (useColorEffect && buttonImage != null)
-        {
-            buttonImage.color = hoverColor;
-        }
+        transform.localScale = originalScale * 1.1f;
+        // �� �ٲٰ� ������ button.image.color = Color.yellow; ���� ������
     }
 
     public void OnPointerExit(PointerEventData eventData)
@@ -155,25 +148,6 @@ public class UIButtonEffect : MonoBehaviour, IPointerEnterHandler, IPointerExitH
         }
         
         transform.localScale = originalScale;
-        
-        if (useColorEffect && buttonImage != null)
-        {
-            buttonImage.color = originalColor;
-        }
-        
-        isHovering = false;
-        isPressed = false;
-    }
-    
-    [ContextMenu("효과 테스트")]
-    public void TestEffect()
-    {
-        OnPointerEnter(null);
-        Invoke(nameof(TestEffectEnd), 1f);
-    }
-    
-    void TestEffectEnd()
-    {
-        OnPointerExit(null);
+        // �� �ǵ�����
     }
 }

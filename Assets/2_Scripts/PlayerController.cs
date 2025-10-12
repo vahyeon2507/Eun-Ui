@@ -5,9 +5,9 @@ using UnityEngine;
 
 // PlayerController — 패링/스페셜/히트박스 자식 콜라이더판 (디버그 UI 포함)
 // - 3연속 기본공격과 스페셜 공격 모두 "자식 Collider2D"로만 히트 판정.
-// - 구버전 attackPoint/OverlapCircle/Box 기반 로직, 관련 필드 전부 제거.
-// - 스페셜 적중 시 BulgasariBoss.OnParrySpecialLanded(col)로 그로기 트리거 신호 전송.
-// - IParryStreakProvider 그대로 유지.
+// - (호환) attackPoint는 원거리/탈리스만 등의 발사 기준점으로만 사용.
+// - 스페셜 적중 시 BulgasariBoss.OnParrySpecialLanded(col)로 그로기 트리거 신호.
+// - IParryStreakProvider 유지.  AudioManager 즉시 재생 로직 병합.
 
 [RequireComponent(typeof(Rigidbody2D))]
 [RequireComponent(typeof(Animator))]
@@ -15,7 +15,7 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
 {
     [HideInInspector] public bool ExternalRangedOverride;
 
-    // === 새로 추가/통일: 자식 히트박스 그룹 ===
+    // === 자식 히트박스 그룹 ===
     [Header("Hitboxes (children driven)")]
     [Tooltip("Attack1에 쓸 자식 Collider2D들 (isTrigger 권장)")]
     public Collider2D[] hitboxesAttack1;
@@ -182,6 +182,9 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
         {
             if (canDash && !isDashing && !isParrying && !isAttacking && attackLockTimer <= 0f)
             {
+                // 대시 사운드 즉시 재생
+                if (AudioManager.Instance != null)
+                    AudioManager.Instance.PlaySFXInstant(AudioManager.Instance.playerDashSFX);
                 StartCoroutine(DoDash());
             }
         }
@@ -191,6 +194,9 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
         {
             if (canParry && !isParrying && !isDashing && attackLockTimer <= 0f)
             {
+                // 패링 사운드 즉시 재생
+                if (AudioManager.Instance != null)
+                    AudioManager.Instance.PlaySFXInstant(AudioManager.Instance.playerParrySFX);
                 StartCoroutine(DoParry());
             }
         }
@@ -204,6 +210,10 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
 
             if (grounded && !isDashing && !isParrying)
             {
+                // 점프 사운드 즉시 재생
+                if (AudioManager.Instance != null)
+                    AudioManager.Instance.PlaySFXInstant(AudioManager.Instance.playerJumpSFX);
+
                 Vector2 v = rb.linearVelocity;
                 v.y = jumpForce;
                 rb.linearVelocity = v;
@@ -291,6 +301,20 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
         int idx = Mathf.Clamp(comboIndex - 1, 0, comboLockDurations.Length - 1);
         attackLockTimer = comboLockDurations[idx];
 
+        // 공격 사운드 즉시 재생 (애니 이벤트보다 먼저)
+        if (AudioManager.Instance != null)
+        {
+            if (AudioManager.Instance.playerAttackSFX != null)
+            {
+                AudioManager.Instance.PlaySFXInstant(AudioManager.Instance.playerAttackSFX);
+            }
+            else
+            {
+                // 폴백
+                AudioManager.Instance.PlayPlayerAttack();
+            }
+        }
+
         if (animator != null)
         {
             switch (comboIndex)
@@ -351,7 +375,18 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
 
         canDash = false;
         isDashing = true;
-        if (animator != null) animator.SetTrigger(animDashTrigger);
+        if (animator != null)
+        {
+            // 안전한 트리거 확인 후 설정
+            foreach (var param in animator.parameters)
+            {
+                if (param.name == animDashTrigger && param.type == AnimatorControllerParameterType.Trigger)
+                {
+                    animator.SetTrigger(animDashTrigger);
+                    break;
+                }
+            }
+        }
 
         float elapsed = 0f;
         float dir = isFacingRight ? 1f : -1f;
@@ -384,7 +419,17 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     {
         canParry = false;
         isParrying = true;
-        if (animator != null) animator.SetTrigger(animParryTrigger);
+        if (animator != null)
+        {
+            foreach (var param in animator.parameters)
+            {
+                if (param.name == animParryTrigger && param.type == AnimatorControllerParameterType.Trigger)
+                {
+                    animator.SetTrigger(animParryTrigger);
+                    break;
+                }
+            }
+        }
 
         float elapsed = 0f;
         while (elapsed < parryWindow)
@@ -479,7 +524,12 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
             if (consumed) return;
         }
 
+        // 화면/카메라 흔들림
         GetComponent<PlayerHitShake>()?.Shake();
+
+        // 피격 사운드 즉시 재생
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlaySFXInstant(AudioManager.Instance.playerHurtSFX);
 
         Debug.Log($"[Player] Took {amount} damage.");
         if (healthComponent != null)
@@ -517,7 +567,7 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     {
         Debug.Log("[PS] OnParrySpecialHit fired");
 
-        // (UI2 쪽 로직 유지) PlayerHealth의 강화 공격 사용 시도
+        // UI2 쪽 로직 유지: PlayerHealth 강화 공격 사용 시도
         if (healthComponent != null)
         {
             var useEnhancedMethod = healthComponent.GetType().GetMethod("UseEnhancedAttack");

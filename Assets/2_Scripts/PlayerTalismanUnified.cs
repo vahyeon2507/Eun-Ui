@@ -200,6 +200,11 @@ public class PlayerTalismanUnified : MonoBehaviour
 
         currentCharges--;
         _cooldownTimer = fireCooldown;
+        
+        // 부적 발사 사운드 초고속 재생
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlaySFXInstant(AudioManager.Instance.talismanFireSFX);
+            
         if (logEvents) Debug.Log($"[Talisman] Fire {current} (remain {currentCharges})");
     }
 
@@ -266,6 +271,10 @@ public class PlayerTalismanUnified : MonoBehaviour
                               ?? hitE.collider.GetComponentInParent<IDamageable>()
                               ?? hitE.collider.GetComponentInChildren<IDamageable>();
                     if (dmg != null) dmg.TakeDamage(p.damage);
+
+                    // 부적 충돌 사운드 초고속 재생
+                    if (AudioManager.Instance != null)
+                        AudioManager.Instance.PlaySFXInstant(AudioManager.Instance.talismanImpactSFX);
 
                     ImpactAndSpawnField(hitE.point, p.element);
                     DestroyVisual(p.visual);

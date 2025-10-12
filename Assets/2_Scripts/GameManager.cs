@@ -131,6 +131,10 @@ public class GameManager : MonoBehaviour
 
     void OnRestart()
     {
+        // 버튼 클릭 사운드
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlayButtonClick();
+            
         Time.timeScale = 1;
         SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
@@ -276,7 +280,14 @@ public class GameManager : MonoBehaviour
 
     void OnSoundChanged(float value)
     {
-        AudioListener.volume = value;
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.SetMasterVolume(value);
+        }
+        else
+        {
+            AudioListener.volume = value; // 폴백
+        }
     }
 
     void OnResolutionChanged(int index)

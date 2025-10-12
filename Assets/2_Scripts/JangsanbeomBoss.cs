@@ -150,12 +150,17 @@ public class JangsanbeomBoss : MonoBehaviour
     public bool phase2IntroInvulnerable = true;
     public float phase2IntroFallbackDuration = 1.5f;
 
-    // ====== Dash / Animation Locks ======
+    [Header("BGM Settings")]
+    [Tooltip("보스 시작 시 즉시 BGM 전환 (플레이어 감지 전)")]
+    public bool startBGMImmediately = false;
+
+    // ---------- Dash / Animation Locks ----------
     [Header("Dash / Animation Locks")]
-    public string trig_Dash = "Dash";
-    bool _dashActive = false;
-    bool _animLockMove = false;
-    bool _animLockFlip = false;
+    public string trig_Dash = "Dash";   // 애니메이터에 동일 이름 트리거 생성해서 사용
+    // bool _dashActive = false; // 사용하지 않는 변수 - 주석 처리
+    bool _animLockMove = false;         // 애니메이션으로 이동 잠금
+    bool _animLockFlip = false;         // 애니메이션으로 플립 잠금
+
 
     // ====== Internals ======
     Vector3 _rootOriginalScale, _graphicsOriginalScale;
@@ -175,6 +180,7 @@ public class JangsanbeomBoss : MonoBehaviour
     bool _inPhase2 = false;
     bool _phase2IntroPlaying = false;
     bool _invulnerable = false;
+    bool _bossBGMStarted = false; // 보스 BGM이 시작되었는지 추적
 
     // health poll
     float _lastKnownHp = -1f, _lastKnownMaxHp = -1f;
@@ -296,6 +302,17 @@ public class JangsanbeomBoss : MonoBehaviour
         UpdateHealthCacheImmediate();
         UpdatePhaseFlagsFromHealth();
         ApplyPhaseMapRoots(false);
+
+        // 즉시 BGM 전환 옵션
+        if (startBGMImmediately && !_bossBGMStarted && !_inPhase2)
+        {
+            Debug.Log("[Boss] Starting boss BGM immediately");
+            if (AudioManager.Instance != null)
+            {
+                AudioManager.Instance.PlayBossBGM();
+                _bossBGMStarted = true;
+            }
+        }
 
         if (player != null)
         {
@@ -463,6 +480,19 @@ public class JangsanbeomBoss : MonoBehaviour
     void EnterPhase2()
     {
         if (debugFlip) Debug.Log("[Boss] Entering Phase 2!");
+
+        // 2페이즈 BGM 전환
+        if (AudioManager.Instance != null)
+        {
+            Debug.Log("[Boss] Switching to Phase 2 BGM");
+            AudioManager.Instance.PlayPhase2BGM();
+        }
+        else
+        {
+            Debug.LogError("[Boss] AudioManager.Instance is null when switching to Phase 2 BGM!");
+        }
+
+        // **핵심**: 인트로 맵을 켜기 전에 Phase2 플래그를 true로 먼저 설정
         _inPhase2 = true;
 
         if (teleportToCenterOnPhase2)
@@ -615,6 +645,17 @@ public class JangsanbeomBoss : MonoBehaviour
                 float d = Mathf.Abs(player.position.x - transform.position.x);
                 if (d <= aggroRange && pool.Count > 0)
                 {
+                    // 보스 BGM 시작 (1페이즈에서만)
+                    if (!_bossBGMStarted && !_inPhase2)
+                    {
+                        Debug.Log("[Boss] Starting boss BGM (Phase 1)");
+                        if (AudioManager.Instance != null)
+                        {
+                            AudioManager.Instance.PlayBossBGM();
+                            _bossBGMStarted = true;
+                        }
+                    }
+                    
                     if (UnityEngine.Random.Range(0, 100) < 60)
                         StartAttackByIndex(0, pool);
                 }
@@ -702,6 +743,13 @@ public class JangsanbeomBoss : MonoBehaviour
     void PerformAttackOnce(AttackData atk, bool applyDamage)
     {
         if (!applyDamage) return;
+        if (_invulnerable) return; // 변신/무적 중엔 공격 무시(원하면 제거)
+
+        // 보스 공격 사운드 재생
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlayBossAttack();
+
+        if (playerLayer == 0) { Debug.LogWarning("[Boss] playerLayer not set."); return; }
 
         Vector2 center = GetAttackWorldPos(atk);
         float worldAngle = atk.Angle * VisualSign();
@@ -851,9 +899,10 @@ public class JangsanbeomBoss : MonoBehaviour
             if (p.name == name && p.type == AnimatorControllerParameterType.Float) { animator.SetFloat(name, v); return; }
     }
 
-    // ====== Animation Events ======
-    public void Anim_DashStart() { _dashActive = true; _animLockMove = true; _animLockFlip = true; busy = true; }
-    public void Anim_DashEnd() { _dashActive = false; _animLockMove = false; _animLockFlip = false; busy = false; }
+    // ===== Animation Events: Dash / Locks / I-Frames / Relative motion =====
+    public void Anim_DashStart() { /* _dashActive = true; */ _animLockMove = true; _animLockFlip = true; busy = true; }
+    public void Anim_DashEnd() { /* _dashActive = false; */ _animLockMove = false; _animLockFlip = false; busy = false; }
+
     public void Anim_SetMoveLock(int on) { _animLockMove = (on != 0); }
     public void Anim_SetFlipLock(int on) { _animLockFlip = (on != 0); }
     public void Anim_InvulnOn() { _invulnerable = true; }

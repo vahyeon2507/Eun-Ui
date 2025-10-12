@@ -38,7 +38,7 @@ public class BossHealth : MonoBehaviour, IDamageable
 
     // 내부
     private bool isInvulnerable = false;
-    private bool isStaggered = false;
+    // private bool isStaggered = false; // 사용하지 않는 변수 - 주석 처리
     private Rigidbody2D rb;
     private AudioSource audioSource;
 
@@ -95,14 +95,29 @@ public class BossHealth : MonoBehaviour, IDamageable
             Vector3 fxPos = transform.position + Vector3.up * hitEffectYOffset;
             Instantiate(hitEffectPrefab, fxPos, Quaternion.identity);
         }
-        if (audioSource != null && hitSfx != null)
+        
+        // 오디오 매니저 우선 사용, 폴백으로 기존 AudioSource 사용
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlayBossHurt();
+        }
+        else if (audioSource != null && hitSfx != null)
+        {
             audioSource.PlayOneShot(hitSfx);
+        }
 
         // 애니메이터 트리거 (안전하게 호출)
         if (animator != null)
         {
-            // Animator에 'Hurt' 트리거가 없다면 조용히 무시됨
-            animator.SetTrigger("Hurt");
+            // 안전한 트리거 설정
+            foreach (var param in animator.parameters)
+            {
+                if (param.name == "Hurt" && param.type == AnimatorControllerParameterType.Trigger)
+                {
+                    animator.SetTrigger("Hurt");
+                    break;
+                }
+            }
         }
 
         // 이벤트(인스펙터에 연결 가능)
@@ -120,9 +135,9 @@ public class BossHealth : MonoBehaviour, IDamageable
 
     IEnumerator HitReactionCoroutine()
     {
-        // 시작: 무적 + 스태거 상태
+        // 시작: 무적 상태
         isInvulnerable = true;
-        isStaggered = true;
+        // isStaggered = true; // 사용하지 않는 변수
 
         // 깜빡임(간단) — 스프라이트가 없으면 전체 invulnTime을 그냥 기다림
         if (spriteRenderer != null)
@@ -167,7 +182,7 @@ public class BossHealth : MonoBehaviour, IDamageable
         // 스태거 유지
         yield return new WaitForSeconds(staggerTime);
 
-        isStaggered = false;
+        // isStaggered = false; // 사용하지 않는 변수
 
         // 남은 invuln 시간(이미 스프라이트 깜빡임으로 대기했을 수 있으므로 잔여 계산)
         float remaining = invulnTime - staggerTime;
@@ -185,8 +200,28 @@ public class BossHealth : MonoBehaviour, IDamageable
         if (currentHp > 0) currentHp = 0;
 
         // 애니메이션, 사운드
-        if (animator != null) animator.SetTrigger("Die");
-        if (audioSource != null && deathSfx != null) audioSource.PlayOneShot(deathSfx);
+        if (animator != null) 
+        {
+            // 안전한 트리거 설정
+            foreach (var param in animator.parameters)
+            {
+                if (param.name == "Die" && param.type == AnimatorControllerParameterType.Trigger)
+                {
+                    animator.SetTrigger("Die");
+                    break;
+                }
+            }
+        }
+        
+        // 오디오 매니저 우선 사용, 폴백으로 기존 AudioSource 사용
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlayBossDeath();
+        }
+        else if (audioSource != null && deathSfx != null)
+        {
+            audioSource.PlayOneShot(deathSfx);
+        }
 
         onDied?.Invoke();
 

@@ -6104,7 +6104,10 @@ MonoBehaviour:
   settingsAnimator: {fileID: 773021375}
   dim: {fileID: 667382411}
   soundSlider: {fileID: 2062145616}
+  musicSlider: {fileID: 2062145616}
+  sfxSlider: {fileID: 2062145616}
   resolutionDropdown: {fileID: 1307246636}
+  fullscreenToggle: {fileID: 811408729}
 --- !u!4 &1289007023
 Transform:
   m_ObjectHideFlags: 0

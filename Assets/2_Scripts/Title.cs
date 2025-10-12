@@ -6,9 +6,9 @@ using TMPro;
 
 public class Title : MonoBehaviour
 {
-    [SerializeField] private Transform imageParent; // ImageBackGround ������Ʈ
-    [SerializeField] private TMP_Text titleText;    // TitleText ������Ʈ
-    [SerializeField] private TMP_Text openingText;  // OpeningText ������Ʈ
+    [SerializeField] private Transform imageParent; // ImageBackGround 오브젝트
+    [SerializeField] private TMP_Text titleText;    // TitleText 오브젝트
+    [SerializeField] private TMP_Text openingText;  // OpeningText 오브젝트
     [SerializeField] private string nextSceneName = "GameScene";
     [SerializeField] private float fadeDuration = 1.0f;
 
@@ -17,9 +17,22 @@ public class Title : MonoBehaviour
 
     void Start()
     {
+        // Null 체크 추가
+        if (imageParent == null)
+        {
+            Debug.LogError("[Title] imageParent가 할당되지 않았습니다!");
+            return;
+        }
+        
+        if (titleText == null || openingText == null)
+        {
+            Debug.LogError("[Title] titleText 또는 openingText가 할당되지 않았습니다!");
+            return;
+        }
+
         images = imageParent.GetComponentsInChildren<Image>(true);
 
-        // ��� �̹����� �ؽ�Ʈ �����ϰ� �ʱ�ȭ
+        // 모든 이미지와 텍스트 투명하게 초기화
         foreach (var img in images)
             img.color = new Color(1, 1, 1, 0);
         SetTextAlpha(titleText, 0f);
@@ -33,7 +46,16 @@ public class Title : MonoBehaviour
         if (isWaitingForInput && (Input.anyKeyDown || Input.GetMouseButtonDown(0)))
         {
             isWaitingForInput = false;
-            StartCoroutine(FadeAll(1f, 0f, () => SceneManager.LoadScene(nextSceneName)));
+            StartCoroutine(FadeAll(1f, 0f, () => {
+                try
+                {
+                    SceneManager.LoadScene(nextSceneName);
+                }
+                catch (System.Exception e)
+                {
+                    Debug.LogError($"[Title] 씬 로딩 실패: {e.Message}");
+                }
+            }));
         }
     }
 
@@ -45,31 +67,40 @@ public class Title : MonoBehaviour
             timer += Time.deltaTime;
             float alpha = Mathf.Lerp(from, to, timer / fadeDuration);
 
-            foreach (var img in images)
-            {
-                var color = img.color;
-                color.a = alpha;
-                img.color = color;
-            }
+            // 이미지 알파 설정
+            SetImagesAlpha(alpha);
+            // 텍스트 알파 설정
             SetTextAlpha(titleText, alpha);
             SetTextAlpha(openingText, alpha);
 
             yield return null;
         }
-        foreach (var img in images)
-        {
-            var color = img.color;
-            color.a = to;
-            img.color = color;
-        }
+        
+        // 최종 알파 값 설정
+        SetImagesAlpha(to);
         SetTextAlpha(titleText, to);
         SetTextAlpha(openingText, to);
 
         onComplete?.Invoke();
     }
 
+    void SetImagesAlpha(float alpha)
+    {
+        if (images == null) return;
+        foreach (var img in images)
+        {
+            if (img != null)
+            {
+                var color = img.color;
+                color.a = alpha;
+                img.color = color;
+            }
+        }
+    }
+
     void SetTextAlpha(TMP_Text text, float alpha)
     {
+        if (text == null) return;
         var color = text.color;
         color.a = alpha;
         text.color = color;

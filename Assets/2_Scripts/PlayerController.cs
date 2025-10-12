@@ -94,7 +94,7 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     public MonoBehaviour healthComponent; // optional
 
     [Header("Debug / UI")]
-    public bool showParryDebugUI = true; // 인게임 OnGUI로 카운트/상태 표시
+    public bool showParryDebugUI = false; // 인게임 OnGUI로 카운트/상태 표시 (기본값 false로 변경)
     public Vector2 parryDebugPosition = new Vector2(10, 10);
     public GUIStyle parryDebugStyle;
 
@@ -413,7 +413,6 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
             {
                 if (_recentlyConsumedHitIds.Contains(hitId))
                 {
-                    Debug.Log($"[Player] Hit already consumed (id={hitId})");
                     return true;
                 }
 
@@ -431,7 +430,6 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
             OnParryStreakChanged?.Invoke(parrySuccessCount);
 
             lastParrySuccessTime = Time.time;
-            Debug.Log($"[Player] Parry success #{parrySuccessCount}");
 
             // 잠깐 무적(중복 히트 방지)
             StartCoroutine(TemporaryInvul(0.06f));
@@ -489,7 +487,6 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     IEnumerator TriggerParrySpecial()
     {
         parrySpecialLocked = true;
-        Debug.Log("[Player] ParrySpecial triggered!");
         if (animator != null) animator.SetTrigger(animParrySpecialTrigger);
 
         // 스페셜 타격은 애니메이션 이벤트(OnParrySpecialHit)에서 처리

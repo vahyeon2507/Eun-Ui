@@ -46,7 +46,6 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         if (healthBar != null) healthBar.value = currentHealth;
 
         // 피격 애니메이션 트리거 (있으면)
-        if (animator != null) animator.SetTrigger("Hurt");
 
         // 무적 프레임 시작
         StartCoroutine(InvulnerabilityCoroutine());

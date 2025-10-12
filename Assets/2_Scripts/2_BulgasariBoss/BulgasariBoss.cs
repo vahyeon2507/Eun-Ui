@@ -43,6 +43,36 @@ public class BulgasariBoss : MonoBehaviour, IDamageable
     public bool specialHitGetsFullDamage = true;
 
     // ===== Internals =====
+
+
+    [Header("Groggy trigger (by Parry Special hit)")]
+    public bool groggyOnParrySpecialHit = true;   // 스페셜 적중으로 그로기?
+    public Collider2D chestGroggyCollider;        // 가슴 콜라이더(드래그)
+
+    // 플레이어 스페셜이 '이 보스의 콜라이더'를 때렸을 때 호출됨
+    public void OnParrySpecialLanded(Collider2D hitCol)
+    {
+        if (!groggyOnParrySpecialHit || _groggy) return;
+
+        // 가슴 콜라이더가 지정되어 있으면 '정확히 가슴'일 때만
+        if (chestGroggyCollider != null)
+        {
+            if (hitCol == chestGroggyCollider)
+                EnterGroggy();
+            return;
+        }
+
+        // 폴백: 가슴이 지정 안 됐으면 '보스의 어떤 콜라이더든' 스페셜이면 허용
+        // (원하면 여기서 이름 검사나 태그 검사 추가 가능)
+        EnterGroggy();
+    }
+
+    // ====== 아래는 기존 그로기 루틴 재사용 ======
+    void EnterGroggy()
+    {
+        if (_groggyCo != null) StopCoroutine(_groggyCo);
+        _groggyCo = StartCoroutine(GroggyRoutine());
+    }
     float _currentMitigation;
     bool _groggy;
     Coroutine _groggyCo;
@@ -86,6 +116,28 @@ public class BulgasariBoss : MonoBehaviour, IDamageable
             OnParryChanged(prov.CurrentParryStreak);
         }
     }
+
+    public void TriggerGroggyFromSpecial(float durationOverride = -1f)
+{
+    if (_groggyCo != null) StopCoroutine(_groggyCo);
+    _groggyCo = StartCoroutine(GroggyRoutine_Ext(durationOverride));
+}
+
+IEnumerator GroggyRoutine_Ext(float durationOverride)
+{
+    _groggy = true;
+    _currentMitigation = groggyMitigation;
+    if (animator && !string.IsNullOrEmpty(animTrigGroggyOn)) animator.SetTrigger(animTrigGroggyOn);
+    if (debugLog) Debug.Log("[Bulgasari] GROGGY ON (special)");
+
+    float dur = (durationOverride > 0f) ? durationOverride : groggyDuration;
+    yield return new WaitForSeconds(dur);
+
+    _groggy = false;
+    _currentMitigation = baseDamageMitigation;
+    if (animator && !string.IsNullOrEmpty(animTrigGroggyOff)) animator.SetTrigger(animTrigGroggyOff);
+    if (debugLog) Debug.Log("[Bulgasari] GROGGY OFF");
+}
 
     void OnDestroy()
     {
@@ -177,11 +229,6 @@ public class BulgasariBoss : MonoBehaviour, IDamageable
         if (debugLog) Debug.Log($"[Bulgasari] Groggy pending armed for {specialConfirmWindow:0.00}s");
     }
 
-    void EnterGroggy()
-    {
-        if (_groggyCo != null) StopCoroutine(_groggyCo);
-        _groggyCo = StartCoroutine(GroggyRoutine());
-    }
 
     IEnumerator GroggyRoutine()
     {

@@ -21,6 +21,8 @@ public class PlayerTalismanUnified : MonoBehaviour
     public float rechargeInterval = 15f;
     public int currentCharges = 2;
 
+    
+
     [Header("Projectile Visuals (Optional)")]
     public GameObject[] perElementProjectileVisual = new GameObject[5];
     public GameObject genericProjectileVisual;

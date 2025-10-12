@@ -8,96 +8,160 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public class BulgasariAttackHooks : MonoBehaviour
 {
-
     // ===== Refs =====
-
-    public IEnumerable<string> GetAttackIds()
-    {
-        // 네가 쓰는 테이블 타입에 맞춰서 순회
-        foreach (var e in attackDefs)            // 예: List<AttackIdDef> attackDefs;
-            if (!string.IsNullOrEmpty(e.id))
-                yield return e.id;
-    }
-
-    // 3) 직접 실행용(애니 없이 즉시 히트 발생)
-    public void ExecById(string id)
-    {
-        if (!TryGetDefById(id, out var def)) return;
-        Perform(def); // 기존 Perform(AttackDefinition2D def, Transform originOverride = null)
-    }
-
-   public bool TryGetDefById(string id, out AttackDefinition2D def)
-{
-    def = null;
-    if (string.IsNullOrEmpty(id) || attackDefs == null) return false;
-
-    foreach (var e in attackDefs) // e : DefEntry (struct)
-    {
-        // struct는 null 비교 불가 → default(struct)인지 검사
-        if (EqualityComparer<DefEntry>.Default.Equals(e, default)) 
-            continue;
-
-        // ID 일치 + 실제 Def 존재
-        if (e.id == id && e.def != null)
-        {
-            def = e.def;
-            return true;                 // ← bool을 리턴해야 함
-        }
-    }
-    return false;
-}
-
-    
-
-    public bool HasAttackId(string id) => TryGetDefById(id, out _);
     public BulgasariBoss boss;
-    public Transform attackOriginCenter;   // �⺻ ���� (������ transform)
-    public Transform attackOriginLeft;     // (����) ����/���� ��Ŀ
-    public Transform attackOriginRight;    // (����) ������/������ ��Ŀ
 
-    // ===== Legacy (�ɼ�) : ����Ʈ�� ����� �� �ڵ� ��Ͽ� =====
+    [Header("Attack Origins (Transform fallback)")]
+    [Tooltip("가슴 기준 원점(미지정 시 self). 'Origin by Collider'가 지정되면 무시됨")]
+    public Transform attackOriginCenter;
+    [Tooltip("왼팔 원점(선택)")]
+    public Transform attackOriginLeft;
+    [Tooltip("오른팔 원점(선택)")]
+    public Transform attackOriginRight;
+
+    [Header("Origin by Collider (preferred)")]
+    [Tooltip("가슴/왼팔/오른팔의 기준점을 Transform 대신 이 콜라이더의 bounds.center로 사용")]
+    public Collider2D originCenterCollider;
+    public Collider2D originLeftCollider;
+    public Collider2D originRightCollider;
+
+    // 내부 피벗(콜라이더 중심을 담는 숨김 트랜스폼)
+    Transform _pivotCenter, _pivotLeft, _pivotRight;
+
+    // ===== Legacy (optional, for bootstrap) =====
     [Header("Legacy (optional, for bootstrap)")]
     public AttackDefinition2D thorn;
     public AttackDefinition2D defSweep;
     public AttackDefinition2D defSlam;
-
-    [Header("Gizmos / Preview")]
-    public bool gizmoEnabled = true;
-
-    public enum GizmoMode { Off, SelectedID, All }
-    public GizmoMode gizmoMode = GizmoMode.SelectedID;
-
-    [Tooltip("SelectedID ����� �� �� ���� ID")]
-    public string gizmoAttackId = "Thorn";
-
-    [Tooltip("���Ѵٸ� ��Ŀ�� ���� (��: Left / Right / Center). �� ���̸� ID�� ��Ī�� ��Ŀ ���")]
-    public string gizmoAnchorKey = "";
-
-    public Color gizmoFill = new(1f, 0.2f, 0.2f, 0.12f);
-    public Color gizmoWire = new(1f, 0.2f, 0.2f, 0.36f);
 
     // ===== Anchors / Hitboxes =====
     [Serializable]
     public struct AnchorEntry
     {
         public string key;                 // "Left","Right","Center","SpineL"...
-        public HitboxTrigger2D hit;        // ���� Ʈ����(������)
-        public Transform originOverride;   // ���� ����(������ hit.transform/Center ���)
+        public HitboxTrigger2D hit;        // 히트 트리거(선택)
+        public Transform originOverride;   // 원점 오버라이드(선택, hit.transform/Center 대신)
     }
+
     [Header("Anchors / Hitboxes")]
     public List<AnchorEntry> anchors = new();
 
-    // BulgasariAttackHooks.cs ���� (���� �ڵ� �״�� �ΰ� �Ʒ��� �߰�)
+    // ===== Attack Table (ID ↔ Definition) =====
+    [Serializable]
+    public struct DefEntry
+    {
+        public string id;                  // "Thorn","Sweep","Slam" 등
+        public AttackDefinition2D def;     // 공격 정의
+        public Transform originOverride;   // 이 공격만 특정 원점 사용(선택)
+        public int defaultBurst;           // 버스트 기본 횟수(0/1이면 단발)
+        public float defaultInterval;      // 버스트 기본 간격(초)
+    }
 
-    // �ν����� �⺻ ���ӽð�(������ �� �� ���)
+    [Header("Attack Table (ID ↔ Def)")]
+    public List<DefEntry> attackDefs = new();
+
+    // ===== OnAt (지정 프레임 히트) 기본값 =====
     [Header("OnAt Defaults")]
     public float defaultOnAtDuration = 0.20f;
 
-    // ���� ����
+    // ===== Gizmos / Preview =====
+    [Header("Gizmos / Preview")]
+    public bool gizmoEnabled = true;
+
+    public enum GizmoMode { Off, SelectedID, All }
+    public GizmoMode gizmoMode = GizmoMode.SelectedID;
+
+    [Tooltip("SelectedID 모드일 때 볼 공격 ID")]
+    public string gizmoAttackId = "Thorn";
+
+    [Tooltip("지정하면 이 앵커로 미리봄 (예: Left / Right / Center). 비워두면 ID와 같은 키/기본 원점 사용")]
+    public string gizmoAnchorKey = "";
+
+    public Color gizmoFill = new(1f, 0.2f, 0.2f, 0.12f);
+    public Color gizmoWire = new(1f, 0.2f, 0.2f, 0.36f);
+
+    // ====== 라이프사이클 ======
+    void Awake()
+    {
+        EnsurePivots();
+        UpdateAllPivotsFromColliders();
+        BootstrapLegacyDefaults();
+    }
+
+#if UNITY_EDITOR
+    void OnValidate()
+    {
+        // 키/ID 공백 정리
+        for (int i = 0; i < anchors.Count; i++)
+        {
+            anchors[i] = new AnchorEntry
+            {
+                key = string.IsNullOrWhiteSpace(anchors[i].key) ? anchors[i].key : anchors[i].key.Trim(),
+                hit = anchors[i].hit,
+                originOverride = anchors[i].originOverride
+            };
+        }
+        for (int i = 0; i < attackDefs.Count; i++)
+        {
+            attackDefs[i] = new DefEntry
+            {
+                id = string.IsNullOrWhiteSpace(attackDefs[i].id) ? attackDefs[i].id : attackDefs[i].id.Trim(),
+                def = attackDefs[i].def,
+                originOverride = attackDefs[i].originOverride,
+                defaultBurst = attackDefs[i].defaultBurst,
+                defaultInterval = attackDefs[i].defaultInterval
+            };
+        }
+
+        if (!Application.isPlaying)
+        {
+            EnsurePivots();
+            UpdateAllPivotsFromColliders(); // 에디터에서도 기즈모 정확히 보이도록
+        }
+    }
+#endif
+
+    // ===== 유틸: 공격 ID 헬퍼 =====
+    public IEnumerable<string> GetAttackIds()
+    {
+        if (attackDefs == null) yield break;
+        foreach (var e in attackDefs)
+            if (!string.IsNullOrEmpty(e.id))
+                yield return e.id;
+    }
+
+    public bool HasAttackId(string id) => TryGetDefById(id, out _);
+
+    public bool TryGetDefById(string id, out AttackDefinition2D def)
+    {
+        def = null;
+        if (string.IsNullOrEmpty(id) || attackDefs == null) return false;
+
+        foreach (var e in attackDefs) // struct는 null 아님
+        {
+            // default(struct) 보호
+            if (EqualityComparer<DefEntry>.Default.Equals(e, default)) continue;
+            if (e.id == id && e.def != null)
+            {
+                def = e.def;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // 애니 없이 즉시 실행
+    public void ExecById(string id)
+    {
+        if (!TryGetDefById(id, out var def)) return;
+        Perform(def);
+    }
+
+    // ====== 지정 프레임 히트(OnAt) ======
     void OnAt_Internal(string key, float dur)
     {
         var a = FindAnchor(key);
-        if (a == null || a.Value.hit == null)
+        if (!a.HasValue || a.Value.hit == null)
         {
             Debug.LogWarning($"[Bulgasari] Anchor '{key}' not found or no HitboxTrigger2D.");
             return;
@@ -105,14 +169,10 @@ public class BulgasariAttackHooks : MonoBehaviour
         a.Value.hit.Activate(Mathf.Max(0f, dur));
     }
 
-    // 1) Ű�� �޴� ����(���ӽð��� �⺻�� ���) �� �̺�Ʈ���� ���ڿ� 1����
-    public void Anim_OnAt_Key(string key)
-    {
-        OnAt_Internal(key, defaultOnAtDuration);
-    }
+    // 1) key만 받음(기본 지속시간 사용)
+    public void Anim_OnAt_Key(string key) => OnAt_Internal(key, defaultOnAtDuration);
 
-    // 2) "key,duration" �� �ٷ� �޴� ���� �� �̺�Ʈ���� ���ڿ� 1����
-    // ��) Anim_OnAt_Spec("Left,0.35")
+    // 2) "key,duration" 형태로 받음
     public void Anim_OnAt_Spec(string spec)
     {
         if (string.IsNullOrWhiteSpace(spec)) return;
@@ -122,40 +182,23 @@ public class BulgasariAttackHooks : MonoBehaviour
         OnAt_Internal(key, dur);
     }
 
-
-    // ===== Attack Table (ID �� Definition) =====
-    [Serializable]
-    public struct DefEntry
-    {
-        public string id;                  // "Thorn","Sweep","Slam"... ���� ���ڿ�
-        public AttackDefinition2D def;     // ������ ���� ������
-        public Transform originOverride;   // �� ���� ���� ������(���� ���)
-        public int defaultBurst;        // ��Ÿ �⺻ Ƚ��(0/1�̸� �ܹ�)
-        public float defaultInterval;     // ��Ÿ �⺻ ����(��)
-    }
-    [Header("Attack Table (ID �� Def)")]
-    public List<DefEntry> attackDefs = new();
-
-    // ====== ���� ���� ======
+    // ====== 공통 실행 ======
     public void Perform(AttackDefinition2D def, Transform originOverride = null)
     {
         if (!def) return;
 
-        var origin = originOverride
-                   ? originOverride
-                   : (attackOriginCenter ? attackOriginCenter : transform);
-
+        var origin = originOverride ? originOverride : ResolveCenterOrigin();
         bool facingRight = transform.localScale.x >= 0f;
 
         HitExec2D.ExecuteAttack(def, origin, facingRight, col =>
         {
-            // �и� �켱 �Һ�
+            // 패링 소비 우선
             var pc = col.GetComponent<PlayerController>() ??
                      col.GetComponentInParent<PlayerController>() ??
                      col.GetComponentInChildren<PlayerController>();
             if (pc != null && pc.IsParrying && pc.ConsumeHitboxIfParrying(col)) return;
 
-            // ����� ����
+            // 대미지 전달
             var dmg = col.GetComponent<IDamageable>() ??
                       col.GetComponentInParent<IDamageable>() ??
                       col.GetComponentInChildren<IDamageable>();
@@ -163,42 +206,21 @@ public class BulgasariAttackHooks : MonoBehaviour
         });
     }
 
-
-
-
-
-    // ====== �ִϸ��̼� �̺�Ʈ API (Ȯ����) ======
-
-    // A) ���� ���� ����ġ: �ش� ��Ŀ�� ��Ʈ�ڽ��� dur�� �Ҵ�
-    public void Anim_OnAt(string key, float dur)
-    {
-        var a = FindAnchor(key);
-        if (a == null || a.Value.hit == null)
-        {
-            Debug.LogWarning($"[Bulgasari] Anchor '{key}' not found or no HitboxTrigger2D.");
-            return;
-        }
-        a.Value.hit.Activate(dur);
-    }
-
-    // B) ���� 1ȸ: �ν����� ���̺��� "����ID"�� ����
+    // ====== 애니메이션 이벤트 API ======
     public void Anim_ATK_ID(string id)
     {
         var de = FindDef(id);
-        if (de == null || !de.Value.def)
+        if (!de.HasValue || !de.Value.def)
         {
             Debug.LogWarning($"[Bulgasari] AttackID '{id}' not found.");
             return;
         }
-
-        // ���� �̸��� ��Ŀ�� ������ �� ������ �ڵ� ���
         var a = FindAnchor(id);
         var origin = ResolveOrigin(de.Value, a, null);
         Perform(de.Value.def, origin);
     }
 
-    // C) ���� ��Ÿ: "id,Ƚ��,����[,��ĿŰ]" (Ƚ��/���� ���� �� ���̺� �⺻��)
-    //   ��) "Thorn,4,0.07"  /  "Thorn"  /  "Thorn,3,0.05,Left"
+    // "id,횟수,간격[,앵커키]"
     public void Anim_ATK_Burst(string spec)
     {
         if (string.IsNullOrWhiteSpace(spec)) return;
@@ -207,7 +229,7 @@ public class BulgasariAttackHooks : MonoBehaviour
         string id = parts[0];
 
         var de = FindDef(id);
-        if (de == null || !de.Value.def)
+        if (!de.HasValue || !de.Value.def)
         {
             Debug.LogWarning($"[Bulgasari] AttackID '{id}' not found.");
             return;
@@ -226,12 +248,14 @@ public class BulgasariAttackHooks : MonoBehaviour
         StartCoroutine(BurstRoutine(de.Value.def, origin, count, interval));
     }
 
-    // D) ����: Ư�� ��ĿŰ�� �����ؼ� �����ϰ� ���� ��
     public void Anim_ATK_ID_At(string id, string key)
     {
         var de = FindDef(id);
-        if (de == null || !de.Value.def) { Debug.LogWarning($"[Bulgasari] AttackID '{id}' not found."); return; }
-
+        if (!de.HasValue || !de.Value.def)
+        {
+            Debug.LogWarning($"[Bulgasari] AttackID '{id}' not found.");
+            return;
+        }
         var a = FindAnchor(key);
         var origin = ResolveOrigin(de.Value, a, key);
         Perform(de.Value.def, origin);
@@ -246,7 +270,7 @@ public class BulgasariAttackHooks : MonoBehaviour
         }
     }
 
-    // ====== ȣȯ��(���� �̺�Ʈ �̸� ����) ======
+    // 편의 래퍼(레거시)
     public void Anim_ATK_DoublePunch() => Anim_ATK_ID("Thorn");
     public void Anim_ATK_Sweep() => Anim_ATK_ID("Sweep");
     public void Anim_ATK_Slam() => Anim_ATK_ID("Slam");
@@ -257,6 +281,8 @@ public class BulgasariAttackHooks : MonoBehaviour
     void OnDrawGizmosSelected()
     {
         if (!gizmoEnabled) return;
+        EnsurePivots();
+        UpdateAllPivotsFromColliders();
 
         bool facingRight = transform.localScale.x >= 0f;
 
@@ -269,8 +295,8 @@ public class BulgasariAttackHooks : MonoBehaviour
                 var origin = ResolveOrigin(de, a, gizmoAnchorKey);
                 HitExec2D.DrawGizmos(de.def, origin, facingRight, gizmoFill, gizmoWire);
             }
-            // ���Ž� 3���� ������
-            var legacyOrigin = attackOriginCenter ? attackOriginCenter : transform;
+            // 레거시 3개도 보정
+            var legacyOrigin = ResolveCenterOrigin();
             HitExec2D.DrawGizmos(thorn, legacyOrigin, facingRight, gizmoFill, gizmoWire);
             HitExec2D.DrawGizmos(defSweep, legacyOrigin, facingRight, gizmoFill, gizmoWire);
             HitExec2D.DrawGizmos(defSlam, legacyOrigin, facingRight, gizmoFill, gizmoWire);
@@ -280,20 +306,20 @@ public class BulgasariAttackHooks : MonoBehaviour
         if (gizmoMode == GizmoMode.SelectedID)
         {
             var deOpt = FindDef(gizmoAttackId);
-            if (deOpt != null && deOpt.Value.def)
+            if (deOpt.HasValue && deOpt.Value.def)
             {
                 var a = string.IsNullOrEmpty(gizmoAnchorKey) ? FindAnchor(gizmoAttackId) : FindAnchor(gizmoAnchorKey);
                 var origin = ResolveOrigin(deOpt.Value, a, gizmoAnchorKey);
                 HitExec2D.DrawGizmos(deOpt.Value.def, origin, facingRight, gizmoFill, gizmoWire);
                 return;
             }
-            // ���Ž� ��Ī�� ���
+            // 레거시 fallback
             AttackDefinition2D legacy = (gizmoAttackId == "Thorn") ? thorn :
                                         (gizmoAttackId == "Sweep") ? defSweep :
                                         (gizmoAttackId == "Slam") ? defSlam : null;
             if (legacy)
             {
-                var origin = attackOriginCenter ? attackOriginCenter : transform;
+                var origin = ResolveCenterOrigin();
                 HitExec2D.DrawGizmos(legacy, origin, facingRight, gizmoFill, gizmoWire);
             }
         }
@@ -302,52 +328,152 @@ public class BulgasariAttackHooks : MonoBehaviour
     // ====== Internals ======
     AnchorEntry? FindAnchor(string key)
     {
-        if (string.IsNullOrWhiteSpace(key)) return null;
-        return anchors.FirstOrDefault(a => string.Equals(a.key, key, StringComparison.OrdinalIgnoreCase));
+        if (string.IsNullOrWhiteSpace(key) || anchors == null || anchors.Count == 0) return null;
+        for (int i = 0; i < anchors.Count; i++)
+        {
+            if (string.Equals(anchors[i].key, key, StringComparison.OrdinalIgnoreCase))
+                return anchors[i];
+        }
+        return null;
     }
 
     DefEntry? FindDef(string id)
     {
-        if (string.IsNullOrWhiteSpace(id)) return null;
-        return attackDefs.FirstOrDefault(a => string.Equals(a.id, id, StringComparison.OrdinalIgnoreCase));
+        if (string.IsNullOrWhiteSpace(id) || attackDefs == null || attackDefs.Count == 0) return null;
+        for (int i = 0; i < attackDefs.Count; i++)
+        {
+            if (string.Equals(attackDefs[i].id, id, StringComparison.OrdinalIgnoreCase))
+                return attackDefs[i];
+        }
+        return null;
+    }
+
+    // --- 콜라이더 피벗/원점 해석 ---
+    Transform ResolveCenterOrigin()
+    {
+        if (originCenterCollider != null)
+        {
+            if (_pivotCenter == null) _pivotCenter = CreatePivot("__OriginPivot(Center)");
+            SnapPivotToCollider(_pivotCenter, originCenterCollider);
+            return _pivotCenter;
+        }
+        return attackOriginCenter ? attackOriginCenter : transform;
+    }
+
+    Transform ResolveLeftOrigin()
+    {
+        if (originLeftCollider != null)
+        {
+            if (_pivotLeft == null) _pivotLeft = CreatePivot("__OriginPivot(Left)");
+            SnapPivotToCollider(_pivotLeft, originLeftCollider);
+            return _pivotLeft;
+        }
+        return attackOriginLeft ? attackOriginLeft : transform;
+    }
+
+    Transform ResolveRightOrigin()
+    {
+        if (originRightCollider != null)
+        {
+            if (_pivotRight == null) _pivotRight = CreatePivot("__OriginPivot(Right)");
+            SnapPivotToCollider(_pivotRight, originRightCollider);
+            return _pivotRight;
+        }
+        return attackOriginRight ? attackOriginRight : transform;
     }
 
     Transform ResolveOrigin(DefEntry de, AnchorEntry? anchorMaybe, string keyOverride)
     {
+        // 1) 공격별 오버라이드
         if (de.originOverride) return de.originOverride;
 
-        // �켱����: ���� Ű �� ���� �̸� ��Ŀ �� ��Ŀ�� hit/override �� Center
-        if (anchorMaybe != null)
+        // 2) 앵커 기반
+        if (anchorMaybe.HasValue)
         {
             var a = anchorMaybe.Value;
             if (a.originOverride) return a.originOverride;
             if (a.hit) return a.hit.transform;
         }
 
-        // ���� Ű�� ���� ã�� (������ �� ã���� ��)
+        // 3) 키 기반: "Center/Left/Right"면 콜라이더 피벗 우선
         if (!string.IsNullOrEmpty(keyOverride))
         {
+            var t = ResolvePivotByKey(keyOverride);
+            if (t != null) return t;
+
+            // 앵커 테이블에만 있고 키가 맞을 수 있으니 한 번 더
             var a2 = FindAnchor(keyOverride);
-            if (a2 != null)
+            if (a2.HasValue)
             {
                 if (a2.Value.originOverride) return a2.Value.originOverride;
                 if (a2.Value.hit) return a2.Value.hit.transform;
             }
         }
 
-        return attackOriginCenter ? attackOriginCenter : transform;
+        // 4) 최종: Center 콜라이더 피벗 → 트랜스폼 → 자기 자신
+        return ResolveCenterOrigin();
     }
 
-    void Awake() => BootstrapLegacyDefaults();
+    Transform ResolvePivotByKey(string key)
+    {
+        if (string.Equals(key, "Center", StringComparison.OrdinalIgnoreCase)) return ResolveCenterOrigin();
+        if (string.Equals(key, "Left", StringComparison.OrdinalIgnoreCase)) return ResolveLeftOrigin();
+        if (string.Equals(key, "Right", StringComparison.OrdinalIgnoreCase)) return ResolveRightOrigin();
+        return null;
+    }
 
+    // --- Pivot helpers ---
+    void EnsurePivots()
+    {
+        if (_pivotCenter == null) _pivotCenter = FindOrCreate("__OriginPivot(Center)");
+        if (_pivotLeft == null) _pivotLeft = FindOrCreate("__OriginPivot(Left)");
+        if (_pivotRight == null) _pivotRight = FindOrCreate("__OriginPivot(Right)");
+    }
+
+    Transform FindOrCreate(string name)
+    {
+        var t = transform.Find(name);
+        return t ? t : CreatePivot(name);
+    }
+
+    Transform CreatePivot(string name)
+    {
+        var go = new GameObject(name);
+        go.transform.SetParent(transform, worldPositionStays: false);
+        go.hideFlags = HideFlags.DontSaveInEditor | HideFlags.HideInHierarchy;
+        return go.transform;
+    }
+
+    void SnapPivotToCollider(Transform pivot, Collider2D col)
+    {
+        if (!pivot || !col) return;
+        var b = col.bounds;
+        pivot.position = b.center;
+        pivot.rotation = Quaternion.identity;
+    }
+
+    void UpdateAllPivotsFromColliders()
+    {
+        if (originCenterCollider) SnapPivotToCollider(_pivotCenter, originCenterCollider);
+        if (originLeftCollider) SnapPivotToCollider(_pivotLeft, originLeftCollider);
+        if (originRightCollider) SnapPivotToCollider(_pivotRight, originRightCollider);
+    }
+
+    void DrawPivotGizmo(Transform t, Color c)
+    {
+        if (!t) return;
+        Gizmos.color = c; Gizmos.DrawWireSphere(t.position, 0.06f);
+    }
+
+    // --- 부트스트랩 ---
     void BootstrapLegacyDefaults()
     {
-        // �⺻ ��Ŀ �ڵ� �߰� (������� ����)
+        // 기본 앵커 추가(중복 방지)
         AddDefaultAnchor("Center", attackOriginCenter);
         AddDefaultAnchor("Left", attackOriginLeft);
         AddDefaultAnchor("Right", attackOriginRight);
 
-        // ���� ���̺� ������� ���Ž� �ʵ�� 1ȸ ��Ʈ��Ʈ��
+        // AttackDefs 비어 있으면 레거시 1회 셋업
         if (attackDefs == null) attackDefs = new List<DefEntry>();
         if (attackDefs.Count == 0)
         {
@@ -369,31 +495,4 @@ public class BulgasariAttackHooks : MonoBehaviour
             originOverride = t
         });
     }
-
-#if UNITY_EDITOR
-    void OnValidate()
-    {
-        // Ű ���� ����
-        for (int i = 0; i < anchors.Count; i++)
-        {
-            anchors[i] = new AnchorEntry
-            {
-                key = string.IsNullOrWhiteSpace(anchors[i].key) ? anchors[i].key : anchors[i].key.Trim(),
-                hit = anchors[i].hit,
-                originOverride = anchors[i].originOverride
-            };
-        }
-        for (int i = 0; i < attackDefs.Count; i++)
-        {
-            attackDefs[i] = new DefEntry
-            {
-                id = string.IsNullOrWhiteSpace(attackDefs[i].id) ? attackDefs[i].id : attackDefs[i].id.Trim(),
-                def = attackDefs[i].def,
-                originOverride = attackDefs[i].originOverride,
-                defaultBurst = attackDefs[i].defaultBurst,
-                defaultInterval = attackDefs[i].defaultInterval
-            };
-        }
-    }
-#endif
 }

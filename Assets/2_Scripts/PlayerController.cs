@@ -1,19 +1,36 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using System;
 
-// PlayerController — 패링/스페셜/호환성 보강판 (디버그 UI 포함)
-// 변경: 패링 성공 카운트는 시간 경과로 자동 초기화되지 않음.
-//       오직 ParrySpecial 발동(소모) 시에만 parrySuccessCount를 0으로 초기화.
+// PlayerController — 패링/스페셜/히트박스 자식 콜라이더판 (디버그 UI 포함)
+// - 3연속 기본공격과 스페셜 공격 모두 "자식 Collider2D"로만 히트 판정.
+// - 구버전 attackPoint/OverlapCircle/Box 기반 로직, 관련 필드 전부 제거.
+// - 스페셜 적중 시 BulgasariBoss.OnParrySpecialLanded(col)로 그로기 트리거 신호 전송.
+// - IParryStreakProvider 그대로 유지.
+
 [RequireComponent(typeof(Rigidbody2D))]
 [RequireComponent(typeof(Animator))]
-
-
-public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider // <== IParryStreakProvider 구현
+public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
 {
     [HideInInspector] public bool ExternalRangedOverride;
 
+    // === 새로 추가/통일: 자식 히트박스 그룹 ===
+    [Header("Hitboxes (children driven)")]
+    [Tooltip("Attack1에 쓸 자식 Collider2D들 (isTrigger 권장)")]
+    public Collider2D[] hitboxesAttack1;
+    [Tooltip("Attack2에 쓸 자식 Collider2D들")]
+    public Collider2D[] hitboxesAttack2;
+    [Tooltip("Attack3에 쓸 자식 Collider2D들")]
+    public Collider2D[] hitboxesAttack3;
+
+    [Tooltip("패링 스페셜에 쓸 자식 Collider2D들 (여기에 뭔가라도 있으면 스페셜은 이걸 사용)")]
+    public Collider2D[] hitboxesParrySpecial;
+
+    // IParryStreakProvider
+
+    [Header("Ability Anchor (for ranged/talisman)")]
+    public Transform attackPoint;  // 없으면 transform을 앵커로 사용
 
     public int CurrentParryStreak => parrySuccessCount;
     public event Action<int> OnParryStreakChanged;
@@ -32,13 +49,11 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     public float normalGravity = 1f;
 
     [Header("Attack - general")]
-    public Transform attackPoint;
+    [Tooltip("공격이 맞을 레이어(적/보스). 자식 히트박스가 이 레이어와 겹치는 상대만 집계")]
     public LayerMask enemyLayer;
-    public float inputBufferWindow = 0.45f;
+    public float inputBufferWindow = 0.45f; // (남겨둠: 필요시 입력 버퍼에 활용 가능)
 
     [Header("Combo (3 steps)")]
-    public int maxCombo = 3;
-    public float[] comboRanges = new float[3] { 0.6f, 0.8f, 1.0f };
     public int[] comboDamages = new int[3] { 1, 1, 2 };
     // <-- 배열명 정확히: comboLockDurations
     public float[] comboLockDurations = new float[3] { 0.25f, 0.3f, 0.4f };
@@ -65,17 +80,11 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     public int parrySuccessNeeded = 4;
     public string animParrySpecialTrigger = "ParrySpecial";
     public float parrySpecialInvulDuration = 0.3f;
-    [Tooltip("(더 이상 자동 리셋을 원하지 않는 경우 무시) 패링 성공 후 카운트 리셋까지의 허용 시간(초). 현재는 사용하지 않습니다.")]
-    public float parrySuccessResetDelay = 3.0f; // **이 값은 더 이상 자동 리셋에 사용되지 않음**
+    [Tooltip("(더 이상 자동 리셋을 원하지 않는 경우 무시) 과거 호환용")]
+    public float parrySuccessResetDelay = 3.0f; // 사용 안 함(호환만)
 
-    // === NEW: 패링 스페셜 타격 설정 ===
-    [Header("Parry Special Attack (hit settings)")]
-    public bool parrySpecialUseCircle = true;           // 원형 or 박스형
-    public float parrySpecialRadius = 1.6f;             // 원형 반경
-    public Vector2 parrySpecialBoxSize = new(3.2f, 1.6f); // 박스 크기
-    public Vector2 parrySpecialOffset = new(1.0f, 0.1f);  // 캐릭터 기준 오프셋 (우측이 +)
-    public int parrySpecialDamage = 3;                  // 대미지
-    public LayerMask parrySpecialEnemyMaskOverride;     // 비워두면 enemyLayer 사용
+    [Tooltip("스페셜만 별도 레이어마스크를 쓰고 싶다면 지정(비워두면 enemyLayer 사용)")]
+    public LayerMask parrySpecialEnemyMaskOverride;
 
     [Header("Ground Check / Stability")]
     public float groundCheckRadius = 0.14f;
@@ -95,7 +104,8 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     bool isFacingRight = true;
 
     // combo internals
-    int comboIndex = 0;
+    int comboIndex = 0;        // 1..3
+    int maxCombo => 3;
     bool isAttacking = false;
     bool queuedNext = false;
     float lastAttackButtonTime = -10f;
@@ -125,13 +135,11 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     // public getters
     public bool IsDashing => isDashing;
     public bool IsParrying => isParrying;
-
     void Start()
     {
         rb = GetComponent<Rigidbody2D>();
         animator = GetComponent<Animator>();
 
-        if (attackPoint == null) Debug.LogWarning("[PlayerController] attackPoint not assigned!");
         if (groundCheck == null) Debug.LogWarning("[PlayerController] groundCheck not assigned!");
 
         if (parryDebugStyle == null)
@@ -151,12 +159,11 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
         UpdateAnimationParams();
 
         if (attackLockTimer > 0f) attackLockTimer -= Time.deltaTime;
-
-        // (자동 리셋 제거)
     }
 
     void HandleInputs()
     {
+        // 기본 공격 입력(좌클릭)
         if (Input.GetMouseButtonDown(0))
         {
             lastAttackButtonTime = Time.time;
@@ -170,6 +177,7 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
             }
         }
 
+        // 대쉬
         if (Input.GetKeyDown(KeyCode.LeftShift) || Input.GetKeyDown(KeyCode.RightShift))
         {
             if (canDash && !isDashing && !isParrying && !isAttacking && attackLockTimer <= 0f)
@@ -178,6 +186,7 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
             }
         }
 
+        // 패링
         if (Input.GetKeyDown(KeyCode.C) || Input.GetKeyDown(KeyCode.LeftControl))
         {
             if (canParry && !isParrying && !isDashing && attackLockTimer <= 0f)
@@ -186,6 +195,7 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
             }
         }
 
+        // 점프
         if (Input.GetButtonDown("Jump"))
         {
             bool grounded = Physics2D.OverlapCircle(groundCheck.position, groundCheckRadius, groundLayer);
@@ -197,11 +207,8 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
 
                 if (fx) fx.PlayFx("JumpDust", "Feet");
             }
-
         }
     }
-
-
 
     void HandleMovement()
     {
@@ -264,7 +271,7 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     }
 
     // --------------------------------------------------------
-    // Combo / Attack functions
+    // Combo / Attack functions (자식 히트박스 사용)
     // --------------------------------------------------------
     void StartAttack(int attackStep)
     {
@@ -289,22 +296,29 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
         }
     }
 
+    // 애니메이션 이벤트에서 한 프레임 히트할 때 호출
     public void OnAttackHit()
     {
         if (comboIndex <= 0 || comboIndex > maxCombo) return;
 
-        float range = (comboRanges != null && comboRanges.Length >= comboIndex) ? comboRanges[comboIndex - 1] : 0.6f;
-        int dmg = (comboDamages != null && comboDamages.Length >= comboIndex) ? comboDamages[comboIndex - 1] : 1;
+        int dmg = (comboDamages != null && comboDamages.Length >= comboIndex)
+                    ? comboDamages[comboIndex - 1] : 1;
 
-        if (attackPoint == null) { Debug.LogWarning("[PlayerController] attackPoint null"); return; }
-
-        Collider2D[] hits = Physics2D.OverlapCircleAll(attackPoint.position, range, enemyLayer);
-        foreach (var col in hits)
+        Collider2D[] group = null;
+        switch (comboIndex)
         {
-            if (col == null) continue;
-            var dmgComp = col.GetComponent<IDamageable>() ?? col.GetComponentInParent<IDamageable>() ?? col.GetComponentInChildren<IDamageable>();
-            if (dmgComp != null) dmgComp.TakeDamage(dmg);
+            case 1: group = hitboxesAttack1; break;
+            case 2: group = hitboxesAttack2; break;
+            case 3: group = hitboxesAttack3; break;
         }
+
+        if (group == null || group.Length == 0)
+        {
+            Debug.LogWarning($"[Player] Attack{comboIndex} hitboxes not assigned.");
+            return;
+        }
+
+        ApplyHitboxGroup(group, enemyLayer, dmg, null);
     }
 
     public void OnAttackAnimationEnd()
@@ -383,7 +397,6 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     // --------------------------------------------------------
     public bool ConsumeHitboxIfParrying(object hitInfo = null)
     {
-        // 디버그 로그 - 호출 및 현재 상태 확인
         Debug.Log($"[Player] ConsumeHitboxIfParrying called. isParrying={isParrying}, isInvulnerable={isInvulnerable}, hitInfo={hitInfo}");
 
         if (isInvulnerable) return true;
@@ -415,7 +428,7 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
 
             // 실제 패링 성공 처리 (카운트 증가 등)
             parrySuccessCount++;
-            OnParryStreakChanged?.Invoke(parrySuccessCount); // <== 추가
+            OnParryStreakChanged?.Invoke(parrySuccessCount);
 
             lastParrySuccessTime = Time.time;
             Debug.Log($"[Player] Parry success #{parrySuccessCount}");
@@ -442,7 +455,7 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     }
 
     // --------------------------------------------------------
-    // IDamageable implementation (defensive: check parry here too)
+    // IDamageable
     // --------------------------------------------------------
     public void TakeDamage(int amount)
     {
@@ -454,18 +467,24 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
             if (consumed) return;
         }
 
+        GetComponent<PlayerHitShake>()?.Shake();
+
         Debug.Log($"[Player] Took {amount} damage.");
         if (healthComponent != null)
         {
+
             var mi = healthComponent.GetType().GetMethod("TakeDamage");
             if (mi != null) mi.Invoke(healthComponent, new object[] { amount });
             else Debug.LogWarning("[Player] healthComponent provided but no TakeDamage(int) found.");
             return;
         }
+
+
+
     }
 
     // --------------------------------------------------------
-    // Parry special logic
+    // Parry special logic (자식 히트박스 사용)
     // --------------------------------------------------------
     IEnumerator TriggerParrySpecial()
     {
@@ -479,73 +498,46 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
         // **스페셜을 소비했을 때만 카운트 초기화**
         parrySuccessCount = 0;
         lastParrySuccessTime = -999f;
-        OnParryStreakChanged?.Invoke(parrySuccessCount); // <== 추가
+        OnParryStreakChanged?.Invoke(parrySuccessCount);
 
-        // 잠깐 유지 후 잠금 해제
         yield return new WaitForSeconds(0.25f);
         parrySpecialLocked = false;
     }
 
-    // === NEW: 패링 스페셜 타격 함수(애니메이션 이벤트로 호출) ===
+    // 애니메이션 이벤트로 1틱(프레임) 스페셜 히트
     public void OnParrySpecialHit()
     {
-        // 사용할 레이어 마스크 결정
+        Debug.Log("[PS] OnParrySpecialHit fired");
+
         var mask = (parrySpecialEnemyMaskOverride.value != 0) ? parrySpecialEnemyMaskOverride : enemyLayer;
 
-        // 기준점: attackPoint가 있으면 사용, 없으면 본인 위치
-        Vector2 originBase = (attackPoint != null) ? (Vector2)attackPoint.position : (Vector2)transform.position;
 
-        // 좌우 방향(스케일 x 기준) 반영
-        float dir = (transform.localScale.x >= 0f) ? 1f : -1f;
-
-        // 오프셋 적용
-        Vector2 origin = originBase + new Vector2(parrySpecialOffset.x * dir, parrySpecialOffset.y);
-
-        // 충돌 수집
-        Collider2D[] hits;
-        if (parrySpecialUseCircle)
+        if (hitboxesParrySpecial == null || hitboxesParrySpecial.Length == 0)
         {
-            hits = Physics2D.OverlapCircleAll(origin, parrySpecialRadius, mask);
-#if UNITY_EDITOR
-            Debug.DrawLine(origin + Vector2.right * parrySpecialRadius, origin - Vector2.right * parrySpecialRadius, Color.red, 0.25f);
-            Debug.DrawLine(origin + Vector2.up * parrySpecialRadius, origin - Vector2.up * parrySpecialRadius, Color.red, 0.25f);
-#endif
-        }
-        else
-        {
-            float ang = 0f; // 필요하면 회전값 사용
-            // 박스의 가로는 좌우에 맞게 생각했지만 OverlapBoxAll은 크기를 절대값으로 받으므로 그대로 전달
-            hits = Physics2D.OverlapBoxAll(origin, parrySpecialBoxSize, ang, mask);
-#if UNITY_EDITOR
-            Vector2 hx = new(parrySpecialBoxSize.x * 0.5f * dir, parrySpecialBoxSize.y * 0.5f);
-            Debug.DrawLine(origin - hx, origin + hx, Color.red, 0.25f);
-            Debug.DrawLine(new(origin.x - hx.x, origin.y + hx.y), new(origin.x + hx.x, origin.y - hx.y), Color.red, 0.25f);
-#endif
+            Debug.LogWarning("[Player] hitboxesParrySpecial not assigned.");
+            return;
         }
 
-        var touched = new HashSet<Collider2D>();
-        foreach (var col in hits)
-        {
-            if (col == null || touched.Contains(col)) continue;
-            touched.Add(col);
+        ApplyHitboxGroup(
+            hitboxesParrySpecial,
+            mask,
+            // 대미지는 여기선 별도 값이 없다면 3~5 등 프로젝트 룰에 맞춰 설정
+            // 필요 시 전용 변수(예: parrySpecialDamage) 유지해도 됨
+            damage: 3,
+            onTouch: (col) =>
 
-            var dmg = col.GetComponent<IDamageable>()
-                   ?? col.GetComponentInParent<IDamageable>()
-                   ?? col.GetComponentInChildren<IDamageable>();
-            if (dmg != null)
             {
-                dmg.TakeDamage(parrySpecialDamage);
-                continue;
-            }
+                Debug.Log($"[PS] hit {col.name}");
+                // 보스 그로기 트리거 알림
+                var boss = col.GetComponentInParent<BulgasariBoss>();
+                if (boss != null) boss.OnParrySpecialLanded(col);
 
-            // 구형 EnemyHealth 지원
-            var enemyHealth = col.GetComponent<EnemyHealth>() ?? col.GetComponentInParent<EnemyHealth>();
-            if (enemyHealth != null)
-            {
-                enemyHealth.TakeDamage(parrySpecialDamage);
-                continue;
-            }
-        }
+
+                var grog = col.GetComponent<BulgasariGroggyTarget>() ?? col.GetComponentInParent<BulgasariGroggyTarget>();
+                if (grog != null) grog.NotifyParrySpecialHit(this);
+                Debug.Log($"[PS] groggyTarget? {(grog != null)}");
+
+            });
     }
 
     IEnumerator TemporaryInvul(float dur)
@@ -556,45 +548,70 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     }
 
     // --------------------------------------------------------
-    // Gizmos
+    // Hitbox group executor (공통 루틴)
     // --------------------------------------------------------
+    static readonly List<Collider2D> _overlapBuf = new(16);
+
+    void ApplyHitboxGroup(Collider2D[] group, LayerMask mask, int damage, Action<Collider2D> onTouch)
+    {
+        if (group == null || group.Length == 0) return;
+
+        var filter = new ContactFilter2D
+        {
+            useTriggers = true,
+            useLayerMask = true
+        };
+        filter.SetLayerMask(mask);
+
+        var seen = new HashSet<Collider2D>();
+
+        foreach (var hb in group)
+        {
+            if (!hb || !hb.enabled) continue;
+
+            _overlapBuf.Clear();
+            // 중요: Collider2D.OverlapCollider(…) 사용 (Unity API)
+            int count = hb.Overlap(filter, _overlapBuf);
+            for (int i = 0; i < count; i++)
+            {
+                var c = _overlapBuf[i];
+                if (!c || seen.Contains(c)) continue;
+                seen.Add(c);
+
+                // 대미지 전달
+                var dmg = c.GetComponent<IDamageable>()
+                       ?? c.GetComponentInParent<IDamageable>()
+                       ?? c.GetComponentInChildren<IDamageable>();
+                if (dmg != null) dmg.TakeDamage(damage);
+
+                onTouch?.Invoke(c);
+            }
+        }
+    }
+
+    // (선택) 지속 판정이 필요할 때 쓰는 코루틴 — 애니 이벤트에서 duration 넘겨 호출 가능
+    IEnumerator ApplyHitboxGroupFor(Collider2D[] group, LayerMask mask, int damage, float duration, Action<Collider2D> onTouch = null)
+    {
+        float t = 0f;
+        while (t < duration)
+        {
+            ApplyHitboxGroup(group, mask, damage, onTouch);
+            yield return null; // 매 프레임 추적
+            t += Time.deltaTime;
+        }
+    }
+
+    // --------------------------------------------------------
+    // Gizmos (필요 최소만)
+    // --------------------------------------------------------
+#if UNITY_EDITOR
     void OnDrawGizmosSelected()
     {
-        if (groundCheck != null)
-        {
-            Gizmos.color = Color.cyan;
-            Gizmos.DrawWireSphere(groundCheck.position, groundCheckRadius);
-        }
-        if (attackPoint != null && comboRanges != null && comboRanges.Length > 0)
-        {
-            int idx = Mathf.Clamp(comboIndex - 1, 0, comboRanges.Length - 1);
-            float r = (comboRanges != null && comboRanges.Length > 0) ? comboRanges[idx] : comboRanges[0];
-            Gizmos.color = Color.yellow;
-            Gizmos.DrawWireSphere(attackPoint.position, r);
-        }
-
-#if UNITY_EDITOR
         if (isParrying)
         {
             UnityEditor.Handles.color = Color.green;
             UnityEditor.Handles.DrawWireDisc(transform.position + Vector3.up * 1.2f, Vector3.forward, 0.4f);
         }
+    }
 #endif
-    }
-
-    // --------------------------------------------------------
-    // Simple in-game debug UI for parry status/count
-    // --------------------------------------------------------
-    void OnGUI()
-    {
-        if (!showParryDebugUI) return;
-
-        string text = $"Parry: {(isParrying ? "ON" : "off")}  |  SuccessCount: {parrySuccessCount} / {parrySuccessNeeded}\n" +
-                      $"ParrySpecialLocked: {parrySpecialLocked}  |  Invul: {isInvulnerable}\n" +
-                      $"LastParryTimeAgo: {(lastParrySuccessTime < -900f ? "n/a" : (Time.time - lastParrySuccessTime).ToString("F2") + "s")}";
-
-        Rect r = new Rect(parryDebugPosition.x, parryDebugPosition.y, 360, 60);
-        GUI.Box(r, GUIContent.none);
-        GUI.Label(new Rect(r.x + 6, r.y + 4, r.width - 10, r.height - 8), text, parryDebugStyle);
-    }
 }

@@ -5,200 +5,164 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public class BulgasariAttackAI : MonoBehaviour
 {
-    public enum FireMode
-    {
-        AnimatorTrigger,  // 애니메이터 트리거를 쏴서 애니메이션+이벤트로 공격
-        DirectExec        // 애니 없이 훅스에서 바로 히트 박스 실행
-    }
-
     [Header("Refs")]
-    public BulgasariAttackHooks hooks;   // 어택 테이블/실행 담당
-    public Animator animator;            // AnimatorTrigger 모드일 때 사용
-    public Transform player;             // (선택) 사거리 조건에 쓸 플레이어
+    public BulgasariAttackHooks hooks;   // 필요없어도 둠(훅스에서 히트 실행)
+    public Animator animator;
+    public Transform player;
 
-    [Header("Loop / Cadence")]
+    [Header("Run")]
     public bool runOnStart = true;
-    public Vector2 intervalRange = new Vector2(1.2f, 2.0f); // 공격 간 최소/최대 대기
-    public float thinkTick = 0.1f;                          // 후보가 없을 때 폴링 주기
-    public FireMode fireMode = FireMode.AnimatorTrigger;
+    public int layerIndex = 0;                  // 공격이 있는 레이어
+    [Tooltip("공격 스테이트 공통 태그명 (Animator State Tag)")]
+    public string attackTagName = "Attack";
 
-    [Header("Distance Gate (optional)")]
-    public bool gateByDistance = false;
-    public float minDistance = 0f;    // 이보다 가까워야/멀어야 등의 용도
-    public float maxDistance = 999f;
+    [Header("Idle pause (seconds)")]
+    public Vector2 idlePauseRange = new Vector2(0.35f, 0.75f);
+
+    [Header("Time guard (seconds)")]
+    [Tooltip("공격으로 진입을 기다리는 최대 시간")]
+    public float enterTimeout = 0.5f;
+    [Tooltip("공격이 끝나길 기다리는 최대 시간(넘으면 강제 Idle)")]
+    public float attackTimeout = 6f;
+
+    [Header("Idle return (fallback only)")]
+    [Tooltip("타임아웃으로 막혔을 때만 강제 Idle로 넘김")]
+    public bool forceIdleOnTimeout = true;
+    public string idleStateName = "Idle";
+    public float crossFadeIdleDuration = 0.06f;
 
     [System.Serializable]
-    public class AttackSlot
+    public class AttackEntry
     {
-        [Tooltip("hooks의 Attack Table에 등록된 ID와 같아야 함")]
-        public string id = "Clap";
-
-        [Tooltip("AnimatorTrigger 모드일 때 쏠 트리거 이름")]
-        public string animTrigger = "Clap";
-
-        [Tooltip("랜덤 선택 가중치")]
-        public float weight = 1f;
-
-        [Tooltip("해당 공격의 개별 쿨다운(초)")]
-        public float cooldown = 2.0f;
-
-        [Tooltip("애니메이션이 끝나기 전 다음 공격을 막고 싶으면 대략의 바쁜 시간(초)")]
-        public float busyTime = 0.8f;
-
-        [HideInInspector] public float _cdTimer;
+        public string id = "clap";         // 참고용
+        public string animTrigger = "clap";// AnyState → 이 트리거 1개로 전이
+        public float cooldown = 0.8f;      // 같은 기술 재사용 대기
+        public bool useDistanceGate = false;
+        public float minDistance = 0f;
+        public float maxDistance = 999f;
+        [HideInInspector] public float nextReadyTime;
     }
 
-    [Header("Attack List (랜덤 풀)")]
-    public List<AttackSlot> attacks = new();
+    [Header("Attacks")]
+    public List<AttackEntry> attacks = new();
 
-    bool _running;
+    [Header("Global distance gate (optional)")]
+    public bool gateByDistance = false;
+    public float globalMinDistance = 0f;
+    public float globalMaxDistance = 999f;
+
     Coroutine _loop;
+    int _attackTagHash;
 
     void Reset()
     {
-        if (!hooks) hooks = GetComponent<BulgasariAttackHooks>();
         if (!animator) animator = GetComponentInChildren<Animator>();
-        if (!player) { var p = GameObject.FindGameObjectWithTag("Player"); if (p) player = p.transform; }
+        if (!player) player = GameObject.FindGameObjectWithTag("Player")?.transform;
+        if (!hooks) hooks = GetComponentInChildren<BulgasariAttackHooks>();
     }
 
-    void Start()
+    void Awake()
     {
-        if (runOnStart) StartAI();
+        _attackTagHash = Animator.StringToHash(attackTagName);
     }
 
-    public void StartAI()
+    void OnEnable()
     {
-        if (_running) return;
-        _running = true;
-        _loop = StartCoroutine(Loop());
+        if (runOnStart && _loop == null) _loop = StartCoroutine(AILoop());
+    }
+    void OnDisable()
+    {
+        if (_loop != null) { StopCoroutine(_loop); _loop = null; }
     }
 
-    public void StopAI()
+    IEnumerator AILoop()
     {
-        _running = false;
-        if (_loop != null) StopCoroutine(_loop);
-        _loop = null;
-    }
+        if (!animator || attacks.Count == 0) yield break;
 
-    IEnumerator Loop()
-    {
-        yield return null;
-
-        while (_running)
+        while (true)
         {
-            // 후보 준비
-            int picked = PickIndex();
-            if (picked < 0)
+            // 0) Idle에서 잠깐 쉬기
+            float idlePause = Random.Range(Mathf.Min(idlePauseRange.x, idlePauseRange.y),
+                                           Mathf.Max(idlePauseRange.x, idlePauseRange.y));
+            yield return new WaitForSeconds(idlePause);
+
+            // 1) 공격 하나 선택
+            var pick = PickOne(Time.time);
+            if (pick == null) continue;
+
+            // 2) 모든 트리거 클리어 후, 선택 트리거만 쏨
+            ClearAllTriggers();
+            animator.SetTrigger(pick.animTrigger);
+
+            // 3) 공격 태그에 "들어갈 때"까지 대기 (enterTimeout)
+            float t = 0f;
+            while (!IsInAttackTag() && t < enterTimeout)
             {
-                TickCooldowns(thinkTick);
-                yield return new WaitForSeconds(thinkTick);
-                continue;
+                yield return null; t += Time.deltaTime;
             }
 
-            // 실행
-            var slot = attacks[picked];
-            DoFire(slot);
-
-            // 쿨다운/바쁜시간 처리
-            slot._cdTimer = slot.cooldown;
-            float wait = Mathf.Max(0f, Random.Range(intervalRange.x, intervalRange.y));
-            float remain = Mathf.Max(wait, slot.busyTime);
-            while (remain > 0f)
+            // 4) 공격 태그에 "있는 동안" 대기 (attackTimeout)
+            t = 0f;
+            while (IsInAttackTag() && t < attackTimeout)
             {
-                float dt = Time.deltaTime;
-                TickCooldowns(dt);
-                remain -= dt;
-                yield return null;
+                // 전이 중이어도 next/current 중 하나가 Attack 태그면 계속 기다림
+                yield return null; t += Time.deltaTime;
             }
+
+            // 5) 타임아웃이면 막힌 상태 — 필요 시 강제로 Idle
+            if (t >= attackTimeout && forceIdleOnTimeout && !string.IsNullOrEmpty(idleStateName))
+                animator.CrossFade(idleStateName, crossFadeIdleDuration, layerIndex, 0f);
+
+            // 6) 쿨다운
+            pick.nextReadyTime = Time.time + pick.cooldown;
         }
     }
 
-    int PickIndex()
+    AttackEntry PickOne(float now)
     {
-        if (attacks == null || attacks.Count == 0 || hooks == null) return -1;
+        float dist = player ? Mathf.Abs(player.position.x - transform.position.x) : 0f;
 
-        // 사거리 조건
-        bool distanceOK = true;
-        if (gateByDistance && player)
+        // 전역 거리 게이트
+        if (gateByDistance && (dist < globalMinDistance || dist > globalMaxDistance))
+            return null;
+
+        // 쿨타임/거리 충족하는 후보 수집
+        var pool = new List<AttackEntry>();
+        foreach (var a in attacks)
         {
-            float d = Mathf.Abs(player.position.x - transform.position.x);
-            distanceOK = (d >= minDistance && d <= maxDistance);
+            if (a == null) continue;
+            if (a.nextReadyTime > now) continue;
+            if (a.useDistanceGate && (dist < a.minDistance || dist > a.maxDistance)) continue;
+            pool.Add(a);
         }
-        if (!distanceOK) return -1;
+        if (pool.Count == 0) return null;
 
-        // 사용 가능 + 가중치 목록
-        float totalW = 0f;
-        List<int> candidates = new();
-        List<float> weights = new();
-
-        for (int i = 0; i < attacks.Count; i++)
-        {
-            var s = attacks[i];
-            if (s == null || string.IsNullOrEmpty(s.id)) continue;
-            if (s._cdTimer > 0f) continue;
-            // hooks에 ID가 존재하는지도 체크
-            if (!hooks.HasAttackId(s.id)) continue;
-
-            candidates.Add(i);
-            float w = Mathf.Max(0.0001f, s.weight);
-            weights.Add(w);
-            totalW += w;
-        }
-
-        if (candidates.Count == 0) return -1;
-
-        // 가중 랜덤
-        float r = Random.value * totalW;
-        float acc = 0f;
-        for (int k = 0; k < candidates.Count; k++)
-        {
-            acc += weights[k];
-            if (r <= acc) return candidates[k];
-        }
-        return candidates[candidates.Count - 1];
+        // 아주 단순하게 랜덤
+        return pool[Random.Range(0, pool.Count)];
     }
 
-    void DoFire(AttackSlot s)
+    bool IsInAttackTag()
     {
-        if (fireMode == FireMode.DirectExec)
+        if (!animator) return false;
+
+        // 현재
+        var cur = animator.GetCurrentAnimatorStateInfo(layerIndex);
+        if (cur.tagHash == _attackTagHash) return true;
+
+        // 전이 중이면 다음 상태도 체크
+        if (animator.IsInTransition(layerIndex))
         {
-            hooks.ExecById(s.id); // 애니 없이 바로 히트
-            return;
+            var next = animator.GetNextAnimatorStateInfo(layerIndex);
+            if (next.tagHash == _attackTagHash) return true;
         }
-
-        if (animator && !string.IsNullOrEmpty(s.animTrigger))
-            animator.SetTrigger(s.animTrigger);
-        else
-            hooks.ExecById(s.id); // 안전망
+        return false;
     }
 
-    void TickCooldowns(float dt)
+    void ClearAllTriggers()
     {
-        for (int i = 0; i < attacks.Count; i++)
-            if (attacks[i] != null && attacks[i]._cdTimer > 0f)
-                attacks[i]._cdTimer -= dt;
+        if (!animator) return;
+        foreach (var p in animator.parameters)
+            if (p.type == AnimatorControllerParameterType.Trigger)
+                animator.ResetTrigger(p.name);
     }
-
-    // === 편의 기능 ===
-#if UNITY_EDITOR
-    [ContextMenu("Import IDs from Hooks")]
-    void ImportFromHooks()
-    {
-        if (hooks == null) return;
-        var ids = hooks.GetAttackIds();
-        attacks = new List<AttackSlot>();
-        foreach (var id in ids)
-        {
-            attacks.Add(new AttackSlot
-            {
-                id = id,
-                animTrigger = id, // 트리거 이름을 ID와 같게 시작(원하면 바꿔)
-                weight = 1f,
-                cooldown = 1.5f,
-                busyTime = 0.7f
-            });
-        }
-        UnityEditor.EditorUtility.SetDirty(this);
-    }
-#endif
 }

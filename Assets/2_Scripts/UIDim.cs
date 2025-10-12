@@ -1,24 +1,52 @@
 using UnityEngine;
 using UnityEngine.UI;
+using System.Collections;
 
 public class UIDim : MonoBehaviour
 {
     [SerializeField] private Image dimImage;
+    [SerializeField] private float targetAlpha = 0.5f;
+    [SerializeField] private float fadeDuration = 0.25f;
+
+    void Awake()
+    {
+        // 초기 상태 안전하게 설정
+        if (dimImage != null)
+        {
+            dimImage.canvasRenderer.SetAlpha(0f); // 즉시 알파 0으로
+            dimImage.raycastTarget = false;      // 클릭은 통과 (시각효과만)
+        }
+        gameObject.SetActive(false);
+    }
 
     public void ShowDim()
     {
         gameObject.SetActive(true);
-        dimImage.CrossFadeAlpha(0.5f, 0.25f, false); // 0.25초 동안 서서히 어두워짐
+        if (dimImage != null)
+        {
+            // Time.timeScale에 상관없이 페이드되게 true로 설정
+            dimImage.CrossFadeAlpha(targetAlpha, fadeDuration, true);
+        }
     }
 
     public void HideDim()
     {
-        dimImage.CrossFadeAlpha(0f, 0.25f, false);
-        Invoke(nameof(Disable), 0.3f); // 애니 끝나고 비활성화
+        if (dimImage != null)
+        {
+            dimImage.CrossFadeAlpha(0f, fadeDuration, true);
+        }
+        StopAllCoroutines();
+        StartCoroutine(DisableAfterUnscaled(fadeDuration + 0.05f));
     }
 
-    void Disable()
+    private IEnumerator DisableAfterUnscaled(float waitSeconds)
     {
+        float t = 0f;
+        while (t < waitSeconds)
+        {
+            t += Time.unscaledDeltaTime;
+            yield return null;
+        }
         gameObject.SetActive(false);
     }
 }

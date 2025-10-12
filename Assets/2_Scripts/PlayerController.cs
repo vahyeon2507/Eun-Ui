@@ -431,6 +431,21 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
 
             lastParrySuccessTime = Time.time;
 
+            // PlayerHealth의 패링바 업데이트
+            if (healthComponent != null)
+            {
+                var addParryMethod = healthComponent.GetType().GetMethod("AddParryCount");
+                if (addParryMethod != null)
+                {
+                    addParryMethod.Invoke(healthComponent, null);
+                    Debug.Log("[Player] PlayerHealth 패링바 업데이트 호출됨");
+                }
+                else
+                {
+                    Debug.LogWarning("[Player] healthComponent에 AddParryCount 메서드가 없습니다!");
+                }
+            }
+
             // 잠깐 무적(중복 히트 방지)
             StartCoroutine(TemporaryInvul(0.06f));
 
@@ -506,6 +521,22 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     {
         Debug.Log("[PS] OnParrySpecialHit fired");
 
+        // PlayerHealth의 강화 공격 사용
+        if (healthComponent != null)
+        {
+            var useEnhancedMethod = healthComponent.GetType().GetMethod("UseEnhancedAttack");
+            if (useEnhancedMethod != null)
+            {
+                useEnhancedMethod.Invoke(healthComponent, null);
+                Debug.Log("[Player] PlayerHealth 강화 공격 사용됨");
+            }
+            else
+            {
+                Debug.LogWarning("[Player] healthComponent에 UseEnhancedAttack 메서드가 없습니다!");
+            }
+        }
+
+        // 사용할 레이어 마스크 결정
         var mask = (parrySpecialEnemyMaskOverride.value != 0) ? parrySpecialEnemyMaskOverride : enemyLayer;
 
 

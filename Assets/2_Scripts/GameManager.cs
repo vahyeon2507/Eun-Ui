@@ -5,18 +5,18 @@ using UnityEngine.UI;
 
 public class GameManager : MonoBehaviour
 {
-    [Header("¸ŞÀÎ ¸Ş´º UI")]
+    [Header("ï¿½ï¿½ï¿½ï¿½ ï¿½Ş´ï¿½ UI")]
     [SerializeField] private GameObject menuPanel;
     [SerializeField] private Button restartButton;
     [SerializeField] private Button continueButton;
     [SerializeField] private Button quitButton;
     [SerializeField] private Button settingsButton;
 
-    [Header("¼³Á¤ ¸Ş´º UI")]
+    [Header("ï¿½ï¿½ï¿½ï¿½ ï¿½Ş´ï¿½ UI")]
     [SerializeField] private GameObject settingsPanel;
-    [SerializeField] private GameObject[] settingPanels;   // ¿Àµğ¿À, ÇØ»óµµ, ±×·¡ÇÈ, Å° ¼¼ÆÃ µî ÆĞ³Îµé
+    [SerializeField] private GameObject[] settingPanels;   // ï¿½ï¿½ï¿½ï¿½ï¿½, ï¿½Ø»ï¿½, ï¿½×·ï¿½ï¿½ï¿½, Å° ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½Ğ³Îµï¿½
 
-    [Header("UI ¿¬Ãâ °ü·Ã")]
+    [Header("UI ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½")]
     [SerializeField] private UIAnimator menuAnimator;
     [SerializeField] private UIAnimator settingsAnimator;
     [SerializeField] private UIDim dim;
@@ -36,6 +36,9 @@ public class GameManager : MonoBehaviour
 
     void Start()
     {
+        // UI ì»´í¬ë„ŒíŠ¸ ìë™ ì°¾ê¸° ë° í• ë‹¹
+        AutoAssignUIComponents();
+        
         menuPanel.SetActive(false);
         settingsPanel.SetActive(false);
 
@@ -47,7 +50,7 @@ public class GameManager : MonoBehaviour
         soundSlider.onValueChanged.AddListener(OnSoundChanged);
         resolutionDropdown.onValueChanged.AddListener(OnResolutionChanged);
 
-        // ÇØ»óµµ ¿É¼Ç 3°³·Î °íÁ¤
+        // ï¿½Ø»ï¿½ ï¿½É¼ï¿½ 3ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
         resolutionDropdown.ClearOptions();
         var options = new System.Collections.Generic.List<string>
         {
@@ -57,10 +60,10 @@ public class GameManager : MonoBehaviour
         };
         resolutionDropdown.AddOptions(options);
 
-        soundSlider.value = 1f; // »ç¿îµå ±âº»°ª 100%
-        AudioListener.volume = 1f; // ½ÇÁ¦ º¼·ıµµ 100%
+        soundSlider.value = 1f; // ï¿½ï¿½ï¿½ï¿½ ï¿½âº»ï¿½ï¿½ 100%
+        AudioListener.volume = 1f; // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 100%
 
-        // ±âº»À¸·Î Ã¹ ¹øÂ° ÅÇ ÄÑ±â (¿¹: ¿Àµğ¿À ÆĞ³Î)
+        // ï¿½âº»ï¿½ï¿½ï¿½ï¿½ Ã¹ ï¿½ï¿½Â° ï¿½ï¿½ ï¿½Ñ±ï¿½ (ï¿½ï¿½: ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ğ³ï¿½)
         if (settingPanels.Length > 0)
             OpenPanel(0);
     }
@@ -69,27 +72,61 @@ public class GameManager : MonoBehaviour
     {
         if (Input.GetKeyDown(KeyCode.Escape))
         {
-            if (settingsPanel.activeSelf)
-            {
-                settingsAnimator.Hide();   // ¼³Á¤ ÆĞ³Î ´İ±â
-                menuAnimator.Show();       // ¸Ş´º ´Ù½Ã ¿­±â
-            }
-            else if (isMenuOpen) // ÀÌ¹Ì ¸Ş´º ¿­·Á ÀÖÀ¸¸é ´İ±â
-            {
-                isMenuOpen = false;
-                menuAnimator.Hide();   // menuPanel.SetActive(false) ´ë½Å
-                dim.HideDim();
-                Time.timeScale = 1;
-            }
-            else // ¸Ş´º°¡ ´İÇô ÀÖÀ¸¸é ¿­±â
-            {
-                isMenuOpen = true;
-                menuAnimator.Show();   // menuPanel.SetActive(true) ´ë½Å
-                dim.ShowDim();
-                Time.timeScale = 0;
-            }
+            HandleEscapeKey();
         }
-
+    }
+    
+    void HandleEscapeKey()
+    {
+        Debug.Log($"[GameManager] ESC í‚¤ ì…ë ¥ - í˜„ì¬ ìƒíƒœ: isMenuOpen={isMenuOpen}, settingsPanel.activeSelf={settingsPanel.activeSelf}");
+        
+        if (settingsPanel != null && settingsPanel.activeSelf)
+        {
+            // ì„¤ì • íŒ¨ë„ì´ ì—´ë ¤ìˆìœ¼ë©´ ë©”ë‰´ë¡œ ëŒì•„ê°€ê¸°
+            if (settingsAnimator != null)
+                settingsAnimator.Hide();
+            else
+                settingsPanel.SetActive(false);
+                
+            if (menuAnimator != null)
+                menuAnimator.Show();
+            else
+                menuPanel.SetActive(true);
+                
+            Debug.Log("[GameManager] ì„¤ì • íŒ¨ë„ â†’ ë©”ë‰´ íŒ¨ë„");
+        }
+        else if (isMenuOpen) // ì´ë¯¸ ë©”ë‰´ ì—´ë¦° ìƒíƒœë©´ ë‹«ê¸°
+        {
+            isMenuOpen = false;
+            
+            if (menuAnimator != null)
+                menuAnimator.Hide();
+            else
+                menuPanel.SetActive(false);
+                
+            if (dim != null)
+                dim.HideDim();
+                
+            Time.timeScale = 1;
+            Debug.Log("[GameManager] ë©”ë‰´ ë‹«ê¸° - ê²Œì„ ì¬ê°œ");
+        }
+        else // ë©”ë‰´ê°€ ë‹«íŒ ìƒíƒœë©´ ì—´ê¸°
+        {
+            isMenuOpen = true;
+            
+            if (menuAnimator != null)
+                menuAnimator.Show();
+            else
+                menuPanel.SetActive(true);
+                
+            if (dim != null)
+                dim.ShowDim();
+                
+            Time.timeScale = 0;
+            Debug.Log("[GameManager] ë©”ë‰´ ì—´ê¸° - ê²Œì„ ì¼ì‹œì •ì§€");
+        }
+        
+        Debug.Log($"[GameManager] ESC ì²˜ë¦¬ ì™„ë£Œ - Time.timeScale: {Time.timeScale}");
     }
 
     void OnRestart()
@@ -101,7 +138,7 @@ public class GameManager : MonoBehaviour
     void OnContinue()
     {
         isMenuOpen = false;
-        menuAnimator.Hide();   // menuPanel.SetActive(false) ´ë½Å
+        menuAnimator.Hide();   // menuPanel.SetActive(false) ï¿½ï¿½ï¿½
         dim.HideDim();
         Time.timeScale = 1;
     }
@@ -117,8 +154,118 @@ public class GameManager : MonoBehaviour
         menuPanel.SetActive(false);
         settingsPanel.SetActive(true);
     }
+    
+    public void CloseSettings()
+    {
+        settingsPanel.SetActive(false);
+        menuPanel.SetActive(true);
+    }
+    
+    public void BackToMenu()
+    {
+        if (settingsPanel.activeSelf)
+        {
+            CloseSettings();
+        }
+    }
+    
+    // UI ì”¬ì—ì„œ ì¼ì‹œì •ì§€ ê¸°ëŠ¥ì´ ì‘ë™í•˜ë„ë¡ public ë©”ì„œë“œ ì¶”ê°€
+    public void TogglePause()
+    {
+        if (isMenuOpen)
+        {
+            // ë©”ë‰´ ë‹«ê¸°
+            isMenuOpen = false;
+            if (menuAnimator != null) menuAnimator.Hide();
+            if (dim != null) dim.HideDim();
+            Time.timeScale = 1;
+            Debug.Log("[GameManager] ê²Œì„ ì¬ê°œ");
+        }
+        else
+        {
+            // ë©”ë‰´ ì—´ê¸°
+            isMenuOpen = true;
+            if (menuAnimator != null) menuAnimator.Show();
+            if (dim != null) dim.ShowDim();
+            Time.timeScale = 0;
+            Debug.Log("[GameManager] ê²Œì„ ì¼ì‹œì •ì§€");
+        }
+    }
+    
+    public void ForceResume()
+    {
+        isMenuOpen = false;
+        Time.timeScale = 1;
+        if (menuAnimator != null) menuAnimator.Hide();
+        if (dim != null) dim.HideDim();
+        Debug.Log("[GameManager] ê°•ì œ ê²Œì„ ì¬ê°œ");
+    }
+    
+    // UI ì»´í¬ë„ŒíŠ¸ë“¤ì„ ìë™ìœ¼ë¡œ ì°¾ì•„ì„œ í• ë‹¹í•˜ëŠ” ë©”ì„œë“œ
+    void AutoAssignUIComponents()
+    {
+        Debug.Log("[GameManager] UI ì»´í¬ë„ŒíŠ¸ ìë™ í• ë‹¹ ì‹œì‘");
+        
+        // menuAnimatorê°€ ì—†ìœ¼ë©´ menuPanelì—ì„œ ì°¾ê¸°
+        if (menuAnimator == null && menuPanel != null)
+        {
+            menuAnimator = menuPanel.GetComponent<UIAnimator>();
+            if (menuAnimator == null)
+            {
+                menuAnimator = menuPanel.AddComponent<UIAnimator>();
+                Debug.Log("[GameManager] menuPanelì— UIAnimator ì¶”ê°€");
+            }
+            else
+            {
+                Debug.Log("[GameManager] menuAnimator ìë™ í• ë‹¹ ì™„ë£Œ");
+            }
+        }
+        
+        // settingsAnimatorê°€ ì—†ìœ¼ë©´ settingsPanelì—ì„œ ì°¾ê¸°
+        if (settingsAnimator == null && settingsPanel != null)
+        {
+            settingsAnimator = settingsPanel.GetComponent<UIAnimator>();
+            if (settingsAnimator == null)
+            {
+                settingsAnimator = settingsPanel.AddComponent<UIAnimator>();
+                Debug.Log("[GameManager] settingsPanelì— UIAnimator ì¶”ê°€");
+            }
+            else
+            {
+                Debug.Log("[GameManager] settingsAnimator ìë™ í• ë‹¹ ì™„ë£Œ");
+            }
+        }
+        
+        // dimì´ ì—†ìœ¼ë©´ ì°¾ê¸°
+        if (dim == null)
+        {
+            dim = FindObjectOfType<UIDim>();
+            if (dim != null)
+            {
+                Debug.Log("[GameManager] UIDim ìë™ í• ë‹¹ ì™„ë£Œ");
+            }
+            else
+            {
+                Debug.LogWarning("[GameManager] UIDimì„ ì°¾ì„ ìˆ˜ ì—†ìŠµë‹ˆë‹¤!");
+            }
+        }
+        
+        // ëˆ„ë½ëœ UI ìš”ì†Œë“¤ í™•ì¸
+        CheckMissingUIComponents();
+    }
+    
+    void CheckMissingUIComponents()
+    {
+        if (menuPanel == null) Debug.LogError("[GameManager] menuPanelì´ í• ë‹¹ë˜ì§€ ì•Šì•˜ìŠµë‹ˆë‹¤!");
+        if (settingsPanel == null) Debug.LogError("[GameManager] settingsPanelì´ í• ë‹¹ë˜ì§€ ì•Šì•˜ìŠµë‹ˆë‹¤!");
+        if (menuAnimator == null) Debug.LogWarning("[GameManager] menuAnimatorê°€ ì—†ìŠµë‹ˆë‹¤!");
+        if (settingsAnimator == null) Debug.LogWarning("[GameManager] settingsAnimatorê°€ ì—†ìŠµë‹ˆë‹¤!");
+        if (dim == null) Debug.LogWarning("[GameManager] dimì´ ì—†ìŠµë‹ˆë‹¤!");
+        
+        Debug.Log($"[GameManager] ì¼ì‹œì •ì§€ ê¸°ëŠ¥ ì¤€ë¹„ ì™„ë£Œ: {(menuAnimator != null && dim != null ? "OK" : "ë¬¸ì œ ìˆìŒ")}");
+    }
 
-    // Inspector¿¡¼­ ¹öÆ° OnClick¿¡ Á÷Á¢ ¿¬°áÇÒ ÇÔ¼ö
+    // Inspectorï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Æ° OnClickï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ô¼ï¿½
     public void OpenPanel(int index)
     {
         for (int i = 0; i < settingPanels.Length; i++)

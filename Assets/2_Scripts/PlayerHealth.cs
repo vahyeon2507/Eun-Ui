@@ -58,43 +58,31 @@ public class PlayerHealth : MonoBehaviour, IDamageable
 
     // ===== IDamageable =====
     public void TakeDamage(int amount)
-    {
-        if (isInvulnerable) return;
+{
+    if (isInvulnerable) return;
 
-        Debug.Log($"[PlayerHealth] 피격! 체력: {currentHealth} -> {currentHealth - amount}");
+    // ✅ 히트 카메라 흔들림 (내장 + 시네머신 임펄스 둘 다 커버)
+    var shaker = GetComponent<PlayerHitShake>();
+    if (shaker == null) shaker = FindObjectOfType<PlayerHitShake>(); // 혹시 따로 붙어있다면
+    shaker?.Shake();   // (진짜 중요) 이 한 줄이 빠져있으면 절대 흔들리지 않음
 
-        currentHealth -= amount;
-        if (currentHealth < 0) currentHealth = 0;
+    Debug.Log($"[PlayerHealth] 피격! 체력: {currentHealth} -> {currentHealth - amount}");
 
-        // 빨간바: 빠르게 목표치로
-        if (redBar != null)
-        {
-            StartCoroutine(AnimateRedBar());
-        }
-        else
-        {
-            Debug.LogWarning("[PlayerHealth] RedBar가 설정되지 않았습니다!");
-        }
+    currentHealth -= amount;
+    if (currentHealth < 0) currentHealth = 0;
 
-        // 노란바: 지연 후 느리게 따라감
-        if (yellowBar != null)
-        {
-            StartCoroutine(UpdateYellowBar());
-        }
-        else
-        {
-            Debug.LogWarning("[PlayerHealth] YellowBar가 설정되지 않았습니다!");
-        }
+    // 빨간/노란 바 갱신 코루틴은 그대로…
+    if (redBar != null) StartCoroutine(AnimateRedBar());
+    if (yellowBar != null) StartCoroutine(UpdateYellowBar());
 
-        // 애니메이션, 연출, 무적
-        if (animator != null) animator.SetTrigger("Hurt");
-        StartCoroutine(HitFlash());
-        StartCoroutine(IFrameCoroutine());
+    if (animator != null) animator.SetTrigger("Hurt");
 
-        // 사망 체크
-        if (currentHealth <= 0)
-            Die();
-    }
+    // 깜빡이기 + iFrame
+    StartCoroutine(HitFlash());
+    StartCoroutine(IFrameCoroutine());
+
+    if (currentHealth <= 0) Die();
+}
 
     IEnumerator AnimateRedBar()
     {

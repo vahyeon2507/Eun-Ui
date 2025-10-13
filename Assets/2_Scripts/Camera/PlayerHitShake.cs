@@ -1,17 +1,23 @@
-using Unity.Cinemachine;
 using UnityEngine;
+
 public class PlayerHitShake : MonoBehaviour
 {
-    [SerializeField] CinemachineImpulseSource softSource;
+    [Header("Link to CameraSimple2D")]
+    public CameraSimple2D target;      // 메인 카메라에 붙은 CameraSimple2D
+    [Header("Defaults (fallback)")]
+    public float amplitude = 0.8f;
+    public float duration = 0.15f;
+    public float frequency = 22f;
 
-    public void Shake(float scale = 1f)
+    void Reset()
     {
-        if (!softSource) return;
+        if (!target) target = FindObjectOfType<CameraSimple2D>();
+    }
 
-        // v3: Default Velocity의 크기로 세기 결정
-        // 기본값을 (0, 1.2, 0)로 두고, 배율만 주고 싶으면 아래처럼:
-        softSource.GenerateImpulse();             // 가장 안전 (Default Velocity 사용)
-
-        // 더 세게 하고 싶으면 다른 소스(세기 큰 Default Velocity)를 따로 하나 더 두는 편이 깔끔.
+    public void Shake()
+    {
+        if (!target) target = FindObjectOfType<CameraSimple2D>();
+        if (target) target.Shake(amplitude, duration, frequency);
+        else Debug.LogWarning("[PlayerHitShake] CameraSimple2D not found.");
     }
 }

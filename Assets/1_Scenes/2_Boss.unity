@@ -8366,8 +8366,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   canvasCamera: {fileID: 519420031}
   redBar: {fileID: 1552790114}
-  yellowBar: {fileID: 0}
-  parryBar: {fileID: 0}
+  yellowBar: {fileID: 1922615056}
+  parryBar: {fileID: 1922615055}
 --- !u!1 &1801530095
 GameObject:
   m_ObjectHideFlags: 0
@@ -9040,6 +9040,39 @@ PrefabInstance:
       insertIndex: -1
       addedObject: {fileID: 1800400547}
   m_SourcePrefab: {fileID: 100100000, guid: 0c2c03cabea046043bf45791d4204d7f, type: 3}
+--- !u!114 &1922615054 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 3027979833422875396, guid: 0c2c03cabea046043bf45791d4204d7f, type: 3}
+  m_PrefabInstance: {fileID: 1922615053}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &1922615055 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 3226962960212719831, guid: 0c2c03cabea046043bf45791d4204d7f, type: 3}
+  m_PrefabInstance: {fileID: 1922615053}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &1922615056 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 8409442348480464663, guid: 0c2c03cabea046043bf45791d4204d7f, type: 3}
+  m_PrefabInstance: {fileID: 1922615053}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &1930701001
 GameObject:
   m_ObjectHideFlags: 0
@@ -9243,7 +9276,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   ImpulseDefinition:
-    ImpulseChannel: 1
+    ImpulseChannel: -1
     ImpulseShape: 2
     CustomImpulseShape:
       serializedVersion: 2
@@ -9295,7 +9328,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d16e5731d43d1a84e90f6a932fa9452c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  softSource: {fileID: 1946008987}
+  target: {fileID: 0}
+  amplitude: 0.8
+  duration: 0.15
+  frequency: 22
+--- !u!114 &1946008989 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 1407434714894907121, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
+  m_PrefabInstance: {fileID: 6104389184371960637}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1419401460}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7dfc66168e9649543af5b6c808321cff, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &1963879337
 GameObject:
   m_ObjectHideFlags: 0
@@ -10180,6 +10227,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 0}
     - target: {fileID: 1290639557195873711, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
+      propertyPath: healthComponent
+      value: 
+      objectReference: {fileID: 1946008989}
+    - target: {fileID: 1290639557195873711, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
       propertyPath: parrySpecialUseCircle
       value: 1
       objectReference: {fileID: 0}
@@ -10216,9 +10267,21 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 1478725031}
     - target: {fileID: 1407434714894907121, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
+      propertyPath: redBar
+      value: 
+      objectReference: {fileID: 1922615055}
+    - target: {fileID: 1407434714894907121, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
+      propertyPath: parryBar
+      value: 
+      objectReference: {fileID: 1922615054}
+    - target: {fileID: 1407434714894907121, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
       propertyPath: healthBar
       value: 
       objectReference: {fileID: 0}
+    - target: {fileID: 1407434714894907121, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
+      propertyPath: yellowBar
+      value: 
+      objectReference: {fileID: 1922615056}
     - target: {fileID: 1768041895077863587, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
       propertyPath: m_SpriteTilingProperty.oldSize.x
       value: 3.6666667

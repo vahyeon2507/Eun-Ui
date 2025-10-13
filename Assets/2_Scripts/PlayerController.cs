@@ -93,7 +93,7 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     public MonoBehaviour healthComponent; // optional
 
     [Header("Debug / UI")]
-    public bool showParryDebugUI = true;
+    public bool showParryDebugUI = true; // 인게임 OnGUI로 카운트/상태 표시
     public Vector2 parryDebugPosition = new Vector2(10, 10);
     public GUIStyle parryDebugStyle;
 
@@ -448,6 +448,7 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     // --------------------------------------------------------
     public bool ConsumeHitboxIfParrying(object hitInfo = null)
     {
+        // 디버그 로그 - 호출 및 현재 상태 확인
         Debug.Log($"[Player] ConsumeHitboxIfParrying called. isParrying={isParrying}, isInvulnerable={isInvulnerable}, hitInfo={hitInfo}");
 
         if (isInvulnerable) return true;
@@ -464,7 +465,6 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
             {
                 if (_recentlyConsumedHitIds.Contains(hitId))
                 {
-                    Debug.Log($"[Player] Hit already consumed (id={hitId})");
                     return true;
                 }
 
@@ -481,7 +481,6 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
             OnParryStreakChanged?.Invoke(parrySuccessCount);
 
             lastParrySuccessTime = Time.time;
-            Debug.Log($"[Player] Parry success #{parrySuccessCount}");
 
             // PlayerHealth의 패링바 업데이트(있으면)
             if (healthComponent != null)
@@ -524,13 +523,6 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
             if (consumed) return;
         }
 
-        // 화면/카메라 흔들림
-        GetComponent<PlayerHitShake>()?.Shake();
-
-        // 피격 사운드 즉시 재생
-        if (AudioManager.Instance != null)
-            AudioManager.Instance.PlaySFXInstant(AudioManager.Instance.playerHurtSFX);
-
         Debug.Log($"[Player] Took {amount} damage.");
         if (healthComponent != null)
         {
@@ -547,7 +539,6 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     IEnumerator TriggerParrySpecial()
     {
         parrySpecialLocked = true;
-        Debug.Log("[Player] ParrySpecial triggered!");
         if (animator != null) animator.SetTrigger(animParrySpecialTrigger);
 
         // 스페셜 타격은 애니메이션 이벤트(OnParrySpecialHit)에서 처리

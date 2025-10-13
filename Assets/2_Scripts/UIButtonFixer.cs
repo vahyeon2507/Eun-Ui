@@ -335,5 +335,6 @@ public class UIButtonFixer : MonoBehaviour
         {
             Debug.LogWarning($"[UI수정] '{buttonName}' 버튼을 찾을 수 없습니다.");
         }
+        
     }
 }

@@ -14,35 +14,36 @@ public class GameManager : MonoBehaviour
 
     [Header("설정 메뉴 UI")]
     [SerializeField] private GameObject settingsPanel;
-    [SerializeField] private GameObject[] settingPanels;   // 그래픽, 오디오, 조작, 키 설정 등 패널들
+    [SerializeField] private GameObject[] settingPanels; // 그래픽/오디오/키설정 등 각 패널
 
-    [Header("UI 애니메이션 컴포넌트")]
+    [Header("UI 애니메이션 컴포넌트(선택)")]
     [SerializeField] private UIAnimator menuAnimator;
     [SerializeField] private UIAnimator settingsAnimator;
     [SerializeField] private UIDim dim;
 
     [Header("설정 UI 요소")]
-    [SerializeField] private Slider soundSlider;
-    [SerializeField] private Slider musicSlider;
-    [SerializeField] private Slider sfxSlider;
+    [SerializeField] private Slider soundSlider;      // 마스터
+    [SerializeField] private Slider musicSlider;      // BGM (저장만, 실제 적용은 프로젝트별 오디오매니저가 처리)
+    [SerializeField] private Slider sfxSlider;        // SFX (저장만)
     [SerializeField] private TMP_Dropdown resolutionDropdown;
     [SerializeField] private Toggle fullscreenToggle;
 
     private bool isMenuOpen = false;
 
-    private readonly Vector2Int[] resolutions =
+    // 지원 해상도 목록
+    private readonly Vector2Int[] resolutions = new Vector2Int[]
     {
         new Vector2Int(1920, 1080),
         new Vector2Int(1600, 900),
-        new Vector2Int(1280, 720)
+        new Vector2Int(1280, 720),
     };
 
-    // 설정 저장 키
-    private const string SOUND_VOLUME_KEY      = "SoundVolume";
-    private const string MUSIC_VOLUME_KEY      = "MusicVolume";
-    private const string SFX_VOLUME_KEY        = "SFXVolume";
-    private const string RESOLUTION_INDEX_KEY  = "ResolutionIndex";
-    private const string FULLSCREEN_KEY        = "Fullscreen";
+    // PlayerPrefs 키
+    private const string SOUND_VOLUME_KEY = "SoundVolume";
+    private const string MUSIC_VOLUME_KEY = "MusicVolume";
+    private const string SFX_VOLUME_KEY = "SFXVolume";
+    private const string RESOLUTION_INDEX_KEY = "ResolutionIndex";
+    private const string FULLSCREEN_KEY = "Fullscreen";
 
     void Start()
     {
@@ -50,211 +51,178 @@ public class GameManager : MonoBehaviour
         SetupButtonListeners();
         InitializeSettings();
         LoadSettings();
-
-        if (menuPanel)     menuPanel.SetActive(false);
-        if (settingsPanel) settingsPanel.SetActive(false);
     }
 
-    #region Init & Wiring
+    // ---------- 초기화 ----------
     void InitializeUI()
     {
-        // 누락 경고
-        if (!menuPanel)       Debug.LogError("[GameManager] menuPanel이 할당되지 않았습니다!");
-        if (!settingsPanel)   Debug.LogError("[GameManager] settingsPanel이 할당되지 않았습니다!");
-        if (!menuAnimator)    Debug.LogWarning("[GameManager] menuAnimator가 비어있습니다. 자동 연결을 시도합니다.");
-        if (!settingsAnimator)Debug.LogWarning("[GameManager] settingsAnimator가 비어있습니다. 자동 연결을 시도합니다.");
-        if (!dim)             Debug.LogWarning("[GameManager] dim이 비어있습니다. 자동 연결을 시도합니다.");
+        if (menuPanel == null) Debug.LogError("[GameManager] menuPanel 미할당");
+        if (settingsPanel == null) Debug.LogError("[GameManager] settingsPanel 미할당");
 
-        AutoAssignUIComponents();
+        // 시작 상태는 모두 닫힘
+        if (menuPanel) menuPanel.SetActive(false);
+        if (settingsPanel) settingsPanel.SetActive(false);
     }
 
     void SetupButtonListeners()
     {
-        if (restartButton)      restartButton.onClick.AddListener(OnRestart);
-        else Debug.LogError("[GameManager] restartButton이 할당되지 않았습니다!");
+        if (restartButton) restartButton.onClick.AddListener(OnRestart);
+        else Debug.LogWarning("[GameManager] restartButton 미할당");
 
-        if (continueButton)     continueButton.onClick.AddListener(OnContinue);
-        else Debug.LogError("[GameManager] continueButton이 할당되지 않았습니다!");
+        if (continueButton) continueButton.onClick.AddListener(OnContinue);
+        else Debug.LogWarning("[GameManager] continueButton 미할당");
 
-        if (quitButton)         quitButton.onClick.AddListener(OnQuit);
-        else Debug.LogError("[GameManager] quitButton이 할당되지 않았습니다!");
+        if (quitButton) quitButton.onClick.AddListener(OnQuit);
+        else Debug.LogWarning("[GameManager] quitButton 미할당");
 
-        if (settingsButton)     settingsButton.onClick.AddListener(OpenSettings);
-        else Debug.LogError("[GameManager] settingsButton이 할당되지 않았습니다!");
+        if (settingsButton) settingsButton.onClick.AddListener(OpenSettings);
+        else Debug.LogWarning("[GameManager] settingsButton 미할당");
 
-        if (soundSlider)        soundSlider.onValueChanged.AddListener(OnSoundChanged);
-        else Debug.LogError("[GameManager] soundSlider가 할당되지 않았습니다!");
+        if (soundSlider) soundSlider.onValueChanged.AddListener(OnSoundChanged);
+        else Debug.LogWarning("[GameManager] soundSlider 미할당");
 
-        if (musicSlider)        musicSlider.onValueChanged.AddListener(OnMusicChanged);
-        else Debug.LogError("[GameManager] musicSlider가 할당되지 않았습니다!");
+        if (musicSlider) musicSlider.onValueChanged.AddListener(OnMusicChanged);
+        else Debug.LogWarning("[GameManager] musicSlider 미할당");
 
-        if (sfxSlider)          sfxSlider.onValueChanged.AddListener(OnSFXChanged);
-        else Debug.LogError("[GameManager] sfxSlider가 할당되지 않았습니다!");
+        if (sfxSlider) sfxSlider.onValueChanged.AddListener(OnSFXChanged);
+        else Debug.LogWarning("[GameManager] sfxSlider 미할당");
 
         if (resolutionDropdown) resolutionDropdown.onValueChanged.AddListener(OnResolutionChanged);
-        else Debug.LogError("[GameManager] resolutionDropdown이 할당되지 않았습니다!");
+        else Debug.LogWarning("[GameManager] resolutionDropdown 미할당");
 
-        if (fullscreenToggle)   fullscreenToggle.onValueChanged.AddListener(OnFullscreenChanged);
-        else Debug.LogError("[GameManager] fullscreenToggle이 할당되지 않았습니다!");
+        if (fullscreenToggle) fullscreenToggle.onValueChanged.AddListener(OnFullscreenChanged);
+        else Debug.LogWarning("[GameManager] fullscreenToggle 미할당");
     }
 
     void InitializeSettings()
     {
-        // 해상도 옵션
+        // 해상도 드롭다운 채우기
         if (resolutionDropdown)
         {
             resolutionDropdown.ClearOptions();
             var options = new System.Collections.Generic.List<string>
             {
-                "1920x1080", "1600x900", "1280x720"
+                "1920x1080",
+                "1600x900",
+                "1280x720"
             };
             resolutionDropdown.AddOptions(options);
         }
 
         // 기본값
-        if (soundSlider)     soundSlider.value = 1f;
-        if (musicSlider)     musicSlider.value = 0.7f;
-        if (sfxSlider)       sfxSlider.value = 1f;
-        if (fullscreenToggle) fullscreenToggle.isOn = Screen.fullScreen;
-        AudioListener.volume = 1f;
+        if (soundSlider) soundSlider.value = 1f;
+        if (musicSlider) musicSlider.value = 0.7f;
+        if (sfxSlider) sfxSlider.value = 1f;
 
-        // 기본 패널
+        if (fullscreenToggle) fullscreenToggle.isOn = Screen.fullScreen;
+
+        // 첫 설정 탭
         if (settingPanels != null && settingPanels.Length > 0)
             OpenPanel(0);
+
+        // 기본 마스터 볼륨(폴백)
+        AudioListener.volume = soundSlider ? soundSlider.value : 1f;
     }
 
     void LoadSettings()
     {
         if (soundSlider)
         {
-            float v = PlayerPrefs.GetFloat(SOUND_VOLUME_KEY, 1f);
+            float v = PlayerPrefs.GetFloat(SOUND_VOLUME_KEY, soundSlider.value);
             soundSlider.value = v;
             AudioListener.volume = v; // 폴백
-            if (AudioManager.Instance != null) AudioManager.Instance.SetMasterVolume(v);
         }
 
         if (musicSlider)
-        {
-            float v = PlayerPrefs.GetFloat(MUSIC_VOLUME_KEY, 0.7f);
-            musicSlider.value = v;
-            if (AudioManager.Instance != null) AudioManager.Instance.SetMusicVolume(v);
-        }
+            musicSlider.value = PlayerPrefs.GetFloat(MUSIC_VOLUME_KEY, musicSlider.value);
 
         if (sfxSlider)
+            sfxSlider.value = PlayerPrefs.GetFloat(SFX_VOLUME_KEY, sfxSlider.value);
+
+        if (fullscreenToggle)
         {
-            float v = PlayerPrefs.GetFloat(SFX_VOLUME_KEY, 1f);
-            sfxSlider.value = v;
-            if (AudioManager.Instance != null) AudioManager.Instance.SetSFXVolume(v);
+            bool fs = PlayerPrefs.GetInt(FULLSCREEN_KEY, Screen.fullScreen ? 1 : 0) == 1;
+            fullscreenToggle.isOn = fs;
+            Screen.fullScreen = fs;
         }
 
         if (resolutionDropdown)
         {
             int idx = PlayerPrefs.GetInt(RESOLUTION_INDEX_KEY, 0);
-            if (idx >= 0 && idx < resolutions.Length)
-            {
-                resolutionDropdown.value = idx;
-                ApplyResolution(idx);
-            }
-        }
-
-        if (fullscreenToggle)
-        {
-            bool fs = PlayerPrefs.GetInt(FULLSCREEN_KEY, 1) == 1;
-            fullscreenToggle.isOn = fs;
-            Screen.fullScreen = fs;
+            idx = Mathf.Clamp(idx, 0, resolutions.Length - 1);
+            resolutionDropdown.value = idx;
+            ApplyResolution(idx);
         }
     }
-    #endregion
 
+    // ---------- 루프 ----------
     void Update()
     {
-        HandleEscapeKeyInput();
-    }
-
-    #region Menu Flow
-    void HandleEscapeKeyInput()
-    {
-        if (!Input.GetKeyDown(KeyCode.Escape)) return;
-
-        if (settingsPanel && settingsPanel.activeSelf)
+        if (Input.GetKeyDown(KeyCode.Escape))
         {
-            CloseSettings();
-        }
-        else if (isMenuOpen)
-        {
-            CloseMenu();
-        }
-        else
-        {
-            OpenMenu();
+            if (settingsPanel != null && settingsPanel.activeSelf)
+            {
+                CloseSettings();
+            }
+            else if (isMenuOpen)
+            {
+                CloseMenu();
+            }
+            else
+            {
+                OpenMenu();
+            }
         }
     }
 
+    // ---------- 메뉴 / 설정 ----------
     void OpenMenu()
     {
         isMenuOpen = true;
-        if (menuPanel) menuPanel.SetActive(true);
-        menuAnimator?.Show();
-        dim?.ShowDim();
-        Time.timeScale = 0;
+        if (menuAnimator) menuAnimator.Show(); else if (menuPanel) menuPanel.SetActive(true);
+        if (dim) dim.ShowDim();
+        Time.timeScale = 0f;
     }
 
     void CloseMenu()
     {
         isMenuOpen = false;
-        menuAnimator?.Hide();
-        dim?.HideDim();
-        if (menuPanel) menuPanel.SetActive(false);
-        Time.timeScale = 1;
+        if (menuAnimator) menuAnimator.Hide(); else if (menuPanel) menuPanel.SetActive(false);
+        if (dim) dim.HideDim();
+        Time.timeScale = 1f;
     }
 
     void OpenSettings()
     {
-        if (menuPanel)     menuPanel.SetActive(false);
-        if (settingsPanel) settingsPanel.SetActive(true);
-        settingsAnimator?.Show();
+        if (settingsAnimator) settingsAnimator.Show(); else if (settingsPanel) settingsPanel.SetActive(true);
+        if (menuAnimator) menuAnimator.Hide(); else if (menuPanel) menuPanel.SetActive(false);
     }
 
     void CloseSettings()
     {
-        settingsAnimator?.Hide();
-        if (settingsPanel) settingsPanel.SetActive(false);
-        if (menuPanel)     menuPanel.SetActive(true);
+        if (settingsAnimator) settingsAnimator.Hide(); else if (settingsPanel) settingsPanel.SetActive(false);
+        if (menuAnimator) menuAnimator.Show(); else if (menuPanel) menuPanel.SetActive(true);
     }
-    #endregion
 
-    #region Buttons
+    // ---------- 버튼 핸들러 ----------
     void OnRestart()
     {
-        if (AudioManager.Instance != null) AudioManager.Instance.PlayButtonClick();
-
-        Time.timeScale = 1;
-        try
-        {
-            SceneManager.LoadScene(SceneManager.GetActiveScene().name);
-        }
-        catch (System.Exception e)
-        {
-            Debug.LogError($"[GameManager] 씬 재시작 실패: {e.Message}");
-        }
+        Time.timeScale = 1f;
+        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
 
-    void OnContinue()
-    {
-        CloseMenu();
-    }
+    void OnContinue() => CloseMenu();
 
     void OnQuit()
     {
-        try { Application.Quit(); }
-        catch (System.Exception e)
-        {
-            Debug.LogError($"[GameManager] 게임 종료 실패: {e.Message}");
-        }
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+#else
+        Application.Quit();
+#endif
     }
-    #endregion
 
-    #region Public helpers (UI에서 직접 호출용)
+    // ---------- 설정 로직 ----------
     public void OpenPanel(int index)
     {
         if (settingPanels == null || index < 0 || index >= settingPanels.Length)
@@ -267,27 +235,9 @@ public class GameManager : MonoBehaviour
             if (settingPanels[i]) settingPanels[i].SetActive(i == index);
     }
 
-    public void TogglePause()
-    {
-        if (isMenuOpen) OnContinue();
-        else OpenMenu();
-    }
-
-    public void ForceResume()
-    {
-        isMenuOpen = false;
-        Time.timeScale = 1;
-        menuAnimator?.Hide();
-        dim?.HideDim();
-        if (menuPanel) menuPanel.SetActive(false);
-    }
-    #endregion
-
-    #region Settings callbacks
     void OnSoundChanged(float value)
     {
-        // AudioManager 우선, 없으면 폴백 + 저장
-        if (AudioManager.Instance != null) AudioManager.Instance.SetMasterVolume(value);
+        // 폴백: 프로젝트 전역 오디오 매니저가 없어도 마스터 볼륨을 AudioListener로 반영
         AudioListener.volume = value;
         PlayerPrefs.SetFloat(SOUND_VOLUME_KEY, value);
         PlayerPrefs.Save();
@@ -295,14 +245,14 @@ public class GameManager : MonoBehaviour
 
     void OnMusicChanged(float value)
     {
-        if (AudioManager.Instance != null) AudioManager.Instance.SetMusicVolume(value);
+        // 값만 저장 (실제 적용은 프로젝트 오디오 매니저에서 읽어 사용)
         PlayerPrefs.SetFloat(MUSIC_VOLUME_KEY, value);
         PlayerPrefs.Save();
     }
 
     void OnSFXChanged(float value)
     {
-        if (AudioManager.Instance != null) AudioManager.Instance.SetSFXVolume(value);
+        // 값만 저장
         PlayerPrefs.SetFloat(SFX_VOLUME_KEY, value);
         PlayerPrefs.Save();
     }
@@ -316,50 +266,42 @@ public class GameManager : MonoBehaviour
 
     void OnResolutionChanged(int index)
     {
-        if (index >= 0 && index < resolutions.Length)
-        {
-            ApplyResolution(index);
-            PlayerPrefs.SetInt(RESOLUTION_INDEX_KEY, index);
-            PlayerPrefs.Save();
-        }
+        if (index < 0 || index >= resolutions.Length) return;
+        ApplyResolution(index);
+        PlayerPrefs.SetInt(RESOLUTION_INDEX_KEY, index);
+        PlayerPrefs.Save();
     }
 
     void ApplyResolution(int index)
     {
-        try
-        {
-            var res = resolutions[index];
-            Screen.SetResolution(res.x, res.y, Screen.fullScreen);
-        }
-        catch (System.Exception e)
-        {
-            Debug.LogError($"[GameManager] 해상도 변경 실패: {e.Message}");
-        }
+        var r = resolutions[index];
+        Screen.SetResolution(r.x, r.y, Screen.fullScreen);
     }
-    #endregion
 
-    #region Auto wiring
-    void AutoAssignUIComponents()
+    // ---------- 외부에서 호출 가능 ----------
+    public void TogglePause()
     {
-        // menuAnimator
-        if (!menuAnimator && menuPanel)
-        {
-            menuAnimator = menuPanel.GetComponent<UIAnimator>();
-            if (!menuAnimator) menuAnimator = menuPanel.AddComponent<UIAnimator>();
-        }
-
-        // settingsAnimator
-        if (!settingsAnimator && settingsPanel)
-        {
-            settingsAnimator = settingsPanel.GetComponent<UIAnimator>();
-            if (!settingsAnimator) settingsAnimator = settingsPanel.AddComponent<UIAnimator>();
-        }
-
-        if (!dim)
-        {
-            dim = FindObjectOfType<UIDim>();
-            if (!dim) Debug.LogWarning("[GameManager] UIDim을 찾지 못했습니다.");
-        }
+        if (isMenuOpen) CloseMenu();
+        else OpenMenu();
     }
-    #endregion
+
+    public void ForceResume()
+    {
+        isMenuOpen = false;
+        Time.timeScale = 1f;
+        if (menuAnimator) menuAnimator.Hide(); else if (menuPanel) menuPanel.SetActive(false);
+        if (dim) dim.HideDim();
+    }
+    // === Compatibility helpers for old UI scripts ===
+    public void BackToMenu()
+    {
+        // 예전 UI에서 호출하던 이름: 설정 화면 -> 메뉴로
+        CloseSettings();
+    }
+
+    public void OpenGameplayTab()  // 만약 UIButtonFixer에서 OpenPanel(3) 같은 하드코드 대신 이걸 쓰고 싶다면
+    {
+        OpenPanel(3);
+    }
+
 }

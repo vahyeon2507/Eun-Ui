@@ -6650,7 +6650,10 @@ MonoBehaviour:
   settingsAnimator: {fileID: 773021375}
   dim: {fileID: 667382411}
   soundSlider: {fileID: 2062145616}
+  musicSlider: {fileID: 0}
+  sfxSlider: {fileID: 0}
   resolutionDropdown: {fileID: 1307246636}
+  fullscreenToggle: {fileID: 0}
 --- !u!4 &1289007023
 Transform:
   m_ObjectHideFlags: 0
@@ -9328,7 +9331,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d16e5731d43d1a84e90f6a932fa9452c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  target: {fileID: 0}
+  target: {fileID: 519420035}
   amplitude: 0.8
   duration: 0.15
   frequency: 22

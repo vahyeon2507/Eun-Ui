@@ -153,6 +153,8 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         if (col != null) col.enabled = false;
         if (rb != null) rb.simulated = false;
 
+        GameOverController.TryBeginFrom(gameObject);
+
         Destroy(gameObject, 1f);
     }
 

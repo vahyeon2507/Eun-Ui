@@ -22,8 +22,21 @@ public class PlayerFxHooks : MonoBehaviour
         var p = RandomPointInCollider(col);   // 내부 유틸로 콜라이더 안 랜덤 좌표
         PlayFxAtWorld(fxId, p);               // 기존 규칙(미러/정렬/SFX/파괴) 그대로 적용
     }
+    [Header("Attack FX")]
+    [Tooltip("기본 공격에 사용할 FX id (PlayerFxHooks.fxList의 id)")]
+    public string hitFxId = "HitSpark";
+
+    // --- Special 전용 FX (신규) ---
+    [Tooltip("패링 스페셜 전용 FX id (PlayerFxHooks.fxList의 id)")]
+    public string parrySpecialFxId = "ParryBurst";
+
+    // 스페셜 중복방지(스윙 1회당 1번만 FX) 가드
+    bool _attackHitFiredThisSwing = false;
+    bool _fxSpawnedThisSwing = false;
 
     /// <summary>히트박스 배열 중 활성 콜라이더 하나를 랜덤 픽</summary>
+    /// 
+
     Collider2D PickRandomActive(Collider2D[] group)
     {
         _tmpCols.Clear();
@@ -106,24 +119,23 @@ public class PlayerFxHooks : MonoBehaviour
         if (!_fxMap.TryGetValue(fxId, out var def) || !def || !def.prefab) return;
 
         float sign = (transform.localScale.x >= 0f) ? 1f : -1f;
-        var go = Instantiate(def.prefab, worldPos, def.followRotation ? Quaternion.identity : Quaternion.identity);
 
-        // Attach가 아니므로 부모 미러링 없음 → 자체 미러만 1회 적용
+        // 생성
+        var go = Instantiate(def.prefab, worldPos, Quaternion.identity);
+
+        // 부모에 붙이지 않는 단발 스폰이므로 parentWillMirror: false
         ApplyMirrorOnce(go, def, sign, parentWillMirror: false);
 
         // 정렬
         if (!string.IsNullOrEmpty(def.sortingLayerOverride))
             foreach (var sr in go.GetComponentsInChildren<SpriteRenderer>(true))
-            {
-                sr.sortingLayerName = def.sortingLayerOverride;
-                sr.sortingOrder = def.orderInLayerOverride;
-            }
+            { sr.sortingLayerName = def.sortingLayerOverride; sr.sortingOrder = def.orderInLayerOverride; }
 
         // SFX
         if (def.sfx)
         {
             if (audioSource) audioSource.PlayOneShot(def.sfx, def.sfxVolume);
-            else AudioSource.PlayClipAtPoint(def.sfx, go.transform.position, def.sfxVolume);
+            else AudioSource.PlayClipAtPoint(def.sfx, worldPos, def.sfxVolume);
         }
 
         if (def.autoDestroy > 0f) Destroy(go, def.autoDestroy);

@@ -15,6 +15,23 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
 {
     [HideInInspector] public bool ExternalRangedOverride;
 
+    // === Attack FX (맞췄을 때) ===
+    [Header("Attack FX")]
+    [Tooltip("기본 공격에 사용할 FX id (PlayerFxHooks.fxList의 id)")]
+    public string hitFxId = "AttackSpark";
+
+    [Tooltip("패링 스페셜 전용 FX id (PlayerFxHooks.fxList의 id)")]
+    public string parrySpecialFxId = "ParryBurst";
+
+    // === 일반 패링 성공 피드백(스페셜 전 아님) ===
+    [Header("Parry Success (non-special)")]
+    [Tooltip("일반 패링 성공 시 재생할 애니메이션 트리거명 (4번째=스페셜 때는 재생 안 됨)")]
+    public string animParrySuccessTrigger = "ParrySuccess";
+    [Tooltip("일반 패링 성공 시 뿌릴 FX id (PlayerFxHooks.fxList의 id)")]
+    public string parrySuccessFxId = "ParrySpark";
+    [Tooltip("일반 패링 성공 FX를 뿌릴 전용 범위(플레이어 자식, isTrigger 권장)")]
+    public Collider2D[] parrySuccessFxAreas;
+
     // === 자식 히트박스 그룹 ===
     [Header("Hitboxes (children driven)")]
     [Tooltip("Attack1에 쓸 자식 Collider2D들 (isTrigger 권장)")]
@@ -30,6 +47,16 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     // (호환) 탈리스만/원거리용 앵커
     [Header("Ability Anchor (for ranged/talisman)")]
     public Transform attackPoint;  // 없으면 transform 사용
+
+    // 스윙/패링 중복 방지 플래그
+    bool _attackHitFiredThisSwing = false;
+    bool _fxSpawnedThisSwing = false;
+    bool _specialHitFiredThisSwing = false;
+    bool _specialFxSpawnedThisSwing = false;
+
+    // 일반 패링 성공 피드백 중복 억제
+    float _lastParryFeedbackTime = -999f;
+    const float _parryFeedbackMinInterval = 0.04f;
 
     // IParryStreakProvider
     public int CurrentParryStreak => parrySuccessCount;
@@ -135,6 +162,20 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     public bool IsDashing => isDashing;
     public bool IsParrying => isParrying;
 
+    // 로컬 헬퍼(폴백용): 콜라이더 내부 임의 포인트
+    Vector3 RandomPointInsideCollider(Collider2D hb)
+    {
+        var b = hb.bounds;
+        for (int i = 0; i < 8; i++)
+        {
+            float x = UnityEngine.Random.Range(b.min.x, b.max.x);
+            float y = UnityEngine.Random.Range(b.min.y, b.max.y);
+            var p = new Vector2(x, y);
+            if (hb.OverlapPoint(p)) return p;
+        }
+        return hb.ClosestPoint(transform.position);
+    }
+
     void Start()
     {
         rb = GetComponent<Rigidbody2D>();
@@ -182,7 +223,6 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
         {
             if (canDash && !isDashing && !isParrying && !isAttacking && attackLockTimer <= 0f)
             {
-                // 대시 사운드 즉시 재생
                 if (AudioManager.Instance != null)
                     AudioManager.Instance.PlaySFXInstant(AudioManager.Instance.playerDashSFX);
                 StartCoroutine(DoDash());
@@ -194,7 +234,6 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
         {
             if (canParry && !isParrying && !isDashing && attackLockTimer <= 0f)
             {
-                // 패링 사운드 즉시 재생
                 if (AudioManager.Instance != null)
                     AudioManager.Instance.PlaySFXInstant(AudioManager.Instance.playerParrySFX);
                 StartCoroutine(DoParry());
@@ -210,7 +249,6 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
 
             if (grounded && !isDashing && !isParrying)
             {
-                // 점프 사운드 즉시 재생
                 if (AudioManager.Instance != null)
                     AudioManager.Instance.PlaySFXInstant(AudioManager.Instance.playerJumpSFX);
 
@@ -294,6 +332,9 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
         if (attackStep < 1 || attackStep > maxCombo) return;
         if (isDashing || isParrying) return;
 
+        _attackHitFiredThisSwing = false;
+        _fxSpawnedThisSwing = false;
+
         isAttacking = true;
         comboIndex = attackStep;
         queuedNext = false;
@@ -301,18 +342,13 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
         int idx = Mathf.Clamp(comboIndex - 1, 0, comboLockDurations.Length - 1);
         attackLockTimer = comboLockDurations[idx];
 
-        // 공격 사운드 즉시 재생 (애니 이벤트보다 먼저)
+        // 공격 사운드 즉시 재생
         if (AudioManager.Instance != null)
         {
             if (AudioManager.Instance.playerAttackSFX != null)
-            {
                 AudioManager.Instance.PlaySFXInstant(AudioManager.Instance.playerAttackSFX);
-            }
             else
-            {
-                // 폴백
-                AudioManager.Instance.PlayPlayerAttack();
-            }
+                AudioManager.Instance.PlayPlayerAttack(); // 폴백
         }
 
         if (animator != null)
@@ -329,6 +365,10 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     // 애니메이션 이벤트에서 한 프레임 히트할 때 호출
     public void OnAttackHit()
     {
+        // 애니메이션 이벤트가 여러 번 찍혀 있어도 스윙당 1번만 처리
+        if (_attackHitFiredThisSwing) return;
+        _attackHitFiredThisSwing = true;
+
         if (comboIndex <= 0 || comboIndex > maxCombo) return;
 
         int dmg = (comboDamages != null && comboDamages.Length >= comboIndex)
@@ -341,16 +381,21 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
             case 2: group = hitboxesAttack2; break;
             case 3: group = hitboxesAttack3; break;
         }
-        if (group == null || group.Length == 0) { Debug.LogWarning($"[Player] Attack{comboIndex} hitboxes not assigned."); return; }
-
-        // ① 대미지 적용 + ② 실제 맞은 콜라이더에만 이펙트
-        //    (여러 적을 동시에 치면 각 적마다 1번씩 FX)
-        var spawnedOn = new HashSet<Transform>();
-        ApplyHitboxGroup(group, enemyLayer, dmg, (col) =>
+        if (group == null || group.Length == 0)
         {
-            var root = col.attachedRigidbody ? col.attachedRigidbody.transform : col.transform.root;
-            if (spawnedOn.Add(root))
-                fx?.PlayFxOnCollider("AttackSpark", col);
+            Debug.LogWarning($"[Player] Attack{comboIndex} hitboxes not assigned.");
+            return;
+        }
+
+        // 실제 맞은 적에게 데미지 주고, FX는 "플레이어 히트박스 내부"에서 딱 1번만 스폰
+        ApplyHitboxGroupWithSource(group, enemyLayer, dmg, (hitTarget, sourceHb) =>
+        {
+            if (!_fxSpawnedThisSwing)
+            {
+                _fxSpawnedThisSwing = true;
+                if (fx != null && !string.IsNullOrEmpty(hitFxId))
+                    fx.PlayFxOnCollider(hitFxId, sourceHb);  // ← 히트박스 내부에서 스폰
+            }
         });
     }
 
@@ -367,6 +412,8 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
         isAttacking = false;
         queuedNext = false;
         attackLockTimer = 0f;
+        _attackHitFiredThisSwing = false;
+        _fxSpawnedThisSwing = false;
     }
 
     // --------------------------------------------------------
@@ -380,7 +427,6 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
         isDashing = true;
         if (animator != null)
         {
-            // 안전한 트리거 확인 후 설정
             foreach (var param in animator.parameters)
             {
                 if (param.name == animDashTrigger && param.type == AnimatorControllerParameterType.Trigger)
@@ -451,9 +497,6 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     // --------------------------------------------------------
     public bool ConsumeHitboxIfParrying(object hitInfo = null)
     {
-        // 디버그 로그 - 호출 및 현재 상태 확인
-        Debug.Log($"[Player] ConsumeHitboxIfParrying called. isParrying={isParrying}, isInvulnerable={isInvulnerable}, hitInfo={hitInfo}");
-
         if (isInvulnerable) return true;
 
         if (isParrying)
@@ -463,14 +506,9 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
             else if (hitInfo is GameObject go) hitId = go.GetInstanceID();
             else if (hitInfo is int i) hitId = i;
 
-            // 중복 소비 방지
             if (hitId != 0)
             {
-                if (_recentlyConsumedHitIds.Contains(hitId))
-                {
-                    return true;
-                }
-
+                if (_recentlyConsumedHitIds.Contains(hitId)) return true;
                 _recentlyConsumedHitIds.Add(hitId);
                 StartCoroutine(ClearConsumedHitAfter(hitId, _recentlyConsumedClearDelay));
             }
@@ -479,32 +517,53 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
                 if (Time.time - lastParrySuccessTime < 0.06f) return true;
             }
 
-            // 성공 처리
+            // 패링 성공 카운트/이벤트
             parrySuccessCount++;
             OnParryStreakChanged?.Invoke(parrySuccessCount);
-
             lastParrySuccessTime = Time.time;
 
-            // PlayerHealth의 패링바 업데이트(있으면)
-            if (healthComponent != null)
+            // === 1~3번째: 일반 패링 성공 피드백(애니+전용 FX) ===
+            if (parrySuccessCount < parrySuccessNeeded)
             {
-                var addParryMethod = healthComponent.GetType().GetMethod("AddParryCount");
-                if (addParryMethod != null) addParryMethod.Invoke(healthComponent, null);
+                if (Time.time - _lastParryFeedbackTime > _parryFeedbackMinInterval)
+                {
+                    _lastParryFeedbackTime = Time.time;
+
+                    // 애니메이션
+                    if (animator != null && !string.IsNullOrEmpty(animParrySuccessTrigger))
+                        animator.SetTrigger(animParrySuccessTrigger);
+
+                    // FX (전용 범위 콜라이더 내부에서 스폰)
+                    if (fx != null && !string.IsNullOrEmpty(parrySuccessFxId))
+                    {
+                        var area = GetFirstEnabledCollider(parrySuccessFxAreas);
+                        if (area != null) fx.PlayFxOnCollider(parrySuccessFxId, area);
+                        else fx.PlayFx(parrySuccessFxId, null, transform); // 폴백
+                    }
+                }
             }
-
-            // 잠깐 무적
-            StartCoroutine(TemporaryInvul(0.06f));
-
-            // 스페셜 조건 달성
-            if (!parrySpecialLocked && parrySuccessCount >= parrySuccessNeeded)
+            // === 4번째: 스페셜 발동(일반 패링 피드백 금지) ===
+            else if (!parrySpecialLocked && parrySuccessCount >= parrySuccessNeeded)
             {
                 StartCoroutine(TriggerParrySpecial());
             }
 
+            // 잠깐 무적
+            StartCoroutine(TemporaryInvul(0.06f));
             return true;
         }
 
         return false;
+    }
+
+    Collider2D GetFirstEnabledCollider(Collider2D[] arr)
+    {
+        if (arr == null) return null;
+        for (int i = 0; i < arr.Length; i++)
+        {
+            if (arr[i] && arr[i].enabled) return arr[i];
+        }
+        return null;
     }
 
     IEnumerator ClearConsumedHitAfter(int hitId, float delay)
@@ -541,6 +600,9 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     // --------------------------------------------------------
     IEnumerator TriggerParrySpecial()
     {
+        _specialHitFiredThisSwing = false;
+        _specialFxSpawnedThisSwing = false;
+
         parrySpecialLocked = true;
         if (animator != null) animator.SetTrigger(animParrySpecialTrigger);
 
@@ -559,7 +621,9 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     // 애니메이션 이벤트로 1틱(프레임) 스페셜 히트
     public void OnParrySpecialHit()
     {
-        Debug.Log("[PS] OnParrySpecialHit fired");
+        // 스윙당 중복 방지
+        if (_specialHitFiredThisSwing) return;
+        _specialHitFiredThisSwing = true;
 
         // UI2 쪽 로직 유지: PlayerHealth 강화 공격 사용 시도
         if (healthComponent != null)
@@ -569,7 +633,6 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
                 useEnhancedMethod.Invoke(healthComponent, null);
         }
 
-        // 사용할 레이어 마스크 결정
         var mask = (parrySpecialEnemyMaskOverride.value != 0) ? parrySpecialEnemyMaskOverride : enemyLayer;
 
         if (hitboxesParrySpecial == null || hitboxesParrySpecial.Length == 0)
@@ -578,21 +641,59 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
             return;
         }
 
-        ApplyHitboxGroup(
+        // 스페셜: 히트박스 내부에서 FX 1회만 생성 + 대상별 그로기 신호 유지
+        ApplyHitboxGroupWithSource(
             hitboxesParrySpecial,
             mask,
-            damage: 3,    // 필요 시 프로젝트 규칙에 맞게 조정
-            onTouch: (col) =>
+            damage: 3,
+            onTouch: (col, sourceHb) =>
             {
-                Debug.Log($"[PS] hit {col.name}");
+                if (!_specialFxSpawnedThisSwing && fx != null && !string.IsNullOrEmpty(parrySpecialFxId))
+                {
+                    _specialFxSpawnedThisSwing = true;
+                    fx.PlayFxOnCollider(parrySpecialFxId, sourceHb); // 스페셜 히트박스 내부에서 스폰
+                }
 
-                // 보스 그로기 트리거 알림
                 var boss = col.GetComponentInParent<BulgasariBoss>();
                 if (boss != null) boss.OnParrySpecialLanded(col);
 
                 var grog = col.GetComponent<BulgasariGroggyTarget>() ?? col.GetComponentInParent<BulgasariGroggyTarget>();
                 if (grog != null) grog.NotifyParrySpecialHit(this);
             });
+    }
+
+    // 히트박스별로 "맞은 대상"과 "그 대상과 실제 겹친 소스 히트박스"를 함께 알려주는 버전
+    void ApplyHitboxGroupWithSource(
+        Collider2D[] group, LayerMask mask, int damage,
+        System.Action<Collider2D, Collider2D> onTouch /* (hitTarget, sourceHitbox) */)
+    {
+        if (group == null || group.Length == 0) return;
+
+        var filter = new ContactFilter2D { useTriggers = true, useLayerMask = true };
+        filter.SetLayerMask(mask);
+
+        var seen = new HashSet<Collider2D>();
+
+        foreach (var hb in group)
+        {
+            if (!hb || !hb.enabled) continue;
+
+            _overlapBuf.Clear();
+            int count = hb.Overlap(filter, _overlapBuf);
+            for (int i = 0; i < count; i++)
+            {
+                var c = _overlapBuf[i];
+                if (!c || seen.Contains(c)) continue;
+                seen.Add(c);
+
+                var dmg = c.GetComponent<IDamageable>()
+                       ?? c.GetComponentInParent<IDamageable>()
+                       ?? c.GetComponentInChildren<IDamageable>();
+                if (dmg != null) dmg.TakeDamage(damage);
+
+                onTouch?.Invoke(c, hb); // ← 맞은 대상과 "그 대상과 실제로 겹친" 플레이어 히트박스를 함께 전달
+            }
+        }
     }
 
     IEnumerator TemporaryInvul(float dur)
@@ -632,17 +733,17 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
                 if (!c || seen.Contains(c)) continue;
                 seen.Add(c);
 
-                var dmg = c.GetComponent<IDamageable>()
-                       ?? c.GetComponentInParent<IDamageable>()
-                       ?? c.GetComponentInChildren<IDamageable>();
-                if (dmg != null) dmg.TakeDamage(damage);
+                var target = c.GetComponent<IDamageable>()
+                         ?? c.GetComponentInParent<IDamageable>()
+                         ?? c.GetComponentInChildren<IDamageable>();
+                if (target != null) target.TakeDamage(damage);
 
                 onTouch?.Invoke(c);
             }
         }
     }
 
-    // (선택) 지속 판정 — 필요 시 애니 이벤트에서 호출
+    // (선택) 지속 판정
     IEnumerator ApplyHitboxGroupFor(Collider2D[] group, LayerMask mask, int damage, float duration, Action<Collider2D> onTouch = null)
     {
         float t = 0f;

@@ -13,6 +13,132 @@ public class PlayerFxHooks : MonoBehaviour
 
     Dictionary<string, Transform> _anchorMap;
     Dictionary<string, FxDefinition2D> _fxMap;
+    // === Attack-range FX helpers ===============================================
+    static readonly List<Collider2D> _tmpCols = new List<Collider2D>(8);
+    // PlayerFxHooks 안에 추가 (public)
+    public void PlayFxOnCollider(string fxId, Collider2D col)
+    {
+        if (!col) return;
+        var p = RandomPointInCollider(col);   // 내부 유틸로 콜라이더 안 랜덤 좌표
+        PlayFxAtWorld(fxId, p);               // 기존 규칙(미러/정렬/SFX/파괴) 그대로 적용
+    }
+
+    /// <summary>히트박스 배열 중 활성 콜라이더 하나를 랜덤 픽</summary>
+    Collider2D PickRandomActive(Collider2D[] group)
+    {
+        _tmpCols.Clear();
+        if (group != null)
+        {
+            for (int i = 0; i < group.Length; i++)
+            {
+                var c = group[i];
+                if (!c) continue;
+                if (!c.enabled) continue;
+                if (!c.gameObject.activeInHierarchy) continue;
+                _tmpCols.Add(c);
+            }
+        }
+        if (_tmpCols.Count == 0) return null;
+        return _tmpCols[Random.Range(0, _tmpCols.Count)];
+    }
+
+    /// <summary>지정한 Collider2D 안쪽 임의 위치(월드좌표) 샘플링</summary>
+    Vector3 RandomPointInCollider(Collider2D col, int maxTries = 10)
+    {
+        if (!col) return col.bounds.center;
+
+        // 케이스별 빠른 샘플
+        var t = col.transform;
+        if (col is BoxCollider2D b)
+        {
+            var local = b.offset + new Vector2(
+                Random.Range(-b.size.x * 0.5f, b.size.x * 0.5f),
+                Random.Range(-b.size.y * 0.5f, b.size.y * 0.5f));
+            return t.TransformPoint(local);
+        }
+        if (col is CircleCollider2D cir)
+        {
+            var local = cir.offset + Random.insideUnitCircle * cir.radius;
+            return t.TransformPoint(local);
+        }
+        if (col is CapsuleCollider2D cap)
+        {
+            for (int i = 0; i < maxTries; i++)
+            {
+                var local = cap.offset + new Vector2(
+                    Random.Range(-cap.size.x * 0.5f, cap.size.x * 0.5f),
+                    Random.Range(-cap.size.y * 0.5f, cap.size.y * 0.5f));
+                var world = t.TransformPoint(local);
+                if (cap.OverlapPoint(world)) return world;
+            }
+            return t.TransformPoint(cap.offset);
+        }
+        if (col is PolygonCollider2D poly)
+        {
+            var bnds = poly.bounds;
+            for (int i = 0; i < maxTries; i++)
+            {
+                var world = new Vector2(
+                    Random.Range(bnds.min.x, bnds.max.x),
+                    Random.Range(bnds.min.y, bnds.max.y));
+                if (poly.OverlapPoint(world)) return world;
+            }
+            return bnds.center;
+        }
+
+        // 불명 타입: AABB 안에서 거절 샘플
+        {
+            var bnds = col.bounds;
+            for (int i = 0; i < maxTries; i++)
+            {
+                var world = new Vector2(
+                    Random.Range(bnds.min.x, bnds.max.x),
+                    Random.Range(bnds.min.y, bnds.max.y));
+                if (col.OverlapPoint(world)) return world;
+            }
+            return bnds.center;
+        }
+    }
+
+    /// <summary>월드 좌표에 FX 즉시 스폰(팔로우/오프셋 무시, 다른 옵션은 그대로 적용)</summary>
+    public void PlayFxAtWorld(string fxId, Vector3 worldPos)
+    {
+        if (!_fxMap.TryGetValue(fxId, out var def) || !def || !def.prefab) return;
+
+        float sign = (transform.localScale.x >= 0f) ? 1f : -1f;
+        var go = Instantiate(def.prefab, worldPos, def.followRotation ? Quaternion.identity : Quaternion.identity);
+
+        // Attach가 아니므로 부모 미러링 없음 → 자체 미러만 1회 적용
+        ApplyMirrorOnce(go, def, sign, parentWillMirror: false);
+
+        // 정렬
+        if (!string.IsNullOrEmpty(def.sortingLayerOverride))
+            foreach (var sr in go.GetComponentsInChildren<SpriteRenderer>(true))
+            {
+                sr.sortingLayerName = def.sortingLayerOverride;
+                sr.sortingOrder = def.orderInLayerOverride;
+            }
+
+        // SFX
+        if (def.sfx)
+        {
+            if (audioSource) audioSource.PlayOneShot(def.sfx, def.sfxVolume);
+            else AudioSource.PlayClipAtPoint(def.sfx, go.transform.position, def.sfxVolume);
+        }
+
+        if (def.autoDestroy > 0f) Destroy(go, def.autoDestroy);
+    }
+
+    /// <summary>
+    /// 현재 공격 히트박스 그룹 내부 임의 위치에 FX 스폰(1회)
+    /// </summary>
+    public void PlayFxInHitboxGroup(string fxId, Collider2D[] hitboxGroup)
+    {
+        var col = PickRandomActive(hitboxGroup);
+        if (!col) { PlayFx(fxId); return; } // 히트박스 없으면 기존 앵커 스폰으로 폴백
+        var p = RandomPointInCollider(col);
+        PlayFxAtWorld(fxId, p);
+    }
 
     void Awake()
     {
@@ -182,5 +308,9 @@ class _FxAnchorFollower : MonoBehaviour
         }
 
         _remain -= Time.deltaTime;
+
+
     }
+
+
 }

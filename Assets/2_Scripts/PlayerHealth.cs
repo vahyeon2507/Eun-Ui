@@ -61,8 +61,10 @@ public class PlayerHealth : MonoBehaviour, IDamageable
 {
     if (isInvulnerable) return;
 
-    // ✅ 히트 카메라 흔들림 (내장 + 시네머신 임펄스 둘 다 커버)
-    var shaker = GetComponent<PlayerHitShake>();
+        GetComponentInChildren<SpriteFlash>()?.FlashOnce();
+
+        // ✅ 히트 카메라 흔들림 (내장 + 시네머신 임펄스 둘 다 커버)
+        var shaker = GetComponent<PlayerHitShake>();
     if (shaker == null) shaker = FindObjectOfType<PlayerHitShake>(); // 혹시 따로 붙어있다면
     shaker?.Shake();   // (진짜 중요) 이 한 줄이 빠져있으면 절대 흔들리지 않음
 

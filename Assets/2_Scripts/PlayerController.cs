@@ -341,14 +341,17 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
             case 2: group = hitboxesAttack2; break;
             case 3: group = hitboxesAttack3; break;
         }
+        if (group == null || group.Length == 0) { Debug.LogWarning($"[Player] Attack{comboIndex} hitboxes not assigned."); return; }
 
-        if (group == null || group.Length == 0)
+        // ① 대미지 적용 + ② 실제 맞은 콜라이더에만 이펙트
+        //    (여러 적을 동시에 치면 각 적마다 1번씩 FX)
+        var spawnedOn = new HashSet<Transform>();
+        ApplyHitboxGroup(group, enemyLayer, dmg, (col) =>
         {
-            Debug.LogWarning($"[Player] Attack{comboIndex} hitboxes not assigned.");
-            return;
-        }
-
-        ApplyHitboxGroup(group, enemyLayer, dmg, null);
+            var root = col.attachedRigidbody ? col.attachedRigidbody.transform : col.transform.root;
+            if (spawnedOn.Add(root))
+                fx?.PlayFxOnCollider("AttackSpark", col);
+        });
     }
 
     public void OnAttackAnimationEnd()

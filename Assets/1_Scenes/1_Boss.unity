@@ -3721,6 +3721,14 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 1384591960}
     - target: {fileID: 5754081757908428923, guid: 705886ff133db74468b31e30d18bf1b0, type: 3}
+      propertyPath: maxHp
+      value: 100
+      objectReference: {fileID: 0}
+    - target: {fileID: 5754081757908428923, guid: 705886ff133db74468b31e30d18bf1b0, type: 3}
+      propertyPath: invulnTime
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5754081757908428923, guid: 705886ff133db74468b31e30d18bf1b0, type: 3}
       propertyPath: hitMoveDistance
       value: 0
       objectReference: {fileID: 0}

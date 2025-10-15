@@ -162,6 +162,22 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     public bool IsDashing => isDashing;
     public bool IsParrying => isParrying;
 
+    // ===== PATCH: PlayerHealth 강타입 캐시/자동 연결 =====
+    PlayerHealth _hpCached;
+    PlayerHealth HP
+    {
+        get
+        {
+            if (_hpCached) return _hpCached;
+            _hpCached = healthComponent as PlayerHealth;
+            if (_hpCached) return _hpCached;
+            _hpCached = GetComponent<PlayerHealth>()
+                     ?? GetComponentInChildren<PlayerHealth>()
+                     ?? GetComponentInParent<PlayerHealth>();
+            return _hpCached;
+        }
+    }
+
     // 로컬 헬퍼(폴백용): 콜라이더 내부 임의 포인트
     Vector3 RandomPointInsideCollider(Collider2D hb)
     {
@@ -188,6 +204,14 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
             parryDebugStyle = new GUIStyle();
             parryDebugStyle.fontSize = 14;
             parryDebugStyle.normal.textColor = Color.white;
+        }
+
+        // ===== PATCH: healthComponent 자동 연결(누락 보호) =====
+        if (healthComponent == null)
+        {
+            var hp = HP;
+            if (hp != null) healthComponent = hp;
+            else Debug.LogWarning("[PlayerController] healthComponent가 비어 있고 PlayerHealth도 찾지 못했습니다.");
         }
     }
 
@@ -497,7 +521,8 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     // --------------------------------------------------------
     public bool ConsumeHitboxIfParrying(object hitInfo = null)
     {
-        if (isInvulnerable) return true;
+        // ===== PATCH: 무적이어도 '패링 중'이면 성공 처리를 허용 =====
+        if (!isParrying && isInvulnerable) return true;
 
         if (isParrying)
         {
@@ -521,6 +546,19 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
             parrySuccessCount++;
             OnParryStreakChanged?.Invoke(parrySuccessCount);
             lastParrySuccessTime = Time.time;
+
+            // ===== PATCH: 패링바 증가 (강타입 우선, 폴백 리플렉션) =====
+            var hp = HP;
+            if (hp != null)
+            {
+                hp.AddParryCount();
+            }
+            else if (healthComponent != null)
+            {
+                var addParryMethod = healthComponent.GetType().GetMethod("AddParryCount");
+                if (addParryMethod != null) addParryMethod.Invoke(healthComponent, null);
+                else Debug.LogWarning("[Player] healthComponent에 AddParryCount가 없습니다.");
+            }
 
             // === 1~3번째: 일반 패링 성공 피드백(애니+전용 FX) ===
             if (parrySuccessCount < parrySuccessNeeded)

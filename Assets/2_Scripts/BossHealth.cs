@@ -199,6 +199,8 @@ public class BossHealth : MonoBehaviour, IDamageable
         // 중복 호출 방지
         if (currentHp > 0) currentHp = 0;
 
+        BossKillTeleportDirector.SignalBossDied();
+
         // 애니메이션, 사운드
         if (animator != null) 
         {

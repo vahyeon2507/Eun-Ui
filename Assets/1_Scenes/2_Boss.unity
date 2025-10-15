@@ -9004,17 +9004,6 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 133}
   m_SizeDelta: {x: -76, y: -868}
   m_Pivot: {x: 0.5, y: 0.5}
---- !u!114 &1552790114 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 6969091104489640388, guid: 0c2c03cabea046043bf45791d4204d7f, type: 3}
-  m_PrefabInstance: {fileID: 1922615053}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!1 &1569446067
 GameObject:
   m_ObjectHideFlags: 0
@@ -9962,9 +9951,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   canvasCamera: {fileID: 519420031}
-  redBar: {fileID: 1552790114}
+  redBar: {fileID: 1922615055}
   yellowBar: {fileID: 1922615056}
-  parryBar: {fileID: 1922615055}
+  parryBar: {fileID: 1922615054}
 --- !u!1 &1801530095
 GameObject:
   m_ObjectHideFlags: 0
@@ -10620,6 +10609,18 @@ PrefabInstance:
     - target: {fileID: 2570867291391698114, guid: 0c2c03cabea046043bf45791d4204d7f, type: 3}
       propertyPath: m_Name
       value: PlayerCanvas (1)
+      objectReference: {fileID: 0}
+    - target: {fileID: 3685151820352090799, guid: 0c2c03cabea046043bf45791d4204d7f, type: 3}
+      propertyPath: m_Name
+      value: Red
+      objectReference: {fileID: 0}
+    - target: {fileID: 4180114506653644222, guid: 0c2c03cabea046043bf45791d4204d7f, type: 3}
+      propertyPath: m_Value
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4180114506653644222, guid: 0c2c03cabea046043bf45791d4204d7f, type: 3}
+      propertyPath: m_Colors.m_ColorMultiplier
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 5648774828221799250, guid: 0c2c03cabea046043bf45791d4204d7f, type: 3}
       propertyPath: m_AnchorMax.x
@@ -12443,6 +12444,18 @@ PrefabInstance:
       value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 1290639557195873711, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
+      propertyPath: 'comboDamages.Array.data[0]'
+      value: 5
+      objectReference: {fileID: 0}
+    - target: {fileID: 1290639557195873711, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
+      propertyPath: 'comboDamages.Array.data[1]'
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 1290639557195873711, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
+      propertyPath: 'comboDamages.Array.data[2]'
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: 1290639557195873711, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
       propertyPath: hitboxesAttack1.Array.size
       value: 1
       objectReference: {fileID: 0}
@@ -12496,7 +12509,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1407434714894907121, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
       propertyPath: maxHealth
-      value: 20
+      value: 40
       objectReference: {fileID: 0}
     - target: {fileID: 1407434714894907121, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
       propertyPath: yellowBar

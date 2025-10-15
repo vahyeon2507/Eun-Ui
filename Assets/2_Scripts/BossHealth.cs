@@ -130,6 +130,7 @@ public class BossHealth : MonoBehaviour, IDamageable
         if (currentHp <= 0)
         {
             Die();
+
         }
     }
 
@@ -195,6 +196,8 @@ public class BossHealth : MonoBehaviour, IDamageable
     void Die()
     {
         Debug.Log("[BossHealth] DIED");
+
+        GetComponent<BossDeathDust>()?.Play();
 
         // 중복 호출 방지
         if (currentHp > 0) currentHp = 0;

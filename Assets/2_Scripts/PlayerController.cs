@@ -159,6 +159,8 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     float groundedRememberCounter = 0f;
 
     // public getters
+
+
     public bool IsDashing => isDashing;
     public bool IsParrying => isParrying;
 
@@ -177,6 +179,7 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
             return _hpCached;
         }
     }
+
 
     // 로컬 헬퍼(폴백용): 콜라이더 내부 임의 포인트
     Vector3 RandomPointInsideCollider(Collider2D hb)
@@ -491,6 +494,7 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     IEnumerator DoParry()
     {
         canParry = false;
+        _parryRewardedThisWindow = false;   // ★ 패링 윈도우 시작할 때 반드시 리셋
         isParrying = true;
         if (animator != null)
         {
@@ -521,11 +525,15 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     // --------------------------------------------------------
     public bool ConsumeHitboxIfParrying(object hitInfo = null)
     {
-        // ===== PATCH: 무적이어도 '패링 중'이면 성공 처리를 허용 =====
+        // 기존 패치 유지: 패링 중이 아니고 무적이면 소비만
         if (!isParrying && isInvulnerable) return true;
 
         if (isParrying)
         {
+            // ★ 이미 이 패링 윈도우에서 보상 지급했다면, 추가 히트는 모두 소비만 하고 종료
+            if (_parryRewardedThisWindow) return true;
+
+            // (기존) hitId 중복 억제/시간 억제 로직 그대로 유지
             int hitId = 0;
             if (hitInfo is Collider2D col) hitId = col.GetInstanceID();
             else if (hitInfo is GameObject go) hitId = go.GetInstanceID();
@@ -542,57 +550,51 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
                 if (Time.time - lastParrySuccessTime < 0.06f) return true;
             }
 
-            // 패링 성공 카운트/이벤트
+            // ===== 여기서 '보상' 1회만 =====
+            _parryRewardedThisWindow = true; // ★ 이제 이 윈도우에선 더 이상 보상 안 줌
+
             parrySuccessCount++;
             OnParryStreakChanged?.Invoke(parrySuccessCount);
             lastParrySuccessTime = Time.time;
 
-            // ===== PATCH: 패링바 증가 (강타입 우선, 폴백 리플렉션) =====
+            // 패링바 UI 증가 (강타입 우선)
             var hp = HP;
-            if (hp != null)
-            {
-                hp.AddParryCount();
-            }
+            if (hp != null) hp.AddParryCount();
             else if (healthComponent != null)
             {
                 var addParryMethod = healthComponent.GetType().GetMethod("AddParryCount");
                 if (addParryMethod != null) addParryMethod.Invoke(healthComponent, null);
-                else Debug.LogWarning("[Player] healthComponent에 AddParryCount가 없습니다.");
             }
 
-            // === 1~3번째: 일반 패링 성공 피드백(애니+전용 FX) ===
+            // (기존) 1~3회: 일반 패링 피드백, 4회: 스페셜 발동
             if (parrySuccessCount < parrySuccessNeeded)
             {
                 if (Time.time - _lastParryFeedbackTime > _parryFeedbackMinInterval)
                 {
                     _lastParryFeedbackTime = Time.time;
-
-                    // 애니메이션
                     if (animator != null && !string.IsNullOrEmpty(animParrySuccessTrigger))
                         animator.SetTrigger(animParrySuccessTrigger);
-
-                    // FX (전용 범위 콜라이더 내부에서 스폰)
                     if (fx != null && !string.IsNullOrEmpty(parrySuccessFxId))
                     {
                         var area = GetFirstEnabledCollider(parrySuccessFxAreas);
                         if (area != null) fx.PlayFxOnCollider(parrySuccessFxId, area);
-                        else fx.PlayFx(parrySuccessFxId, null, transform); // 폴백
+                        else fx.PlayFx(parrySuccessFxId, null, transform);
                     }
                 }
             }
-            // === 4번째: 스페셜 발동(일반 패링 피드백 금지) ===
             else if (!parrySpecialLocked && parrySuccessCount >= parrySuccessNeeded)
             {
                 StartCoroutine(TriggerParrySpecial());
             }
 
-            // 잠깐 무적
+            // (기존) 잠깐 무적
             StartCoroutine(TemporaryInvul(0.06f));
             return true;
         }
 
         return false;
     }
+
 
     Collider2D GetFirstEnabledCollider(Collider2D[] arr)
     {
@@ -792,6 +794,9 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
             t += Time.deltaTime;
         }
     }
+
+
+    bool _parryRewardedThisWindow = false;
 
 #if UNITY_EDITOR
     void OnDrawGizmosSelected()

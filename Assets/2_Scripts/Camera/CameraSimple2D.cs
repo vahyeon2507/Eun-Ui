@@ -11,6 +11,14 @@ public class CameraSimple2D : MonoBehaviour
     [Header("Clamp (optional)")]
     public BoxCollider2D clampBounds;
 
+    [Header("Shake (Inspector Defaults)")]
+    [Tooltip("흔들림 세기(위치 오프셋의 스케일)")]
+    [Range(0f, 2f)] public float shakeAmplitude = 0.8f;
+    [Tooltip("흔들림 유지 시간(초)")]
+    [Min(0f)] public float shakeDuration = 0.15f;
+    [Tooltip("퍼린 노이즈 샘플링 빈도(느리면 5~15, 빠르면 20~40)")]
+    [Range(0.1f, 60f)] public float shakeFrequency = 22f;
+
     // ---- shake runtime ----
     Vector2 _shakeOffset;
     float _shakeAmp, _shakeFreq, _shakeRemain;
@@ -68,11 +76,34 @@ public class CameraSimple2D : MonoBehaviour
         transform.position = pos;
     }
 
-    /// <summary>외부에서 호출하는 흔들림 API</summary>
+    /// <summary>
+    /// 인스펙터 기본값으로 흔들기
+    /// </summary>
+    public void Shake()
+    {
+        Shake(shakeAmplitude, shakeDuration, shakeFrequency);
+    }
+
+    /// <summary>
+    /// 외부에서 호출하는 흔들림 API (기존 시그니처 유지)
+    /// </summary>
     public void Shake(float amplitude = 0.8f, float duration = 0.15f, float frequency = 22f)
     {
         _shakeAmp = amplitude;
         _shakeFreq = frequency;
         _shakeRemain = Mathf.Max(_shakeRemain, duration); // 중복 호출 시 더 긴 쪽 유지
     }
+
+    /// <summary>
+    /// 인스펙터 기본값에 스케일만 곱해서 흔들기(예: 강하게=1.5, 약하게=0.5)
+    /// </summary>
+    public void ShakeScaled(float scale)
+    {
+        Shake(shakeAmplitude * scale, shakeDuration, shakeFrequency);
+    }
+
+#if UNITY_EDITOR
+    [ContextMenu("Test Shake (Defaults)")]
+    void _TestShake() => Shake();
+#endif
 }

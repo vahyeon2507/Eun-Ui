@@ -13,6 +13,14 @@ public class BossKillTeleportDirector : MonoBehaviour
     [Header("Next Scene")]
     public string nextSceneName = "NextScene";   // 기본 다음 씬(필요 시 런타임에 override 가능)
 
+    [Header("Barrier Control")]
+    [Tooltip("보스 처치 시 제거할 투명 벽/콜라이더 오브젝트(들).")]
+    public GameObject[] barriersToRemove;
+    [Tooltip("Destroy 대신 SetActive(false)만 수행 (되돌릴 가능성이 있으면 체크)")]
+    public bool justDisableBarriers = false;
+
+    bool _activatedOnce = false; // 중복 방지
+
     void Awake()
     {
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
@@ -26,6 +34,13 @@ public class BossKillTeleportDirector : MonoBehaviour
 
     public void OnBossDied()
     {
+        if (_activatedOnce) return; // 중복 방지
+        _activatedOnce = true;
+
+        // 1) 먼저 길을 막던 벽 해제
+        RemoveBarriers();
+
+        // 2) 포탈 활성화
         ActivateGate(nextSceneName);
     }
 
@@ -65,5 +80,26 @@ public class BossKillTeleportDirector : MonoBehaviour
         trig.nextSceneName = sceneToLoad;
 
         Debug.Log($"[BossKillTeleportDirector] Gate 활성화됨 @ {spawnPoint.position}, 다음 씬: {sceneToLoad}");
+    }
+
+    void RemoveBarriers()
+    {
+        if (barriersToRemove == null || barriersToRemove.Length == 0) return;
+
+        foreach (var go in barriersToRemove)
+        {
+            if (!go) continue;
+
+            if (justDisableBarriers)
+            {
+                go.SetActive(false);
+                Debug.Log($"[BossKillTeleportDirector] Barrier 비활성화: {go.name}");
+            }
+            else
+            {
+                Destroy(go);
+                Debug.Log($"[BossKillTeleportDirector] Barrier 삭제: {go.name}");
+            }
+        }
     }
 }

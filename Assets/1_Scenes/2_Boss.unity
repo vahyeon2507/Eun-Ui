@@ -891,6 +891,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6093af4b27fc7624d8978b53b9954443, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  hoverScale: 1.1
+  clickScale: 0.95
+  animationSpeed: 8
+  useColorEffect: 0
+  hoverColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
 --- !u!222 &238531826
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -1157,14 +1162,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   animator: {fileID: 276129716}
   healthReceiver: {fileID: 276129720}
-  player: {fileID: 1946008971}
+  player: {fileID: 0}
   baseDamageMitigation: 0.6
   groggyMitigation: 0
   groggyDuration: 4
   animTrigGroggyOn: GroggyOn
   animTrigGroggyOff: GroggyOff
   debugLog: 0
-  parryProvider: {fileID: 1946008969}
+  parryProvider: {fileID: 0}
   reflectionParryProp: CurrentParryStreak
   parryNeeded: 4
   useReflectionPollIfNoProvider: 1
@@ -3740,6 +3745,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   dimImage: {fileID: 667382412}
+  targetAlpha: 0.5
+  fadeDuration: 0.25
 --- !u!114 &667382412
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4019,6 +4026,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6093af4b27fc7624d8978b53b9954443, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  hoverScale: 1.1
+  clickScale: 0.95
+  animationSpeed: 8
+  useColorEffect: 0
+  hoverColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
 --- !u!114 &684537409
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4257,6 +4269,8 @@ MonoBehaviour:
   panel: {fileID: 773021374}
   startOffset: {x: 0, y: -200}
   endPosition: {x: 0, y: 0}
+  animationSpeed: 3
+  debugLog: 0
 --- !u!225 &773021376
 CanvasGroup:
   m_ObjectHideFlags: 0
@@ -5251,6 +5265,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6093af4b27fc7624d8978b53b9954443, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  hoverScale: 1.1
+  clickScale: 0.95
+  animationSpeed: 8
+  useColorEffect: 0
+  hoverColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
 --- !u!114 &1016632948
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5921,6 +5940,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6093af4b27fc7624d8978b53b9954443, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  hoverScale: 1.1
+  clickScale: 0.95
+  animationSpeed: 8
+  useColorEffect: 0
+  hoverColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
 --- !u!222 &1189223607
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -6972,6 +6996,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6093af4b27fc7624d8978b53b9954443, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  hoverScale: 1.1
+  clickScale: 0.95
+  animationSpeed: 8
+  useColorEffect: 0
+  hoverColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
 --- !u!222 &1538902520
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -7736,6 +7765,8 @@ MonoBehaviour:
   panel: {fileID: 1918019742}
   startOffset: {x: -100, y: 0}
   endPosition: {x: 0, y: 0}
+  animationSpeed: 3
+  debugLog: 0
 --- !u!225 &1918019739
 CanvasGroup:
   m_ObjectHideFlags: 0
@@ -7863,6 +7894,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6093af4b27fc7624d8978b53b9954443, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  hoverScale: 1.1
+  clickScale: 0.95
+  animationSpeed: 8
+  useColorEffect: 0
+  hoverColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
 --- !u!114 &1921009734
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -8075,6 +8111,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6093af4b27fc7624d8978b53b9954443, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  hoverScale: 1.1
+  clickScale: 0.95
+  animationSpeed: 8
+  useColorEffect: 0
+  hoverColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
 --- !u!222 &1930701005
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -8268,22 +8309,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1943589458}
   m_CullTransparentMesh: 1
---- !u!114 &1946008969 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 1290639557195873711, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
-  m_PrefabInstance: {fileID: 6104389184371960637}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 872dd94180f2ba0478de595c71ccb7a0, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
---- !u!4 &1946008971 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 2186251996989526959, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
-  m_PrefabInstance: {fileID: 6104389184371960637}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1962588411
 GameObject:
   m_ObjectHideFlags: 0
@@ -9027,6 +9052,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6093af4b27fc7624d8978b53b9954443, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  hoverScale: 1.1
+  clickScale: 0.95
+  animationSpeed: 8
+  useColorEffect: 0
+  hoverColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
 --- !u!114 &2066463668
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -9327,64 +9357,51 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
-    - target: {fileID: 422704032455422116, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
+    - target: {fileID: 2169631952248763071, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
       propertyPath: m_Name
       value: 'Player '
       objectReference: {fileID: 0}
-    - target: {fileID: 1407434714894907121, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
-      propertyPath: healthBar
-      value: 
-      objectReference: {fileID: 1962588413}
-    - target: {fileID: 2186251996989526959, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
+    - target: {fileID: 4462927575711360386, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -0.04
+      value: -7
       objectReference: {fileID: 0}
-    - target: {fileID: 2186251996989526959, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
+    - target: {fileID: 4462927575711360386, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -1.24
+      value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 2186251996989526959, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
+    - target: {fileID: 4462927575711360386, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
       propertyPath: m_LocalPosition.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 2186251996989526959, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
+    - target: {fileID: 4462927575711360386, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
       propertyPath: m_LocalRotation.w
       value: 1
       objectReference: {fileID: 0}
-    - target: {fileID: 2186251996989526959, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
+    - target: {fileID: 4462927575711360386, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
       propertyPath: m_LocalRotation.x
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 2186251996989526959, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
+    - target: {fileID: 4462927575711360386, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
       propertyPath: m_LocalRotation.y
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 2186251996989526959, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
+    - target: {fileID: 4462927575711360386, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
       propertyPath: m_LocalRotation.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 2186251996989526959, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
+    - target: {fileID: 4462927575711360386, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 2186251996989526959, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
+    - target: {fileID: 4462927575711360386, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
       propertyPath: m_LocalEulerAnglesHint.y
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 2186251996989526959, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
+    - target: {fileID: 4462927575711360386, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 2519398596548522941, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
-      propertyPath: m_Enabled
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 3878306766743461896, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
-      propertyPath: m_Enabled
-      value: 0
-      objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 2519398596548522941, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []

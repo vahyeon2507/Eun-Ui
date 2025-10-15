@@ -8,16 +8,17 @@ public class Title : MonoBehaviour
 {
     [SerializeField] private Transform imageParent; // ImageBackGround 오브젝트
     [SerializeField] private TMP_Text titleText;    // TitleText 오브젝트
-    [SerializeField] private TMP_Text openingText;  // OpeningText 오브젝트
+    [SerializeField] private TMP_Text openingText;  // OpeningText 오브젝트 ("아무 키나 누르세요")
     [SerializeField] private string nextSceneName = "GameScene";
     [SerializeField] private float fadeDuration = 1.0f;
+    [SerializeField] private float blinkSpeed = 1.5f; // 깜빡이는 속도 (조정 가능)
 
     private Image[] images;
     private bool isWaitingForInput = false;
+    private Coroutine blinkCoroutine; // 깜빡임 코루틴 저장용
 
     void Start()
     {
-        // 필수 참조 체크
         if (!imageParent)
         {
             Debug.LogError("[Title] imageParent가 할당되지 않았습니다!");
@@ -44,7 +45,12 @@ public class Title : MonoBehaviour
         }
 
         // 페이드 인 후 입력 대기
-        StartCoroutine(FadeAll(0f, 1f, () => isWaitingForInput = true));
+        StartCoroutine(FadeAll(0f, 1f, () =>
+        {
+            isWaitingForInput = true;
+            // 🔥 깜빡이기 시작
+            blinkCoroutine = StartCoroutine(BlinkText(openingText));
+        }));
     }
 
     void Update()
@@ -55,7 +61,12 @@ public class Title : MonoBehaviour
         {
             isWaitingForInput = false;
 
-            // 페이드 아웃하면서 BGM 전환 및 씬 로드
+            // 깜빡임 중단
+            if (blinkCoroutine != null)
+                StopCoroutine(blinkCoroutine);
+            SetTextAlpha(openingText, 1f);
+
+            // 페이드 아웃하면서 씬 로드
             StartCoroutine(FadeAll(1f, 0f, () =>
             {
                 if (AudioManager.Instance != null)
@@ -97,6 +108,18 @@ public class Title : MonoBehaviour
         SetTextAlpha(openingText, to);
 
         onComplete?.Invoke();
+    }
+
+    // 🔥 추가된 부분: 텍스트 깜빡이기 코루틴
+    IEnumerator BlinkText(TMP_Text text)
+    {
+        while (true)
+        {
+            // Mathf.PingPong으로 0~1 사이 알파 반복
+            float alpha = Mathf.PingPong(Time.time * blinkSpeed, 1f);
+            SetTextAlpha(text, alpha);
+            yield return null;
+        }
     }
 
     void SetImagesAlpha(float alpha)

@@ -48,6 +48,11 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     [Header("Ability Anchor (for ranged/talisman)")]
     public Transform attackPoint;  // 없으면 transform 사용
 
+    // === 입력 설정 ===
+    [Header("Input")]
+    [Tooltip("기본공격 추가 키(마우스 좌클릭과 병렬)")]
+    public KeyCode extraAttackKey = KeyCode.X;
+
     // 스윙/패링 중복 방지 플래그
     bool _attackHitFiredThisSwing = false;
     bool _fxSpawnedThisSwing = false;
@@ -112,6 +117,9 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     [Tooltip("스페셜만 별도 레이어마스크를 쓰고 싶다면 지정(비워두면 enemyLayer 사용)")]
     public LayerMask parrySpecialEnemyMaskOverride;
 
+    [Tooltip("패링 스페셜 공격의 대미지(인스펙터 조절)")]
+    public int parrySpecialDamage = 3;
+
     [Header("Ground Check / Stability")]
     public float groundCheckRadius = 0.14f;
     public float groundRememberTime = 0.08f;
@@ -159,8 +167,6 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     float groundedRememberCounter = 0f;
 
     // public getters
-
-
     public bool IsDashing => isDashing;
     public bool IsParrying => isParrying;
 
@@ -179,7 +185,6 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
             return _hpCached;
         }
     }
-
 
     // 로컬 헬퍼(폴백용): 콜라이더 내부 임의 포인트
     Vector3 RandomPointInsideCollider(Collider2D hb)
@@ -231,8 +236,9 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
 
     void HandleInputs()
     {
-        // 기본 공격 입력(좌클릭)
-        if (Input.GetMouseButtonDown(0))
+        // 기본 공격 입력(좌클릭 또는 extraAttackKey)
+        bool attackPressed = Input.GetMouseButtonDown(0) || Input.GetKeyDown(extraAttackKey);
+        if (attackPressed)
         {
             lastAttackButtonTime = Time.time;
             if (isAttacking)
@@ -595,7 +601,6 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
         return false;
     }
 
-
     Collider2D GetFirstEnabledCollider(Collider2D[] arr)
     {
         if (arr == null) return null;
@@ -685,7 +690,7 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
         ApplyHitboxGroupWithSource(
             hitboxesParrySpecial,
             mask,
-            damage: 3,
+            damage: parrySpecialDamage,   // ★ 인스펙터에서 설정한 값 사용
             onTouch: (col, sourceHb) =>
             {
                 if (!_specialFxSpawnedThisSwing && fx != null && !string.IsNullOrEmpty(parrySpecialFxId))
@@ -794,7 +799,6 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
             t += Time.deltaTime;
         }
     }
-
 
     bool _parryRewardedThisWindow = false;
 

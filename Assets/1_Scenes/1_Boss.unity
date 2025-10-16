@@ -3801,7 +3801,7 @@ PrefabInstance:
       objectReference: {fileID: 1384591960}
     - target: {fileID: 5754081757908428923, guid: 705886ff133db74468b31e30d18bf1b0, type: 3}
       propertyPath: maxHp
-      value: 100
+      value: 200
       objectReference: {fileID: 0}
     - target: {fileID: 5754081757908428923, guid: 705886ff133db74468b31e30d18bf1b0, type: 3}
       propertyPath: invulnTime
@@ -3835,6 +3835,14 @@ PrefabInstance:
       propertyPath: Phase2IntroMapRoot
       value: 
       objectReference: {fileID: 186193418}
+    - target: {fileID: 8005152991228664262, guid: 705886ff133db74468b31e30d18bf1b0, type: 3}
+      propertyPath: attacksPhase1.Array.data[0].Damage
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 8005152991228664262, guid: 705886ff133db74468b31e30d18bf1b0, type: 3}
+      propertyPath: attacksPhase1.Array.data[1].Damage
+      value: 4
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

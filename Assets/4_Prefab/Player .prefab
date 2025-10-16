@@ -139,6 +139,7 @@ MonoBehaviour:
   hitboxesParrySpecial:
   - {fileID: 1854360689239350297}
   attackPoint: {fileID: 6462427748164141057}
+  extraAttackKey: 120
   moveSpeed: 5
   jumpForce: 7
   fx: {fileID: 4155843384369479141}
@@ -153,7 +154,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 64
   inputBufferWindow: 0.6
-  comboDamages: 050000000300000006000000
+  comboDamages: 040000000300000005000000
   comboLockDurations:
   - 0.6
   - 0.5
@@ -177,6 +178,7 @@ MonoBehaviour:
   parrySpecialEnemyMaskOverride:
     serializedVersion: 2
     m_Bits: 64
+  parrySpecialDamage: 15
   groundCheckRadius: 0.14
   groundRememberTime: 0.08
   healthComponent: {fileID: 1407434714894907121}

@@ -145,9 +145,36 @@ MonoBehaviour:
   m_GameObject: {fileID: 103517234}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 621bf7fe4c8efb74cb20e0e896202398, type: 3}
+  m_Script: {fileID: 11500000, guid: 7a2851c5134c4ab46b49e4deba640244, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  bgmSource: {fileID: 0}
+  sfxSource: {fileID: 0}
+  uiSource: {fileID: 0}
+  titleBGM: {fileID: 0}
+  gameplayBGM: {fileID: 0}
+  bossBGM: {fileID: 0}
+  phase2BGM: {fileID: 0}
+  playerAttackSFX: {fileID: 0}
+  playerParrySFX: {fileID: 0}
+  playerDashSFX: {fileID: 0}
+  playerJumpSFX: {fileID: 0}
+  playerHurtSFX: {fileID: 0}
+  talismanFireSFX: {fileID: 0}
+  talismanImpactSFX: {fileID: 0}
+  bossAttackSFX: {fileID: 0}
+  bossPhase2SFX: {fileID: 0}
+  bossHurtSFX: {fileID: 0}
+  bossDeathSFX: {fileID: 0}
+  buttonClickSFX: {fileID: 0}
+  menuOpenSFX: {fileID: 0}
+  menuCloseSFX: {fileID: 0}
+  masterVolume: 1
+  bgmVolume: 0.7
+  sfxVolume: 1
+  uiVolume: 0.8
+  defaultFadeTime: 1
+  quickFadeTime: 0.3
 --- !u!4 &103517236
 Transform:
   m_ObjectHideFlags: 0

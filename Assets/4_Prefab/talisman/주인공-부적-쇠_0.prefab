@@ -102,7 +102,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   element: 3
-  duration: 6
+  duration: 1
   radius: 1.5
 --- !u!95 &1051693798543026236
 Animator:

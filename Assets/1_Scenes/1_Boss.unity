@@ -655,6 +655,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Player  (1)
       objectReference: {fileID: 0}
+    - target: {fileID: 1290639557195873711, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
+      propertyPath: parryWindow
+      value: 0.4
+      objectReference: {fileID: 0}
     - target: {fileID: 1407434714894907121, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
       propertyPath: redBar
       value: 
@@ -3801,7 +3805,7 @@ PrefabInstance:
       objectReference: {fileID: 1384591960}
     - target: {fileID: 5754081757908428923, guid: 705886ff133db74468b31e30d18bf1b0, type: 3}
       propertyPath: maxHp
-      value: 200
+      value: 150
       objectReference: {fileID: 0}
     - target: {fileID: 5754081757908428923, guid: 705886ff133db74468b31e30d18bf1b0, type: 3}
       propertyPath: invulnTime

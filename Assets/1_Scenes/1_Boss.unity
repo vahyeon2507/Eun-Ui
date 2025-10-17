@@ -3805,7 +3805,7 @@ PrefabInstance:
       objectReference: {fileID: 1384591960}
     - target: {fileID: 5754081757908428923, guid: 705886ff133db74468b31e30d18bf1b0, type: 3}
       propertyPath: maxHp
-      value: 150
+      value: 200
       objectReference: {fileID: 0}
     - target: {fileID: 5754081757908428923, guid: 705886ff133db74468b31e30d18bf1b0, type: 3}
       propertyPath: invulnTime
@@ -3824,6 +3824,14 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 471174285}
     - target: {fileID: 8005152991228664262, guid: 705886ff133db74468b31e30d18bf1b0, type: 3}
+      propertyPath: MaxHealth
+      value: 200
+      objectReference: {fileID: 0}
+    - target: {fileID: 8005152991228664262, guid: 705886ff133db74468b31e30d18bf1b0, type: 3}
+      propertyPath: CurrentHealth
+      value: 200
+      objectReference: {fileID: 0}
+    - target: {fileID: 8005152991228664262, guid: 705886ff133db74468b31e30d18bf1b0, type: 3}
       propertyPath: Phase1MapRoot
       value: 
       objectReference: {fileID: 578411758}
@@ -3831,6 +3839,10 @@ PrefabInstance:
       propertyPath: Phase2MapRoot
       value: 
       objectReference: {fileID: 2129917341}
+    - target: {fileID: 8005152991228664262, guid: 705886ff133db74468b31e30d18bf1b0, type: 3}
+      propertyPath: dashAttack.Damage
+      value: 4
+      objectReference: {fileID: 0}
     - target: {fileID: 8005152991228664262, guid: 705886ff133db74468b31e30d18bf1b0, type: 3}
       propertyPath: phase2CenterPoint
       value: 
@@ -3845,11 +3857,27 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8005152991228664262, guid: 705886ff133db74468b31e30d18bf1b0, type: 3}
       propertyPath: attacksPhase1.Array.data[0].Damage
-      value: 3
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: 8005152991228664262, guid: 705886ff133db74468b31e30d18bf1b0, type: 3}
+      propertyPath: attacksPhase1.Array.data[0].Size.x
+      value: 2.5
       objectReference: {fileID: 0}
     - target: {fileID: 8005152991228664262, guid: 705886ff133db74468b31e30d18bf1b0, type: 3}
       propertyPath: attacksPhase1.Array.data[1].Damage
-      value: 4
+      value: 8
+      objectReference: {fileID: 0}
+    - target: {fileID: 8005152991228664262, guid: 705886ff133db74468b31e30d18bf1b0, type: 3}
+      propertyPath: attacksPhase1.Array.data[1].Size.x
+      value: 2.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 8005152991228664262, guid: 705886ff133db74468b31e30d18bf1b0, type: 3}
+      propertyPath: attacksPhase1.Array.data[0].Offset.x
+      value: -1.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 8005152991228664262, guid: 705886ff133db74468b31e30d18bf1b0, type: 3}
+      propertyPath: attacksPhase1.Array.data[1].Offset.x
+      value: -1.5
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

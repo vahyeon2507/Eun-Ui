@@ -151,6 +151,10 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     bool isParrying = false;
     bool canParry = true;
 
+    // === 대시 인터럽트용 ===
+    Coroutine _dashRoutine;
+    bool _dashInterrupting;
+
     // parry bookkeeping
     int parrySuccessCount = 0;
     float lastParrySuccessTime = -999f;
@@ -265,11 +269,26 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
         // 패링
         if (Input.GetKeyDown(KeyCode.C) || Input.GetKeyDown(KeyCode.LeftControl))
         {
-            if (canParry && !isParrying && !isDashing && attackLockTimer <= 0f)
+            if (canParry && !isParrying)
             {
-                if (AudioManager.Instance != null)
-                    AudioManager.Instance.PlaySFXInstant(AudioManager.Instance.playerParrySFX);
-                StartCoroutine(DoParry());
+                // 지상 여부: groundedRememberCounter(코요테타임)으로 판단
+                bool groundedForAction = groundedRememberCounter > 0f;
+
+                if (groundedForAction)
+                {
+                    // ★ 지상에서는 어떤 애니메이션 중이든 즉시 패링으로 전환
+                    InterruptToParryImmediately();
+                }
+                else
+                {
+                    // ★ 공중에서는 기존 제한 유지
+                    if (!isDashing && attackLockTimer <= 0f)
+                    {
+                        if (AudioManager.Instance != null)
+                            AudioManager.Instance.PlaySFXInstant(AudioManager.Instance.playerParrySFX);
+                        StartCoroutine(DoParry());
+                    }
+                }
             }
         }
 
@@ -355,6 +374,36 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
         Vector3 s = transform.localScale;
         s.x *= -1f;
         transform.localScale = s;
+    }
+
+    // --------------------------------------------------------
+    // 즉시 패링 인터럽트
+    // --------------------------------------------------------
+    void InterruptToParryImmediately()
+    {
+        // 사운드 먼저
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlaySFXInstant(AudioManager.Instance.playerParrySFX);
+
+        // 1) 대시 중이면 즉시 중단
+        ForceStopDash();
+
+        // 2) 공격 중이면 끊기
+        if (isAttacking) ResetCombo();
+
+        // 혹시 남은 트리거 정리(안전)
+        if (animator != null)
+        {
+            animator.ResetTrigger(animAttack1);
+            animator.ResetTrigger(animAttack2);
+            animator.ResetTrigger(animAttack3);
+        }
+
+        // 3) 이동 락 해제
+        attackLockTimer = 0f;
+
+        // 4) 바로 패링 시작
+        StartCoroutine(DoParry());
     }
 
     // --------------------------------------------------------
@@ -450,14 +499,16 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     }
 
     // --------------------------------------------------------
-    // Dash coroutine
+    // Dash coroutine (중단 가능)
     // --------------------------------------------------------
     IEnumerator DoDash()
     {
         if (fx) fx.PlayFx("DashStart", "Body");
 
         canDash = false;
+        _dashInterrupting = false;
         isDashing = true;
+
         if (animator != null)
         {
             foreach (var param in animator.parameters)
@@ -470,8 +521,14 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
             }
         }
 
+        _dashRoutine = StartCoroutine(DashRoutine());
+        yield break; // 대시는 별도 루틴에서 처리
+    }
+
+    IEnumerator DashRoutine()
+    {
         float elapsed = 0f;
-        float dir = isFacingRight ? 1f : -1f;
+        float dir = (transform.localScale.x >= 0f) ? 1f : -1f;
 
         float prevGravity = rb.gravityScale;
         float originalYVel = rb.linearVelocity.y;
@@ -479,17 +536,49 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
         float prevLock = attackLockTimer;
         attackLockTimer = dashDuration;
 
-        while (elapsed < dashDuration)
+        while (elapsed < dashDuration && !_dashInterrupting)
         {
             rb.linearVelocity = new Vector2(dir * dashSpeed, originalYVel);
             elapsed += Time.deltaTime;
             yield return null;
         }
 
+        // 종료 정리
         rb.gravityScale = prevGravity;
         isDashing = false;
-        attackLockTimer = prevLock;
+        attackLockTimer = _dashInterrupting ? 0f : prevLock;
 
+        _dashRoutine = null;
+
+        // 쿨다운
+        yield return new WaitForSeconds(dashCooldown);
+        canDash = true;
+    }
+
+    void ForceStopDash()
+    {
+        if (!isDashing) return;
+
+        _dashInterrupting = true;
+
+        if (_dashRoutine != null)
+        {
+            StopCoroutine(_dashRoutine);
+            _dashRoutine = null;
+        }
+
+        isDashing = false;
+        rb.gravityScale = normalGravity;
+        attackLockTimer = 0f;
+
+        // 쿨다운은 유지
+        StopCoroutine(nameof(DashCooldownOnly));
+        StartCoroutine(DashCooldownOnly());
+    }
+
+    IEnumerator DashCooldownOnly()
+    {
+        canDash = false;
         yield return new WaitForSeconds(dashCooldown);
         canDash = true;
     }

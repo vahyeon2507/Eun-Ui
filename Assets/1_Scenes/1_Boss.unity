@@ -3840,6 +3840,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 186193418}
     - target: {fileID: 8005152991228664262, guid: 705886ff133db74468b31e30d18bf1b0, type: 3}
+      propertyPath: Phase2HealthThreshold
+      value: 0.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 8005152991228664262, guid: 705886ff133db74468b31e30d18bf1b0, type: 3}
       propertyPath: attacksPhase1.Array.data[0].Damage
       value: 3
       objectReference: {fileID: 0}

@@ -659,6 +659,22 @@ PrefabInstance:
       propertyPath: parryWindow
       value: 0.4
       objectReference: {fileID: 0}
+    - target: {fileID: 1290639557195873711, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
+      propertyPath: parrySpecialDamage
+      value: 30
+      objectReference: {fileID: 0}
+    - target: {fileID: 1290639557195873711, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
+      propertyPath: 'comboDamages.Array.data[0]'
+      value: 8
+      objectReference: {fileID: 0}
+    - target: {fileID: 1290639557195873711, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
+      propertyPath: 'comboDamages.Array.data[1]'
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: 1290639557195873711, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
+      propertyPath: 'comboDamages.Array.data[2]'
+      value: 10
+      objectReference: {fileID: 0}
     - target: {fileID: 1407434714894907121, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
       propertyPath: redBar
       value: 
@@ -667,6 +683,10 @@ PrefabInstance:
       propertyPath: parryBar
       value: 
       objectReference: {fileID: 1705134711}
+    - target: {fileID: 1407434714894907121, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
+      propertyPath: maxHealth
+      value: 100
+      objectReference: {fileID: 0}
     - target: {fileID: 1407434714894907121, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
       propertyPath: yellowBar
       value: 

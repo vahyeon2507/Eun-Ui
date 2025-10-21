@@ -3956,6 +3956,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 238531823}
     - target: {fileID: 5716592064512074557, guid: 61a9b15369fc17e49a0e497ec34f6a86, type: 3}
+      propertyPath: fullscreenToggle
+      value: 
+      objectReference: {fileID: 0}
+    - target: {fileID: 5716592064512074557, guid: 61a9b15369fc17e49a0e497ec34f6a86, type: 3}
       propertyPath: settingsAnimator
       value: 
       objectReference: {fileID: 773021375}

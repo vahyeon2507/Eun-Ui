@@ -154,3 +154,20 @@ MonoBehaviour:
   followDamping: 0.12
   followOffset: {x: 0, y: 0}
   clampBounds: {fileID: 0}
+  defaultShakeAmplitude: 0.8
+  defaultShakeDuration: 0.15
+  defaultShakeFrequency: 22
+  punchZoomEnabled: 1
+  punchZoomTargetSize: 3.6
+  punchZoomIn: 0.08
+  punchZoomHold: 0.3
+  punchZoomOut: 0.5
+  punchZoomUseUnscaled: 1
+  testShakeAmplitude: 0.8
+  testShakeDuration: 0.15
+  testShakeFrequency: 22
+  testPunchTargetSize: 3.6
+  testPunchInTime: 0.08
+  testPunchHoldTime: 0.3
+  testPunchOutTime: 0.5
+  testPunchUnscaled: 1

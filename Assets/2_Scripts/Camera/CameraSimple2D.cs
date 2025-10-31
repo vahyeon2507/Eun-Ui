@@ -1,4 +1,8 @@
 using UnityEngine;
+using System.Collections; // IEnumerator
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 [DisallowMultipleComponent]
 public class CameraSimple2D : MonoBehaviour
@@ -11,19 +15,45 @@ public class CameraSimple2D : MonoBehaviour
     [Header("Clamp (optional)")]
     public BoxCollider2D clampBounds;
 
-    [Header("Shake (Inspector Defaults)")]
-    [Tooltip("흔들림 세기(위치 오프셋의 스케일)")]
-    [Range(0f, 2f)] public float shakeAmplitude = 0.8f;
-    [Tooltip("흔들림 유지 시간(초)")]
-    [Min(0f)] public float shakeDuration = 0.15f;
-    [Tooltip("퍼린 노이즈 샘플링 빈도(느리면 5~15, 빠르면 20~40)")]
-    [Range(0.1f, 60f)] public float shakeFrequency = 22f;
-
     // ---- shake runtime ----
     Vector2 _shakeOffset;
     float _shakeAmp, _shakeFreq, _shakeRemain;
 
+    // ---- punch zoom runtime ----
     Camera _cam;
+    Coroutine _zoomCR;
+
+    // ===== Shake defaults (for convenient external calls) =====
+    [Header("Shake Settings (Inspector defaults)")]
+    [Tooltip("기본 흔들림 세기")]
+    public float defaultShakeAmplitude = 0.8f;
+    [Tooltip("기본 흔들림 지속시간")]
+    public float defaultShakeDuration = 0.15f;
+    [Tooltip("기본 흔들림 주파수")]
+    public float defaultShakeFrequency = 22f;
+
+    // ===== Parry Special Punch Zoom =====
+    [Header("Punch Zoom (Parry Special)")]
+    public bool punchZoomEnabled = true;
+    [Tooltip("작을수록 더 확대됨 (목표 orthographicSize)")]
+    public float punchZoomTargetSize = 3.6f;
+    [Tooltip("줌-인 시간")] public float punchZoomIn = 0.08f;
+    [Tooltip("유지 시간")] public float punchZoomHold = 0.12f;
+    [Tooltip("복귀 시간")] public float punchZoomOut = 0.20f;
+    [Tooltip("Time.unscaledDeltaTime 사용")] public bool punchZoomUseUnscaled = true;
+
+    // ====== TEST PARAMS (Inspector Buttons use these) ======
+    [Header("Test ▸ Shake")]
+    [SerializeField] float testShakeAmplitude = 0.8f;
+    [SerializeField] float testShakeDuration = 0.15f;
+    [SerializeField] float testShakeFrequency = 22f;
+
+    [Header("Test ▸ Punch Zoom (absolute size)")]
+    [SerializeField] float testPunchTargetSize = 3.6f; // 목표 orthographicSize
+    [SerializeField] float testPunchInTime = 0.08f;
+    [SerializeField] float testPunchHoldTime = 0.10f;
+    [SerializeField] float testPunchOutTime = 0.18f;
+    [SerializeField] bool testPunchUnscaled = true;
 
     void Awake()
     {
@@ -45,7 +75,7 @@ public class CameraSimple2D : MonoBehaviour
         if (followTarget)
         {
             Vector3 target = followTarget.position + (Vector3)followOffset;
-            // 언스케일드 기반의 지연 보간(일시정지 영향 X)
+            // 언스케일드 기반 지연 보간
             float k = 1f - Mathf.Pow(1f - followDamping, Time.unscaledDeltaTime * 60f);
             pos = Vector3.Lerp(pos, new Vector3(target.x, target.y, pos.z), k);
         }
@@ -77,33 +107,98 @@ public class CameraSimple2D : MonoBehaviour
     }
 
     /// <summary>
-    /// 인스펙터 기본값으로 흔들기
+    /// 외부 흔들림 API. 파라미터를 음수로 넣으면 인스펙터 기본값을 사용.
     /// </summary>
-    public void Shake()
+    public void Shake(float amplitude = -1f, float duration = -1f, float frequency = -1f)
     {
-        Shake(shakeAmplitude, shakeDuration, shakeFrequency);
+        _shakeAmp = (amplitude > 0f) ? amplitude : defaultShakeAmplitude;
+        _shakeFreq = (frequency > 0f) ? frequency : defaultShakeFrequency;
+        float dur = (duration > 0f) ? duration : defaultShakeDuration;
+
+        _shakeRemain = Mathf.Max(_shakeRemain, dur); // 중복 호출 시 더 긴 쪽 유지
+    }
+
+    /// <summary>펀치 줌(목표 orthographicSize로 in→hold→out)</summary>
+    public void PunchZoom(float targetSize, float inT, float holdT, float outT, bool unscaled = true)
+    {
+        if (_cam == null) return;
+        if (_zoomCR != null) StopCoroutine(_zoomCR);
+        _zoomCR = StartCoroutine(CoPunchZoom(targetSize, inT, holdT, outT, unscaled));
     }
 
     /// <summary>
-    /// 외부에서 호출하는 흔들림 API (기존 시그니처 유지)
+    /// 패링 스페셜 전용 래퍼. PlayerController에서 cam.PunchZoomParrySpecial()로 호출.
     /// </summary>
-    public void Shake(float amplitude = 0.8f, float duration = 0.15f, float frequency = 22f)
+    public void PunchZoomParrySpecial()
     {
-        _shakeAmp = amplitude;
-        _shakeFreq = frequency;
-        _shakeRemain = Mathf.Max(_shakeRemain, duration); // 중복 호출 시 더 긴 쪽 유지
+        if (!punchZoomEnabled || _cam == null) return;
+
+        if (_zoomCR != null) { StopCoroutine(_zoomCR); _zoomCR = null; }
+        _zoomCR = StartCoroutine(CoPunchZoom(
+            punchZoomTargetSize,
+            punchZoomIn,
+            punchZoomHold,
+            punchZoomOut,
+            punchZoomUseUnscaled));
     }
 
-    /// <summary>
-    /// 인스펙터 기본값에 스케일만 곱해서 흔들기(예: 강하게=1.5, 약하게=0.5)
-    /// </summary>
-    public void ShakeScaled(float scale)
+    // === 내부 구현 ===
+    IEnumerator CoPunchZoom(float target, float inT, float holdT, float outT, bool unscaled)
     {
-        Shake(shakeAmplitude * scale, shakeDuration, shakeFrequency);
+        float start = _cam.orthographicSize;
+        float t = 0f;
+
+        // in
+        while (t < inT)
+        {
+            float a = inT > 0f ? t / inT : 1f;
+            _cam.orthographicSize = Mathf.Lerp(start, target, EaseOutCubic(a));
+            t += (unscaled ? Time.unscaledDeltaTime : Time.deltaTime);
+            yield return null;
+        }
+        _cam.orthographicSize = target;
+
+        // hold
+        t = 0f;
+        while (t < holdT)
+        {
+            t += (unscaled ? Time.unscaledDeltaTime : Time.deltaTime);
+            yield return null;
+        }
+
+        // out
+        t = 0f;
+        while (t < outT)
+        {
+            float a = outT > 0f ? t / outT : 1f;
+            _cam.orthographicSize = Mathf.Lerp(target, start, EaseOutCubic(a));
+            t += (unscaled ? Time.unscaledDeltaTime : Time.deltaTime);
+            yield return null;
+        }
+        _cam.orthographicSize = start;
+
+        _zoomCR = null;
     }
 
-#if UNITY_EDITOR
-    [ContextMenu("Test Shake (Defaults)")]
-    void _TestShake() => Shake();
-#endif
+    static float EaseOutCubic(float x)
+    {
+        x = Mathf.Clamp01(x);
+        return 1f - Mathf.Pow(1f - x, 3f);
+    }
+
+    // ===== Inspector Buttons (for quick tests) =====
+    public void Editor_TestShake() =>
+        Shake(testShakeAmplitude, testShakeDuration, testShakeFrequency);
+
+    public void Editor_TestPunchZoom()
+    {
+        if (_cam == null) _cam = GetComponent<Camera>();
+        PunchZoom(testPunchTargetSize, testPunchInTime, testPunchHoldTime, testPunchOutTime, testPunchUnscaled);
+    }
+
+    [ContextMenu("Test/Shake (use test params)")]
+    void Ctx_TestShake() => Editor_TestShake();
+
+    [ContextMenu("Test/Punch Zoom (use test params)")]
+    void Ctx_TestPunchZoom() => Editor_TestPunchZoom();
 }

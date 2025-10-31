@@ -740,14 +740,15 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
         parrySpecialLocked = true;
         if (animator != null) animator.SetTrigger(animParrySpecialTrigger);
 
-        // 스페셜 타격은 애니메이션 이벤트(OnParrySpecialHit)에서 처리
-        yield return TemporaryInvul(parrySpecialInvulDuration);
+        // ★ 여기서 카메라 줌 발동
+        var cam2D = Camera.main ? Camera.main.GetComponent<CameraSimple2D>() : null;
+        if (cam2D) cam2D.PunchZoomParrySpecial();
 
-        // **스페셜을 소비했을 때만 카운트 초기화**
+        // 이하 원래 로직 유지
+        yield return TemporaryInvul(parrySpecialInvulDuration);
         parrySuccessCount = 0;
         lastParrySuccessTime = -999f;
         OnParryStreakChanged?.Invoke(parrySuccessCount);
-
         yield return new WaitForSeconds(0.25f);
         parrySpecialLocked = false;
     }

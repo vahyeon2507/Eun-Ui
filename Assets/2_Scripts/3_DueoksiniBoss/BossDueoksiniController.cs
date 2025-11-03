@@ -1,86 +1,144 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 [DisallowMultipleComponent]
 public class BossDueoksiniController : MonoBehaviour
 {
-    // ===== References =====
+    // =========================
+    // Refs
+    // =========================
     [Header("Refs")]
-    [Tooltip("플레이어 Transform. 비워두면 태그 Player로 자동 탐색")]
-    public Transform player;
-    Rigidbody2D rb;
-    Animator anim;
+    public Transform player;                                // 플레이어 Transform(비워두면 Tag=Player 자동 탐색)
 
-    // ===== Charge (돌진) =====
+    // =========================
+    // Charge (dash) flow
+    // =========================
     [Header("Charge")]
-    [Tooltip("돌진 목표 거리(시작 시 플레이어 ‘가로’ 방향으로 이만큼 진행)")]
+    [Tooltip("돌진 총 가로 거리(+) = 우 / (–) = 좌. 실제로는 플레이어 방향을 보고 부호를 정함")]
     public float chargeDistance = 6f;
-    [Tooltip("돌진에 걸리는 시간")]
+
+    [Tooltip("돌진에 걸리는 시간(초)")]
     public float chargeTime = 0.6f;
-    [Tooltip("장애물 충돌 마스크. 맞으면 그 앞에서 멈춤")]
+
+    [Tooltip("벽/바닥 레이어(여기에 맞으면 앞에서 정지)")]
     public LayerMask environmentMask;
-    [Tooltip("멈출 때 벽과의 최소 간격")]
+
+    [Tooltip("벽 앞 세이프 간격")]
     public float wallSkin = 0.1f;
 
-    [Tooltip("돌진 애니메이션 트리거")]
+    [Tooltip("돌진 시작 애니 트리거(선택)")]
     public string chargeTrigger = "Charge";
-    [Tooltip("돌진 중 bool 파라미터(선택)")]
+
+    [Tooltip("돌진 중 true로 올릴 애니 Bool(선택)")]
     public string isChargingBool = "isCharging";
 
-    [Header("Facing/Move")]
-    [Tooltip("플레이어를 향해 좌우 반전할지")]
+    [Header("Face/Move")]
+    [Tooltip("행동 진입 시 플레이어를 바라보게 좌우 반전")]
     public bool facePlayer = true;
 
-    // ===== Prep (준비 모션) & Attack =====
-    public enum AttackKind { Swipe, ProjectileBurst, GroundSlam }
+    // =========================
+    // NEW: Charge-Prep (single)
+    // =========================
+    [Header("Charge ▸ Prep (single)")]
+    [Tooltip("돌진 직전 준비 모션(하나만). 비우면 준비 없이 바로 돌진/점프 판정")]
+    public string chargePrepTrigger = "Prep_Charge";
+    [Tooltip("애니메이션 이벤트로 종료할지 여부 (AnimEvent_PrepReady 호출)")]
+    public bool chargePrepEndByAnimEvent = false;
+    [Tooltip("이벤트를 쓰지 않는다면 대기 시간(초)")]
+    public float chargePrepHoldTime = 0.5f;
 
+    [Header("Charge ▸ Far → Jump branch")]
+    [Tooltip("돌진 준비 끝 시점에 플레이어와 X거리 절대값이 이 값보다 크면, 돌진 대신 점프 공격으로 분기")]
+    public float farDistanceThreshold = 10f;
+
+    // =========================
+    // Jump attack (when far)
+    // =========================
+    [Header("Jump Attack (when far at Charge-Prep)")]
+    [Tooltip("점프 총 시간(초)")]
+    public float jumpDuration = 0.8f;
+    [Tooltip("포물선 최고 높이 오프셋")]
+    public float jumpArcHeight = 3.5f;
+    [Tooltip("점프 시작 시 애니 트리거(선택)")]
+    public string jumpTrigger = "JumpAtk";
+    [Tooltip("착지 위치에서 GroundSlam을 같이 터뜨릴지")]
+    public bool jumpEndsWithSlam = true;
+
+    // =========================
+    // Attack-Prep list (multi)
+    // =========================
     [System.Serializable]
     public class PrepOption
     {
-        [Tooltip("준비모션 애니 트리거명")]
+        [Tooltip("공격 준비 모션 트리거(예: PrepA, PrepB …)")]
         public string prepTrigger = "PrepA";
-        [Tooltip("준비모션 대기 시간(애니메이션 이벤트로 끝내려면 0으로 두고 아래 플래그 사용)")]
-        public float prepHoldTime = 0.6f;
-        [Tooltip("랜덤 선택 가중치")]
-        public float weight = 1f;
-        [Tooltip("준비모션 이후 실행될 공격 종류")]
+        [Tooltip("이 준비 이후 실행할 공격 타입")]
         public AttackKind attack = AttackKind.Swipe;
-        [Tooltip("이 공격의 애니메이션 트리거(선택)")]
+        [Tooltip("공격 시 쏠 애니 트리거(선택)")]
         public string attackTrigger = "Atk_Swipe";
+        [Tooltip("이벤트를 쓰지 않는다면 준비 대기 시간(초)")]
+        public float prepHoldTime = 0.5f;
+        [Tooltip("랜덤 선택 가중치(클수록 잘 뽑힘)")]
+        public float weight = 1f;
     }
 
+    public enum AttackKind { Swipe, ProjectileBurst, GroundSlam }
+
     [Header("Prep & Attack")]
-    [Tooltip("준비모션 후보들(각 트리거마다 이어지는 공격이 다름)")]
-    public PrepOption[] preps;
-    [Tooltip("준비모션 종료를 애니메이션 이벤트로 받겠다면 체크")]
-    public bool endPrepByAnimEvent = false;
+    [Tooltip("여러 준비 모션 후보 + 각 준비에 매핑된 공격")]
+    public List<PrepOption> preps = new List<PrepOption>();
+    [Tooltip("공격 준비 종료를 애니메이션 이벤트로(AnimEvent_PrepReady) 처리")]
+    public bool attackPrepEndByAnimEvent = false;
 
-    // 공격별 옵션
+    // =========================
+    // Attack: Swipe
+    // =========================
     [Header("Attack ▸ Swipe")]
-    public Collider2D[] swipeHitboxes;
+    public List<Collider2D> swipeHitboxes = new List<Collider2D>();
     public float swipeActiveTime = 0.12f;
+    [Tooltip("애니 이벤트 AnimEvent_SwipeHitOn/Off로 직접 토글할지")]
+    public bool swipeUseAnimEvent = false;
 
+    // =========================
+    // Attack: Projectile Burst
+    // =========================
     [Header("Attack ▸ Projectile Burst")]
     public GameObject projectilePrefab;
-    public Transform[] projectileMuzzles;
+    public List<Transform> projectileMuzzles = new List<Transform>();
     public int projectileCount = 6;
     public float projectileInterval = 0.07f;
     public float projectileSpeed = 12f;
 
+    // =========================
+    // Attack: Ground Slam
+    // =========================
     [Header("Attack ▸ Ground Slam")]
-    public Collider2D[] slamHitboxes;
+    public List<Collider2D> slamHitboxes = new List<Collider2D>();
     public float slamActiveTime = 0.15f;
-    public float slamShakeAmp = 0.8f, slamShakeDur = 0.2f, slamShakeFreq = 20f;
 
-    enum State { Idle, Charging, Prep, Attacking, Recover }
-    State state = State.Idle;
+    [Tooltip("카메라 흔들림 (CameraSimple2D.Shake)")]
+    public float slamShakeAmp = 0.8f;
+    public float slamShakeDur = 0.2f;
+    public float slamShakeFreq = 22f;
 
-    bool _prepReadyFlag = false;
+    // =========================
+    // Internals
+    // =========================
+    Animator _anim;
+    Rigidbody2D _rb;
+    Vector3 _spawnPos;
+    int _lastPrepIndex = -1;
+
+    bool _waitingPrepEvent = false;   // 애니 이벤트로 준비 종료 대기 중
+    bool _inRoutine = false;
 
     void Awake()
     {
-        rb = GetComponent<Rigidbody2D>();
-        anim = GetComponent<Animator>();
+        _anim = GetComponent<Animator>();
+        _rb = GetComponent<Rigidbody2D>();
+        _spawnPos = transform.position;
+
         if (!player)
         {
             var p = GameObject.FindGameObjectWithTag("Player");
@@ -90,216 +148,332 @@ public class BossDueoksiniController : MonoBehaviour
 
     void OnEnable()
     {
-        StartCoroutine(AIRoutine());
+        if (!_inRoutine) StartCoroutine(MainLoop());
     }
 
-    IEnumerator AIRoutine()
+    // =========================
+    // Main FSM Loop
+    // =========================
+    IEnumerator MainLoop()
     {
-        yield return null;
+        _inRoutine = true;
 
         while (true)
         {
-            // 1) CHARGE
-            state = State.Charging;
-            if (facePlayer) FaceToPlayer();
-            if (!string.IsNullOrEmpty(chargeTrigger)) anim.SetTrigger(chargeTrigger);
-            if (!string.IsNullOrEmpty(isChargingBool)) anim.SetBool(isChargingBool, true);
-            yield return ChargeTowardPlayer();
-            if (!string.IsNullOrEmpty(isChargingBool)) anim.SetBool(isChargingBool, false);
+            // 1) Charge-Prep (single)
+            if (facePlayer) FaceTowardPlayer();
 
-            // 2) PREP
-            state = State.Prep;
-            var prep = PickPrep();
-            if (facePlayer) FaceToPlayer();
-            _prepReadyFlag = false;
-            if (!string.IsNullOrEmpty(prep.prepTrigger)) anim.SetTrigger(prep.prepTrigger);
+            yield return DoChargePrep();
 
-            if (endPrepByAnimEvent)
+            // Charge-Prep 종료 시 분기 결정
+            bool far = IsPlayerFar(farDistanceThreshold);
+
+            if (far)
             {
-                while (!_prepReadyFlag) yield return null;
+                // 2-a) Jump Attack → (landing) → 루프 리셋
+                yield return DoJumpAttack();
+                // 요구사항: 점프 후에는 공격 준비로 가지 않고, 루프를 초기화
+                continue; // while(true) 처음으로
             }
             else
             {
-                yield return new WaitForSeconds(prep.prepHoldTime);
+                // 2-b) Dash Charge (X만 이동)
+                yield return DoCharge();
             }
 
-            // 3) ATTACK
-            state = State.Attacking;
-            if (!string.IsNullOrEmpty(prep.attackTrigger))
-                anim.SetTrigger(prep.attackTrigger);
+            // 3) Attack-Prep (multi) → 4) Attack (매핑)
+            if (facePlayer) FaceTowardPlayer();
 
-            switch (prep.attack)
-            {
-                case AttackKind.Swipe: yield return DoAttack_Swipe(); break;
-                case AttackKind.ProjectileBurst: yield return DoAttack_ProjectileBurst(); break;
-                case AttackKind.GroundSlam: yield return DoAttack_GroundSlam(); break;
-            }
-
-            // 4) RECOVER
-            state = State.Recover;
-            yield return new WaitForSeconds(0.25f);
-            state = State.Idle;
-            yield return null;
+            var prep = PickPrep();
+            yield return DoAttackPrep(prep);
+            yield return DoAttack(prep);
         }
     }
 
-    // ===== CHARGE (Y 고정) =====
-    IEnumerator ChargeTowardPlayer()
+    // =========================
+    // Steps
+    // =========================
+    IEnumerator DoChargePrep()
     {
-        Vector2 start = rb.position;
-        float fixedY = start.y;
+        if (!string.IsNullOrEmpty(chargePrepTrigger) && _anim)
+            _anim.SetTrigger(chargePrepTrigger);
 
-        // X 방향만 결정 (+1 or -1)
-        float sign;
-        if (player) sign = (player.position.x - transform.position.x) >= 0f ? 1f : -1f;
-        else sign = transform.localScale.x >= 0f ? 1f : -1f;
+        if (chargePrepEndByAnimEvent)
+        {
+            _waitingPrepEvent = true;
+            while (_waitingPrepEvent) yield return null;
+        }
+        else
+        {
+            yield return new WaitForSeconds(chargePrepHoldTime);
+        }
+    }
 
-        Vector2 dir = new Vector2(sign, 0f); // ★ Y 불변
+    IEnumerator DoCharge()
+    {
+        if (_anim && !string.IsNullOrEmpty(chargeTrigger))
+            _anim.SetTrigger(chargeTrigger);
+        if (_anim && !string.IsNullOrEmpty(isChargingBool))
+            _anim.SetBool(isChargingBool, true);
 
-        // 레이캐스트로 벽까지 거리 제한
-        float dist = chargeDistance;
-        var hit = Physics2D.Raycast(start, dir, chargeDistance, environmentMask);
-        if (hit.collider) dist = Mathf.Max(0f, hit.distance - wallSkin);
+        // 목표 X 계산(플레이어 방향)
+        int dir = DirToPlayer(); // -1 or +1
+        float startX = transform.position.x;
+        float targetX = startX + dir * Mathf.Abs(chargeDistance);
 
-        Vector2 end = start + dir * dist;
+        // 벽 확인: 시작 위치에서 타깃 방향으로 레이
+        float rayLen = Mathf.Abs(chargeDistance) + wallSkin;
+        RaycastHit2D hit = Physics2D.Raycast(
+            origin: new Vector2(transform.position.x, transform.position.y),
+            direction: new Vector2(dir, 0f),
+            distance: rayLen,
+            layerMask: environmentMask
+        );
+        if (hit.collider)
+        {
+            // 벽 앞에서 멈춤
+            targetX = hit.point.x - dir * wallSkin;
+        }
 
+        // 시간 보간 (Y 고정!)
         float t = 0f;
+        Vector3 p0 = transform.position;
+        Vector3 p1 = new Vector3(targetX, p0.y, p0.z);
+
         while (t < chargeTime)
         {
+            float a = Mathf.Clamp01(t / Mathf.Max(0.0001f, chargeTime));
+            float k = EaseInOut(a);
+            Vector3 pos = Vector3.Lerp(p0, p1, k);
+            pos.y = p0.y; // Y 고정
+            transform.position = pos;
+
             t += Time.deltaTime;
-            float a = chargeTime > 0 ? t / chargeTime : 1f;
-            float k = EaseInOutCubic(a);
-            float lerpX = Mathf.Lerp(start.x, end.x, k);
-            rb.MovePosition(new Vector2(lerpX, fixedY)); // ★ Y 고정 이동
-            yield return new WaitForFixedUpdate();
+            yield return null;
         }
-        rb.MovePosition(new Vector2(end.x, fixedY));
-        rb.linearVelocity = Vector2.zero;
+
+        transform.position = p1;
+
+        if (_anim && !string.IsNullOrEmpty(isChargingBool))
+            _anim.SetBool(isChargingBool, false);
     }
 
-    // ===== PREP PICK =====
-    int _lastPrepIndex = -1;
+    IEnumerator DoJumpAttack()
+    {
+        if (_anim && !string.IsNullOrEmpty(jumpTrigger))
+            _anim.SetTrigger(jumpTrigger);
+
+        // 점프 목표: 현재 프레임의 플레이어 X로 수평 정렬 (착지 Y는 시작 Y로 복귀)
+        Vector3 start = transform.position;
+        Vector3 end = new Vector3(player ? player.position.x : start.x, start.y, start.z);
+
+        // 얼굴 방향
+        if (facePlayer) FaceTowardPlayer();
+
+        float t = 0f;
+        while (t < jumpDuration)
+        {
+            float a = Mathf.Clamp01(t / Mathf.Max(0.0001f, jumpDuration));
+            // 포물선: yOffset = 4h*a*(1-a)
+            float yOffset = 4f * jumpArcHeight * a * (1f - a);
+            float x = Mathf.Lerp(start.x, end.x, a);
+            float y = Mathf.Lerp(start.y, start.y, a) + yOffset;
+
+            transform.position = new Vector3(x, y, start.z);
+
+            t += Time.deltaTime;
+            yield return null;
+        }
+        transform.position = new Vector3(end.x, start.y, start.z);
+
+        // 착지 효과: Ground Slam 옵션
+        if (jumpEndsWithSlam)
+        {
+            yield return DoSlamOnce();
+        }
+    }
+
     PrepOption PickPrep()
     {
-        if (preps == null || preps.Length == 0) return new PrepOption();
+        if (preps == null || preps.Count == 0)
+            return new PrepOption(); // 기본값
 
+        // 직전과 같은 준비는 피하고, weight로 가중치 선택
+        int n = preps.Count;
         float total = 0f;
-        for (int i = 0; i < preps.Length; i++)
+        for (int i = 0; i < n; i++)
         {
             if (i == _lastPrepIndex) continue;
             total += Mathf.Max(0f, preps[i].weight);
         }
-        if (total <= 0f)
-        {
-            _lastPrepIndex = (_lastPrepIndex + 1) % preps.Length;
-            return preps[_lastPrepIndex];
-        }
-
         float r = Random.value * total;
-        for (int i = 0; i < preps.Length; i++)
+        for (int i = 0; i < n; i++)
         {
             if (i == _lastPrepIndex) continue;
             float w = Mathf.Max(0f, preps[i].weight);
-            if (r <= w) { _lastPrepIndex = i; return preps[i]; }
+            if (r < w) { _lastPrepIndex = i; return preps[i]; }
             r -= w;
         }
-        _lastPrepIndex = preps.Length - 1;
-        return preps[_lastPrepIndex];
+        _lastPrepIndex = 0;
+        return preps[0];
     }
 
-    // ===== ATTACKS =====
-    IEnumerator DoAttack_Swipe()
+    IEnumerator DoAttackPrep(PrepOption opt)
     {
-        if (swipeHitboxes != null && swipeHitboxes.Length > 0)
+        if (_anim && !string.IsNullOrEmpty(opt.prepTrigger))
+            _anim.SetTrigger(opt.prepTrigger);
+
+        if (attackPrepEndByAnimEvent)
         {
-            SetCollidersEnabled(swipeHitboxes, true);
-            yield return new WaitForSeconds(swipeActiveTime);
-            SetCollidersEnabled(swipeHitboxes, false);
+            _waitingPrepEvent = true;
+            while (_waitingPrepEvent) yield return null;
         }
-        else yield return new WaitForSeconds(0.15f);
+        else
+        {
+            yield return new WaitForSeconds(Mathf.Max(0f, opt.prepHoldTime));
+        }
     }
 
-    IEnumerator DoAttack_ProjectileBurst()
+    IEnumerator DoAttack(PrepOption opt)
     {
-        if (!projectilePrefab || projectileMuzzles == null || projectileMuzzles.Length == 0)
+        if (_anim && !string.IsNullOrEmpty(opt.attackTrigger))
+            _anim.SetTrigger(opt.attackTrigger);
+
+        switch (opt.attack)
         {
-            yield return new WaitForSeconds(0.2f);
+            case AttackKind.Swipe:
+                yield return DoSwipeOnce();
+                break;
+            case AttackKind.ProjectileBurst:
+                yield return DoProjectileBurst();
+                break;
+            case AttackKind.GroundSlam:
+                yield return DoSlamOnce();
+                break;
+        }
+    }
+
+    // =========================
+    // Attacks
+    // =========================
+    IEnumerator DoSwipeOnce()
+    {
+        if (swipeUseAnimEvent)
+        {
+            // 애니 이벤트가 On/Off를 제어한다. 여기서는 단순히 짧은 대기만.
+            // (필요하면 공격 애니 길이만큼 Wait)
+            yield return new WaitForSeconds(Mathf.Max(0.05f, swipeActiveTime));
+        }
+        else
+        {
+            ToggleColliders(swipeHitboxes, true);
+            yield return new WaitForSeconds(swipeActiveTime);
+            ToggleColliders(swipeHitboxes, false);
+        }
+    }
+
+    IEnumerator DoProjectileBurst()
+    {
+        if (!projectilePrefab || projectileMuzzles.Count == 0)
+        {
             yield break;
         }
 
         for (int i = 0; i < projectileCount; i++)
         {
-            foreach (var mz in projectileMuzzles)
+            foreach (var m in projectileMuzzles)
             {
-                if (!mz) continue;
-                var go = Instantiate(projectilePrefab, mz.position, mz.rotation);
-                var rb2 = go.GetComponent<Rigidbody2D>();
-                if (rb2)
-                {
-                    Vector2 dir = player ? (player.position - mz.position).normalized
-                                         : (transform.localScale.x >= 0 ? Vector2.right : Vector2.left);
-                    rb2.linearVelocity = dir * projectileSpeed;
-                }
+                if (!m) continue;
+                var go = GameObject.Instantiate(projectilePrefab, m.position, m.rotation);
+                var rb = go.GetComponent<Rigidbody2D>();
+                Vector2 dir = Vector2.right * DirToPlayer();
+                if (player) dir = (player.position - m.position).normalized;
+                if (rb) rb.linearVelocity = dir * projectileSpeed;
             }
-            yield return new WaitForSeconds(projectileInterval);
+            if (projectileInterval > 0f)
+                yield return new WaitForSeconds(projectileInterval);
+            else
+                yield return null;
         }
     }
 
-    IEnumerator DoAttack_GroundSlam()
+    IEnumerator DoSlamOnce()
     {
-        var cam2D = Camera.main ? Camera.main.GetComponent<CameraSimple2D>() : null;
-        if (cam2D) cam2D.Shake(slamShakeAmp, slamShakeDur, slamShakeFreq);
+        // 카메라 흔들림(있으면)
+        var cam = Camera.main ? Camera.main.GetComponent<CameraSimple2D>() : null;
+        if (cam) cam.Shake(slamShakeAmp, slamShakeDur, slamShakeFreq);
 
-        if (slamHitboxes != null && slamHitboxes.Length > 0)
-        {
-            SetCollidersEnabled(slamHitboxes, true);
-            yield return new WaitForSeconds(slamActiveTime);
-            SetCollidersEnabled(slamHitboxes, false);
-        }
-        else yield return new WaitForSeconds(0.2f);
+        ToggleColliders(slamHitboxes, true);
+        yield return new WaitForSeconds(slamActiveTime);
+        ToggleColliders(slamHitboxes, false);
     }
 
-    // ===== Utilities =====
-    void SetCollidersEnabled(Collider2D[] arr, bool on)
+    // =========================
+    // Helpers
+    // =========================
+    bool IsPlayerFar(float threshold)
     {
-        for (int i = 0; i < arr.Length; i++)
-            if (arr[i]) arr[i].enabled = on;
+        if (!player) return false;
+        return Mathf.Abs(player.position.x - transform.position.x) > Mathf.Abs(threshold);
     }
 
-    void FaceToPlayer()
+    int DirToPlayer()
     {
-        if (!player) return;
-        bool right = (player.position.x - transform.position.x) >= 0f;
+        if (!player) return transform.localScale.x >= 0f ? 1 : -1;
+        return (player.position.x - transform.position.x) >= 0f ? 1 : -1;
+    }
+
+    void FaceTowardPlayer()
+    {
+        int dir = DirToPlayer();
         Vector3 s = transform.localScale;
-        s.x = Mathf.Abs(s.x) * (right ? 1f : -1f);
+        s.x = Mathf.Abs(s.x) * (dir >= 0 ? 1f : -1f);
         transform.localScale = s;
     }
 
-    static float EaseInOutCubic(float t)
+    static void ToggleColliders(List<Collider2D> list, bool on)
     {
-        t = Mathf.Clamp01(t);
-        return t < 0.5f ? 4f * t * t * t : 1f - Mathf.Pow(-2f * t + 2f, 3f) / 2f;
+        if (list == null) return;
+        for (int i = 0; i < list.Count; i++)
+        {
+            if (list[i]) list[i].enabled = on;
+        }
     }
 
-    // ===== Animation Events =====
-    public void AnimEvent_PrepReady() { _prepReadyFlag = true; }
-    public void AnimEvent_SwipeHitOn() => SetCollidersEnabled(swipeHitboxes, true);
-    public void AnimEvent_SwipeHitOff() => SetCollidersEnabled(swipeHitboxes, false);
-    public void AnimEvent_SlamHitOn() => SetCollidersEnabled(slamHitboxes, true);
-    public void AnimEvent_SlamHitOff() => SetCollidersEnabled(slamHitboxes, false);
+    static float EaseInOut(float x)
+    {
+        x = Mathf.Clamp01(x);
+        // smootherstep-ish
+        return x * x * (3f - 2f * x);
+    }
 
-#if UNITY_EDITOR
+    // =========================
+    // Animation Events
+    // =========================
+    // 준비 모션 종료 이벤트(Charge-Prep/Attack-Prep 공용)
+    public void AnimEvent_PrepReady()
+    {
+        _waitingPrepEvent = false;
+    }
+
+    // 스와이프/슬램 충돌 On/Off (애니 이벤트용)
+    public void AnimEvent_SwipeHitOn() { ToggleColliders(swipeHitboxes, true); }
+    public void AnimEvent_SwipeHitOff() { ToggleColliders(swipeHitboxes, false); }
+    public void AnimEvent_SlamHitOn() { ToggleColliders(slamHitboxes, true); }
+    public void AnimEvent_SlamHitOff() { ToggleColliders(slamHitboxes, false); }
+
+    // =========================
+    // Gizmos (에디터 미리보기)
+    // =========================
     void OnDrawGizmosSelected()
     {
-        // 가로 돌진 라인 미리보기
-        float sign;
-        if (player) sign = (player.position.x - transform.position.x) >= 0f ? 1f : -1f;
-        else sign = transform.localScale.x >= 0f ? 1f : -1f;
-
-        Vector3 dir = new Vector3(sign, 0f, 0f);
         Gizmos.color = Color.cyan;
-        Gizmos.DrawLine(transform.position,
-                        transform.position + dir * chargeDistance);
+        Vector3 a = transform.position;
+        Vector3 b = a + Vector3.right * Mathf.Sign(transform.localScale.x == 0 ? 1f : transform.localScale.x) * chargeDistance;
+        Gizmos.DrawLine(a, b);
+        Gizmos.DrawSphere(b, 0.08f);
+
+        Gizmos.color = Color.magenta;
+        Gizmos.DrawWireSphere(transform.position, Mathf.Abs(farDistanceThreshold));
     }
-#endif
 }

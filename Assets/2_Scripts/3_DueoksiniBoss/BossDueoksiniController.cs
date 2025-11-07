@@ -9,7 +9,16 @@ public class BossDueoksiniController : MonoBehaviour
     // Refs
     // =========================
     [Header("Refs")]
-    public Transform player;                                // 플레이어 Transform(비워두면 Tag=Player 자동 탐색)
+    public Transform player; // (비워두면 Tag=Player 자동 탐색)
+
+    // === NEW: Graphics/Animator 전용 참조(자식으로 옮겨도 동작) ===
+    [Header("Graphics (optional)")]
+    [Tooltip("보스의 애니메이터(보통 GfxRoot에 있음). 비워두면 자식에서 자동 탐색")]
+    public Animator gfxAnimator;
+    [Tooltip("보스의 스프라이트 렌더러(자식). 비워두면 자식에서 자동 탐색")]
+    public SpriteRenderer gfxRenderer;
+    [Tooltip("좌우 반전을 적용할 트랜스폼(보통 FacingPivot). 비워두면 gfxRenderer/Animator의 Transform → 없으면 루트")]
+    public Transform gfxFlipRoot;
 
     // =========================
     // Charge (dash) flow
@@ -17,19 +26,14 @@ public class BossDueoksiniController : MonoBehaviour
     [Header("Charge")]
     [Tooltip("돌진 총 가로 거리(+) = 우 / (–) = 좌. 실제로는 플레이어 방향을 보고 부호를 정함")]
     public float chargeDistance = 6f;
-
     [Tooltip("돌진에 걸리는 시간(초)")]
     public float chargeTime = 0.6f;
-
     [Tooltip("벽/바닥 레이어(여기에 맞으면 앞에서 정지)")]
     public LayerMask environmentMask;
-
     [Tooltip("벽 앞 세이프 간격")]
     public float wallSkin = 0.1f;
-
     [Tooltip("돌진 시작 애니 트리거(선택)")]
     public string chargeTrigger = "Charge";
-
     [Tooltip("돌진 중 true로 올릴 애니 Bool(선택)")]
     public string isChargingBool = "isCharging";
 
@@ -56,13 +60,9 @@ public class BossDueoksiniController : MonoBehaviour
     // Jump attack (when far)
     // =========================
     [Header("Jump Attack (when far at Charge-Prep)")]
-    [Tooltip("점프 총 시간(초)")]
     public float jumpDuration = 0.8f;
-    [Tooltip("포물선 최고 높이 오프셋")]
     public float jumpArcHeight = 3.5f;
-    [Tooltip("점프 시작 시 애니 트리거(선택)")]
     public string jumpTrigger = "JumpAtk";
-    [Tooltip("착지 위치에서 GroundSlam을 같이 터뜨릴지")]
     public bool jumpEndsWithSlam = true;
 
     // =========================
@@ -71,24 +71,17 @@ public class BossDueoksiniController : MonoBehaviour
     [System.Serializable]
     public class PrepOption
     {
-        [Tooltip("공격 준비 모션 트리거(예: PrepA, PrepB …)")]
         public string prepTrigger = "PrepA";
-        [Tooltip("이 준비 이후 실행할 공격 타입")]
         public AttackKind attack = AttackKind.Swipe;
-        [Tooltip("공격 시 쏠 애니 트리거(선택)")]
         public string attackTrigger = "Atk_Swipe";
-        [Tooltip("이벤트를 쓰지 않는다면 준비 대기 시간(초)")]
         public float prepHoldTime = 0.5f;
-        [Tooltip("랜덤 선택 가중치(클수록 잘 뽑힘)")]
         public float weight = 1f;
     }
 
     public enum AttackKind { Swipe, ProjectileBurst, GroundSlam }
 
     [Header("Prep & Attack")]
-    [Tooltip("여러 준비 모션 후보 + 각 준비에 매핑된 공격")]
     public List<PrepOption> preps = new List<PrepOption>();
-    [Tooltip("공격 준비 종료를 애니메이션 이벤트로(AnimEvent_PrepReady) 처리")]
     public bool attackPrepEndByAnimEvent = false;
 
     // =========================
@@ -116,8 +109,6 @@ public class BossDueoksiniController : MonoBehaviour
     [Header("Attack ▸ Ground Slam")]
     public List<Collider2D> slamHitboxes = new List<Collider2D>();
     public float slamActiveTime = 0.15f;
-
-    [Tooltip("카메라 흔들림 (CameraSimple2D.Shake)")]
     public float slamShakeAmp = 0.8f;
     public float slamShakeDur = 0.2f;
     public float slamShakeFreq = 22f;
@@ -125,25 +116,36 @@ public class BossDueoksiniController : MonoBehaviour
     // =========================
     // Internals
     // =========================
-    Animator _anim;
+    Animator _anim;               // 실제로 사용할 애니메이터(= gfxAnimator)
     Rigidbody2D _rb;
     Vector3 _spawnPos;
     int _lastPrepIndex = -1;
 
-    bool _waitingPrepEvent = false;   // 애니 이벤트로 준비 종료 대기 중
+    bool _waitingPrepEvent = false;
     bool _inRoutine = false;
 
     void Awake()
     {
-        _anim = GetComponent<Animator>();
-        _rb = GetComponent<Rigidbody2D>();
-        _spawnPos = transform.position;
-
+        // --- 플레이어 자동 찾기 ---
         if (!player)
         {
             var p = GameObject.FindGameObjectWithTag("Player");
             if (p) player = p.transform;
         }
+
+        // --- 그래픽/애니메이터 자동 바인딩 (자식 포함) ---
+        if (!gfxAnimator) gfxAnimator = GetComponentInChildren<Animator>(true);
+        if (!gfxRenderer) gfxRenderer = GetComponentInChildren<SpriteRenderer>(true);
+        if (!gfxFlipRoot)
+        {
+            if (gfxRenderer) gfxFlipRoot = gfxRenderer.transform;
+            else if (gfxAnimator) gfxFlipRoot = gfxAnimator.transform;
+            else gfxFlipRoot = transform; // 최후 폴백
+        }
+        _anim = gfxAnimator; // 기존 코드와의 최소 변경을 위해 내부 필드에 연결
+
+        _rb = GetComponent<Rigidbody2D>();
+        _spawnPos = transform.position;
     }
 
     void OnEnable()
@@ -165,23 +167,22 @@ public class BossDueoksiniController : MonoBehaviour
 
             yield return DoChargePrep();
 
-            // Charge-Prep 종료 시 분기 결정
+            // 분기
             bool far = IsPlayerFar(farDistanceThreshold);
 
             if (far)
             {
-                // 2-a) Jump Attack → (landing) → 루프 리셋
+                // 2-a) Jump Attack → 루프 초기화
                 yield return DoJumpAttack();
-                // 요구사항: 점프 후에는 공격 준비로 가지 않고, 루프를 초기화
-                continue; // while(true) 처음으로
+                continue;
             }
             else
             {
-                // 2-b) Dash Charge (X만 이동)
+                // 2-b) Dash Charge (Y 고정)
                 yield return DoCharge();
             }
 
-            // 3) Attack-Prep (multi) → 4) Attack (매핑)
+            // 3) Attack-Prep → 4) Attack
             if (facePlayer) FaceTowardPlayer();
 
             var prep = PickPrep();
@@ -216,26 +217,23 @@ public class BossDueoksiniController : MonoBehaviour
         if (_anim && !string.IsNullOrEmpty(isChargingBool))
             _anim.SetBool(isChargingBool, true);
 
-        // 목표 X 계산(플레이어 방향)
-        int dir = DirToPlayer(); // -1 or +1
+        // 목표 X(플레이어 방향)
+        int dir = DirToPlayer();
         float startX = transform.position.x;
         float targetX = startX + dir * Mathf.Abs(chargeDistance);
 
-        // 벽 확인: 시작 위치에서 타깃 방향으로 레이
+        // 벽 체크
         float rayLen = Mathf.Abs(chargeDistance) + wallSkin;
         RaycastHit2D hit = Physics2D.Raycast(
-            origin: new Vector2(transform.position.x, transform.position.y),
-            direction: new Vector2(dir, 0f),
-            distance: rayLen,
-            layerMask: environmentMask
+            new Vector2(transform.position.x, transform.position.y),
+            new Vector2(dir, 0f),
+            rayLen,
+            environmentMask
         );
         if (hit.collider)
-        {
-            // 벽 앞에서 멈춤
             targetX = hit.point.x - dir * wallSkin;
-        }
 
-        // 시간 보간 (Y 고정!)
+        // 시간 보간 (Y 고정)
         float t = 0f;
         Vector3 p0 = transform.position;
         Vector3 p1 = new Vector3(targetX, p0.y, p0.z);
@@ -251,7 +249,6 @@ public class BossDueoksiniController : MonoBehaviour
             t += Time.deltaTime;
             yield return null;
         }
-
         transform.position = p1;
 
         if (_anim && !string.IsNullOrEmpty(isChargingBool))
@@ -263,21 +260,18 @@ public class BossDueoksiniController : MonoBehaviour
         if (_anim && !string.IsNullOrEmpty(jumpTrigger))
             _anim.SetTrigger(jumpTrigger);
 
-        // 점프 목표: 현재 프레임의 플레이어 X로 수평 정렬 (착지 Y는 시작 Y로 복귀)
         Vector3 start = transform.position;
         Vector3 end = new Vector3(player ? player.position.x : start.x, start.y, start.z);
 
-        // 얼굴 방향
         if (facePlayer) FaceTowardPlayer();
 
         float t = 0f;
         while (t < jumpDuration)
         {
             float a = Mathf.Clamp01(t / Mathf.Max(0.0001f, jumpDuration));
-            // 포물선: yOffset = 4h*a*(1-a)
             float yOffset = 4f * jumpArcHeight * a * (1f - a);
             float x = Mathf.Lerp(start.x, end.x, a);
-            float y = Mathf.Lerp(start.y, start.y, a) + yOffset;
+            float y = start.y + yOffset;
 
             transform.position = new Vector3(x, y, start.z);
 
@@ -286,19 +280,15 @@ public class BossDueoksiniController : MonoBehaviour
         }
         transform.position = new Vector3(end.x, start.y, start.z);
 
-        // 착지 효과: Ground Slam 옵션
         if (jumpEndsWithSlam)
-        {
             yield return DoSlamOnce();
-        }
     }
 
     PrepOption PickPrep()
     {
         if (preps == null || preps.Count == 0)
-            return new PrepOption(); // 기본값
+            return new PrepOption();
 
-        // 직전과 같은 준비는 피하고, weight로 가중치 선택
         int n = preps.Count;
         float total = 0f;
         for (int i = 0; i < n; i++)
@@ -341,15 +331,9 @@ public class BossDueoksiniController : MonoBehaviour
 
         switch (opt.attack)
         {
-            case AttackKind.Swipe:
-                yield return DoSwipeOnce();
-                break;
-            case AttackKind.ProjectileBurst:
-                yield return DoProjectileBurst();
-                break;
-            case AttackKind.GroundSlam:
-                yield return DoSlamOnce();
-                break;
+            case AttackKind.Swipe: yield return DoSwipeOnce(); break;
+            case AttackKind.ProjectileBurst: yield return DoProjectileBurst(); break;
+            case AttackKind.GroundSlam: yield return DoSlamOnce(); break;
         }
     }
 
@@ -360,8 +344,6 @@ public class BossDueoksiniController : MonoBehaviour
     {
         if (swipeUseAnimEvent)
         {
-            // 애니 이벤트가 On/Off를 제어한다. 여기서는 단순히 짧은 대기만.
-            // (필요하면 공격 애니 길이만큼 Wait)
             yield return new WaitForSeconds(Mathf.Max(0.05f, swipeActiveTime));
         }
         else
@@ -374,10 +356,7 @@ public class BossDueoksiniController : MonoBehaviour
 
     IEnumerator DoProjectileBurst()
     {
-        if (!projectilePrefab || projectileMuzzles.Count == 0)
-        {
-            yield break;
-        }
+        if (!projectilePrefab || projectileMuzzles.Count == 0) yield break;
 
         for (int i = 0; i < projectileCount; i++)
         {
@@ -390,16 +369,13 @@ public class BossDueoksiniController : MonoBehaviour
                 if (player) dir = (player.position - m.position).normalized;
                 if (rb) rb.linearVelocity = dir * projectileSpeed;
             }
-            if (projectileInterval > 0f)
-                yield return new WaitForSeconds(projectileInterval);
-            else
-                yield return null;
+            if (projectileInterval > 0f) yield return new WaitForSeconds(projectileInterval);
+            else yield return null;
         }
     }
 
     IEnumerator DoSlamOnce()
     {
-        // 카메라 흔들림(있으면)
         var cam = Camera.main ? Camera.main.GetComponent<CameraSimple2D>() : null;
         if (cam) cam.Shake(slamShakeAmp, slamShakeDur, slamShakeFreq);
 
@@ -425,10 +401,12 @@ public class BossDueoksiniController : MonoBehaviour
 
     void FaceTowardPlayer()
     {
+        // === 그래픽만 뒤집는다(히트박스/루트는 그대로) ===
         int dir = DirToPlayer();
-        Vector3 s = transform.localScale;
+        var target = gfxFlipRoot ? gfxFlipRoot : transform;
+        Vector3 s = target.localScale;
         s.x = Mathf.Abs(s.x) * (dir >= 0 ? 1f : -1f);
-        transform.localScale = s;
+        target.localScale = s;
     }
 
     static void ToggleColliders(List<Collider2D> list, bool on)
@@ -443,33 +421,27 @@ public class BossDueoksiniController : MonoBehaviour
     static float EaseInOut(float x)
     {
         x = Mathf.Clamp01(x);
-        // smootherstep-ish
         return x * x * (3f - 2f * x);
     }
 
     // =========================
     // Animation Events
     // =========================
-    // 준비 모션 종료 이벤트(Charge-Prep/Attack-Prep 공용)
-    public void AnimEvent_PrepReady()
-    {
-        _waitingPrepEvent = false;
-    }
-
-    // 스와이프/슬램 충돌 On/Off (애니 이벤트용)
+    public void AnimEvent_PrepReady() { _waitingPrepEvent = false; }
     public void AnimEvent_SwipeHitOn() { ToggleColliders(swipeHitboxes, true); }
     public void AnimEvent_SwipeHitOff() { ToggleColliders(swipeHitboxes, false); }
     public void AnimEvent_SlamHitOn() { ToggleColliders(slamHitboxes, true); }
     public void AnimEvent_SlamHitOff() { ToggleColliders(slamHitboxes, false); }
 
     // =========================
-    // Gizmos (에디터 미리보기)
+    // Gizmos
     // =========================
     void OnDrawGizmosSelected()
     {
         Gizmos.color = Color.cyan;
         Vector3 a = transform.position;
-        Vector3 b = a + Vector3.right * Mathf.Sign(transform.localScale.x == 0 ? 1f : transform.localScale.x) * chargeDistance;
+        float sign = Mathf.Sign(transform.localScale.x == 0 ? 1f : transform.localScale.x);
+        Vector3 b = a + Vector3.right * sign * chargeDistance;
         Gizmos.DrawLine(a, b);
         Gizmos.DrawSphere(b, 0.08f);
 

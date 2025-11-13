@@ -2360,18 +2360,50 @@ MonoBehaviour:
   jumpArcHeight: 3.5
   jumpTrigger: JumpAtk
   jumpEndsWithSlam: 1
+  simpleAttacks:
+  - name: Stabbing the regime
+    attackTrigger: Stabbing the regime
+    useAnimEvent: 0
+    activeTime: 0
+    hitboxes:
+    - {fileID: 0}
+    moveDistance: 0
+    moveTime: 0
+    moveCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 0
+      m_PostInfinity: 0
+      m_RotationOrder: 0
+  - name: Stabbing the regime
+    attackTrigger: Stabbing the regime
+    useAnimEvent: 0
+    activeTime: 0
+    hitboxes:
+    - {fileID: 0}
+    moveDistance: 2
+    moveTime: 2
+    moveCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 0
+      m_PostInfinity: 0
+      m_RotationOrder: 0
   preps:
-  - prepTrigger: Attack Ready
-    attack: 0
-    attackTrigger: 
+  - prepTrigger: Atk_Swipe
     prepHoldTime: 2
     weight: 0
+    useAnimEventEnd: 0
+    attack: 0
+    simpleIndex: 0
+    simpleChoices:
+    - simpleIndex: 0
+      weight: 0
+    attackTriggerOverride: 
   attackPrepEndByAnimEvent: 0
-  swipeHitboxes: []
-  swipeActiveTime: 0.12
-  swipeUseAnimEvent: 0
   projectilePrefab: {fileID: 1658260126}
-  projectileMuzzles: []
+  projectileMuzzles:
+  - {fileID: 0}
   projectileCount: 6
   projectileInterval: 0.07
   projectileSpeed: 12
@@ -4357,13 +4389,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cbee1e985dfe3784d95ebc06562d5d9b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  spriteRenderer: {fileID: 2012914638}
+  sprite: {fileID: 2012914638}
   anchorWorld: {fileID: 1223122963}
+  clampAnchors01: 1
   spriteAnchorX: 0
   spriteAnchorY: 0
-  lockX: 0
+  lockX: 1
   lockY: 1
   extraOffset: {x: 0, y: 0}
+  mirrorXOnFlip: 1
+  flipRoot: {fileID: 1637889249}
+  perClip:
+  - clip: {fileID: 7400000, guid: 9d43b69b1d2dec142a800945e78d1f8a, type: 2}
+    anchorX: 0
+    anchorY: 0
+    extraOffset: {x: 0, y: 0}
 --- !u!95 &2012914637
 Animator:
   serializedVersion: 7

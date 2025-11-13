@@ -1,46 +1,142 @@
+ï»¿using System.Collections.Generic;
 using UnityEngine;
 
 [DisallowMultipleComponent]
 public class SpriteBoundsAnchor : MonoBehaviour
 {
-    [Header("Target anchoring")]
-    public SpriteRenderer spriteRenderer;   // GfxRoot ¾Æ·¡ÀÇ º»Ã¼ SR
-    public Transform anchorWorld;           // FacingPivot/FootAnchor °°Àº '°íÁ¤Á¡'
+    [Header("Targets")]
+    public SpriteRenderer sprite;          // GfxRootì˜ SR
+    public Transform anchorWorld;          // FootAnchor ê°™ì€ ì›”ë“œ ê¸°ì¤€ì 
 
-    [Tooltip("½ºÇÁ¶óÀÌÆ® ¹Ù¿îÁî ¾È¿¡¼­ ¸ÂÃâ ÁöÁ¡: X=0..1(ÁÂ~¿ì) / Y=0..1(ÇÏ~»ó)")]
-    [Range(0, 1)] public float spriteAnchorX = 0.5f; // 0.5=°¡·Î Áß¾Ó
-    [Range(0, 1)] public float spriteAnchorY = 0.0f; // 0=¹Ù´Ú(¹ß), 1=¸Ó¸®
+    [Header("Anchor (normalized, but free input)")]
+    public bool clampAnchors01 = true;     // âœ” ê¸°ë³¸: 0..1ë¡œ ìë™ í´ë¨í”„
+    public float spriteAnchorX = 0.5f;     // ë°”ìš´ì¦ˆ ë‚´ X ë¹„ìœ¨(0=ì™¼, 1=ì˜¤) - ììœ  ì…ë ¥
+    public float spriteAnchorY = 0.0f;     // ë°”ìš´ì¦ˆ ë‚´ Y ë¹„ìœ¨(0=ì•„ë˜, 1=ìœ„) - ììœ  ì…ë ¥
 
     [Header("Lock axes")]
-    public bool lockX = false;              // °¡·Îµµ °íÁ¤ÇÒÁö(º¸Åë false ±ÇÀå)
-    public bool lockY = true;               // ¼¼·Î(¹ß) °íÁ¤ (true ±ÇÀå)
+    public bool lockX = true;
+    public bool lockY = true;
 
     [Header("Fine tune (world units)")]
-    public Vector2 extraOffset;             // ¹Ì¼¼ º¸Á¤
+    public Vector2 extraOffset = Vector2.zero; // ì• ë‹ˆë©”ì´ì…˜ì—ì„œ í‚¤ ê°€ëŠ¥
+
+    [Header("Flip support")]
+    public bool mirrorXOnFlip = true;
+    public Transform flipRoot;             // FacingPivot ë“±
+
+    [System.Serializable]
+    public struct ClipOverride
+    {
+        public AnimationClip clip;
+
+        // ììœ  ì…ë ¥(0~1 ë°–ë„ ê°€ëŠ¥). í•„ìš”ì‹œ ì „ì—­ ì„¤ì •(clampAnchors01) ë”°ë¼ í´ë¨í”„ë¨.
+        public float anchorX;
+        public float anchorY;
+
+        // ì´ í´ë¦½ì—ë§Œ ì¶”ê°€ ì˜¤í”„ì…‹(ì›”ë“œ ë‹¨ìœ„)
+        public Vector2 extraOffset;
+    }
+
+    [Header("Per-Clip Overrides (optional)")]
+    public List<ClipOverride> perClip = new List<ClipOverride>();
+
+    Animator _anim;
 
     void Reset()
     {
-        if (!spriteRenderer) spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+        sprite = GetComponentInChildren<SpriteRenderer>(true);
+        if (!anchorWorld) anchorWorld = transform;
+    }
+
+    void Awake()
+    {
+        if (!sprite) sprite = GetComponentInChildren<SpriteRenderer>(true);
+        if (!anchorWorld) anchorWorld = transform;
+        _anim = GetComponentInParent<Animator>();
     }
 
     void LateUpdate()
     {
-        if (!spriteRenderer || !spriteRenderer.sprite || !anchorWorld) return;
+        if (!sprite || !anchorWorld || !sprite.sprite) return;
 
-        // ÇöÀç ½ºÇÁ¶óÀÌÆ®ÀÇ '¿ùµå ¹Ù¿îÁî'
-        var b = spriteRenderer.bounds; // world space
-        float ax = Mathf.Lerp(b.min.x, b.max.x, spriteAnchorX);
-        float ay = Mathf.Lerp(b.min.y, b.max.y, spriteAnchorY);
-        Vector3 spriteAnchorWorld = new Vector3(ax, ay, transform.position.z);
+        // 1) ê¸°ë³¸ê°’
+        float ax = spriteAnchorX;
+        float ay = spriteAnchorY;
+        Vector2 ex = extraOffset;
 
-        // ¿ì¸®°¡ °íÁ¤½ÃÅ°°í ½ÍÀº ¿ùµå À§Ä¡
-        Vector3 desired = anchorWorld.position + (Vector3)extraOffset;
+        // 2) í´ë¦½ë³„ ì˜¤ë²„ë¼ì´ë“œ
+        if (_anim != null && perClip != null && perClip.Count > 0)
+        {
+            var infos = _anim.GetCurrentAnimatorClipInfo(0);
+            if (infos != null && infos.Length > 0)
+            {
+                var playing = infos[0].clip;
+                for (int i = 0; i < perClip.Count; i++)
+                {
+                    if (perClip[i].clip == playing)
+                    {
+                        ax = perClip[i].anchorX;
+                        ay = perClip[i].anchorY;
+                        ex += perClip[i].extraOffset;
+                        break;
+                    }
+                }
+            }
+        }
 
-        // ±× Â÷ÀÌ¸¸Å­ GfxRoot¸¦ ÀÌµ¿ÇØ º¸Á¤
-        Vector3 delta = desired - spriteAnchorWorld;
+        // 3) í•„ìš” ì‹œ 0..1ë¡œ í´ë¨í”„
+        if (clampAnchors01)
+        {
+            ax = Mathf.Clamp01(ax);
+            ay = Mathf.Clamp01(ay);
+        }
+
+        // 4) ì¢Œìš° ë°˜ì „ ì‹œ ë¯¸ëŸ¬
+        bool flipped = (flipRoot && Mathf.Sign(flipRoot.lossyScale.x) < 0f);
+        if (mirrorXOnFlip && flipped) ax = clampAnchors01 ? (1f - ax) : (1f - ax);
+
+        // 5) í˜„ì¬ í”„ë ˆì„ ë°”ìš´ì¦ˆì—ì„œ ì•µì»¤ ì§€ì ì˜ ì›”ë“œ ì¢Œí‘œ
+        Bounds b = sprite.bounds;
+        Vector3 anchorInSpriteWorld = new Vector3(
+            Mathf.LerpUnclamped(b.min.x, b.max.x, ax),
+            Mathf.LerpUnclamped(b.min.y, b.max.y, ay),
+            transform.position.z
+        );
+
+        // 6) ëª©í‘œ ìœ„ì¹˜ = FootAnchor + ì˜¤í”„ì…‹
+        Vector3 target = anchorWorld.position + (Vector3)ex;
+
+        // 7) ë³´ì • ì ìš©
+        Vector3 delta = target - anchorInSpriteWorld;
         var p = transform.position;
         if (lockX) p.x += delta.x;
         if (lockY) p.y += delta.y;
         transform.position = p;
     }
+
+#if UNITY_EDITOR
+    void OnDrawGizmosSelected()
+    {
+        if (!sprite || !sprite.sprite) return;
+        float ax = spriteAnchorX, ay = spriteAnchorY;
+        if (clampAnchors01) { ax = Mathf.Clamp01(ax); ay = Mathf.Clamp01(ay); }
+        if (flipRoot && mirrorXOnFlip && Mathf.Sign(flipRoot.lossyScale.x) < 0f)
+            ax = clampAnchors01 ? (1f - ax) : (1f - ax);
+
+        Bounds b = sprite.bounds;
+        Vector3 pw = new Vector3(
+            Mathf.LerpUnclamped(b.min.x, b.max.x, ax),
+            Mathf.LerpUnclamped(b.min.y, b.max.y, ay),
+            transform.position.z
+        );
+        Gizmos.color = Color.yellow; Gizmos.DrawSphere(pw, 0.04f);
+        if (anchorWorld)
+        {
+            Gizmos.color = Color.cyan;
+            Vector3 tgt = anchorWorld.position + (Vector3)extraOffset;
+            Gizmos.DrawSphere(tgt, 0.05f);
+            Gizmos.DrawLine(pw, tgt);
+        }
+    }
+#endif
 }

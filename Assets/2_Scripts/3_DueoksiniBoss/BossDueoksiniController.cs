@@ -20,6 +20,9 @@ public class BossDueoksiniController : MonoBehaviour
     [Tooltip("좌우 반전을 적용할 트랜스폼(보통 FacingPivot). 비워두면 렌더러/애니메이터 Transform → 없으면 루트")]
     public Transform gfxFlipRoot;
 
+    [SerializeField] private DirectionalAnimPairSync pairSync; // GfxRoot 쪽 컴포넌트 연결
+    public bool FacingRight { get; private set; } = true;
+
     // =========================
     // Charge (dash) flow
     // =========================
@@ -32,7 +35,7 @@ public class BossDueoksiniController : MonoBehaviour
     public LayerMask environmentMask;
     [Tooltip("벽 앞 세이프 간격")]
     public float wallSkin = 0.1f;
-    [Tooltip("돌진 시작 애니 트리거(선택)")]
+    [Tooltip("돌진 애니 베이스 이름(예: Charge → _R/_L 상태 사용)")]
     public string chargeTrigger = "Charge";
     [Tooltip("돌진 중 true로 올릴 애니 Bool(선택)")]
     public string isChargingBool = "isCharging";
@@ -45,7 +48,7 @@ public class BossDueoksiniController : MonoBehaviour
     // Charge-Prep (single)
     // =========================
     [Header("Charge ▸ Prep (single)")]
-    [Tooltip("돌진 직전 준비 모션(하나만). 비우면 준비 없이 바로 돌진/점프 판정")]
+    [Tooltip("좌우 페어의 베이스 이름(예: Prep_Charge → _R/_L 상태 사용)")]
     public string chargePrepTrigger = "Prep_Charge";
     [Tooltip("애니메이션 이벤트로 종료할지 여부 (AnimEvent_PrepReady 호출)")]
     public bool chargePrepEndByAnimEvent = false;
@@ -77,7 +80,7 @@ public class BossDueoksiniController : MonoBehaviour
         public string attackTrigger;
 
         [Header("Hit Window")]
-        [Tooltip("애니메이션 이벤트(AnimEvent_GenericHitOn/Off)로 히트창을 제어할지")]
+        [Tooltip("애니 이벤트(AnimEvent_GenericHitOn/Off)로 히트창을 제어할지")]
         public bool useAnimEvent = false;
         [Tooltip("useAnimEvent=false일 때, 히트 활성 지속시간")]
         public float activeTime = 0.12f;
@@ -104,9 +107,7 @@ public class BossDueoksiniController : MonoBehaviour
     [System.Serializable]
     public struct SimpleChoice
     {
-        [Tooltip("위 Simple Attacks 리스트의 인덱스")]
         public int simpleIndex;
-        [Tooltip("가중치(랜덤 선택용)")]
         public float weight;
     }
 
@@ -117,19 +118,18 @@ public class BossDueoksiniController : MonoBehaviour
         public string prepTrigger = "Atk_Swipe";
         public float prepHoldTime = 0.5f;
         public float weight = 1f;
-        [Tooltip("애니 이벤트 AnimEvent_PrepReady 로 종료할지")]
         public bool useAnimEventEnd = false;
 
         [Header("Attack mapping")]
         public AttackKind attack = AttackKind.Simple;
 
-        [Tooltip("단일 Simple 공격으로 매핑하고 싶을 때(레거시).")]
+        // 레거시 단일
         public int simpleIndex = 0;
 
-        [Tooltip("하나의 준비에서 여러 Simple 공격을 번갈아/랜덤으로 쓰고 싶을 때")]
+        // 다중 랜덤 선택
         public List<SimpleChoice> simpleChoices = new List<SimpleChoice>();
 
-        [Tooltip("선택) 이 준비에서만 공격 트리거를 오버라이드하고 싶다면 입력")]
+        // 이 준비에서만 트리거 오버라이드
         public string attackTriggerOverride = null;
     }
 
@@ -163,8 +163,6 @@ public class BossDueoksiniController : MonoBehaviour
     int _lastPrepIndex = -1;
     bool _waitingPrepEvent = false;
     bool _inRoutine = false;
-
-    // 애니 이벤트에서 토글할 현재 히트박스 묶음(심플 공격용)
     List<Collider2D> _currentHitboxes;
 
     void Awake()
@@ -180,8 +178,15 @@ public class BossDueoksiniController : MonoBehaviour
         if (!gfxFlipRoot) gfxFlipRoot = gfxRenderer ? gfxRenderer.transform
                               : (gfxAnimator ? gfxAnimator.transform : transform);
 
+        if (!pairSync) pairSync = GetComponentInChildren<DirectionalAnimPairSync>(true);
+
         _anim = gfxAnimator;
         _rb = GetComponent<Rigidbody2D>();
+    }
+
+    void Start()
+    {
+        if (facePlayer) FaceTowardPlayer(); // FacingRight 초기화
     }
 
     void OnEnable()
@@ -203,17 +208,19 @@ public class BossDueoksiniController : MonoBehaviour
             // 1) Charge-Prep
             yield return DoChargePrep();
 
-            // 멀리면 점프, 아니면 돌진
+            // 2) 멀리면 점프 → 루프, 아니면 돌진+즉시 공격 시퀀스
             bool far = IsPlayerFar(farDistanceThreshold);
-            if (far) { yield return DoJumpAttack(); continue; }
-            else { yield return DoCharge(); }
-
-            if (facePlayer) FaceTowardPlayer();
-
-            // 2) Attack Prep pick → 3) Attack
-            var prep = PickPrep();
-            yield return DoAttackPrep(prep);
-            yield return DoAttack(prep);
+            if (far)
+            {
+                yield return DoJumpAttack();
+                continue;
+            }
+            else
+            {
+                // ✅ 돌진이 끝나자마자 공격 준비/공격으로 체인
+                yield return DoCharge(chainToAttack: true);
+                continue;
+            }
         }
     }
 
@@ -222,8 +229,8 @@ public class BossDueoksiniController : MonoBehaviour
     // =========================
     IEnumerator DoChargePrep()
     {
-        if (!string.IsNullOrEmpty(chargePrepTrigger) && _anim)
-            _anim.SetTrigger(chargePrepTrigger);
+        if (_anim && !string.IsNullOrEmpty(chargePrepTrigger))
+            PlayDirectionalState(chargePrepTrigger, 0f);
 
         if (chargePrepEndByAnimEvent)
         {
@@ -236,10 +243,14 @@ public class BossDueoksiniController : MonoBehaviour
         }
     }
 
-    IEnumerator DoCharge()
+    // chainToAttack: 도착 즉시 Prep→Attack으로 연결
+    IEnumerator DoCharge(bool chainToAttack = false)
     {
-        if (_anim && !string.IsNullOrEmpty(chargeTrigger)) _anim.SetTrigger(chargeTrigger);
-        if (_anim && !string.IsNullOrEmpty(isChargingBool)) _anim.SetBool(isChargingBool, true);
+        if (_anim && !string.IsNullOrEmpty(chargeTrigger))
+            PlayDirectionalState(chargeTrigger, 0f);
+
+        if (_anim && !string.IsNullOrEmpty(isChargingBool))
+            _anim.SetBool(isChargingBool, true);
 
         int dir = DirToPlayer();
         float startX = transform.position.x;
@@ -249,8 +260,12 @@ public class BossDueoksiniController : MonoBehaviour
         float rayLen = Mathf.Abs(chargeDistance) + wallSkin;
         RaycastHit2D hit = Physics2D.Raycast(
             new Vector2(transform.position.x, transform.position.y),
-            new Vector2(dir, 0f), rayLen, environmentMask);
-        if (hit.collider) targetX = hit.point.x - dir * wallSkin;
+            new Vector2(dir, 0f),
+            rayLen,
+            environmentMask
+        );
+        if (hit.collider)
+            targetX = hit.point.x - dir * wallSkin;
 
         // 시간 보간 (Y 고정)
         float t = 0f;
@@ -264,12 +279,23 @@ public class BossDueoksiniController : MonoBehaviour
             Vector3 pos = Vector3.Lerp(p0, p1, k);
             pos.y = p0.y;
             transform.position = pos;
+
             t += Time.deltaTime;
             yield return null;
         }
         transform.position = p1;
 
-        if (_anim && !string.IsNullOrEmpty(isChargingBool)) _anim.SetBool(isChargingBool, false);
+        if (_anim && !string.IsNullOrEmpty(isChargingBool))
+            _anim.SetBool(isChargingBool, false);
+
+        // ✅ 도착 즉시 공격 준비/공격으로 체인
+        if (chainToAttack)
+        {
+            if (facePlayer) FaceTowardPlayer();
+            var prep = PickPrep();
+            yield return DoAttackPrep(prep);
+            yield return DoAttack(prep);
+        }
     }
 
     IEnumerator DoJumpAttack()
@@ -302,7 +328,6 @@ public class BossDueoksiniController : MonoBehaviour
     {
         if (preps == null || preps.Count == 0) return new PrepOption();
 
-        // 직전 동일 회피 + 가중치
         int n = preps.Count;
         float total = 0f;
         for (int i = 0; i < n; i++)
@@ -354,7 +379,6 @@ public class BossDueoksiniController : MonoBehaviour
             case AttackKind.ProjectileBurst:
                 yield return DoProjectileBurst();
                 break;
-
             case AttackKind.GroundSlam:
                 yield return DoSlamOnce();
                 break;
@@ -399,7 +423,6 @@ public class BossDueoksiniController : MonoBehaviour
         if (sa.useAnimEvent)
         {
             _currentHitboxes = sa.hitboxes; // 애니 이벤트가 On/Off 토글
-            // 애니 길이를 모르면 안전하게 activeTime 만큼만 대기(0이면 한 프레임)
             float wait = Mathf.Max(0.01f, sa.activeTime);
             yield return new WaitForSeconds(wait);
         }
@@ -416,7 +439,7 @@ public class BossDueoksiniController : MonoBehaviour
 
     IEnumerator CoAdvance(float distance, float time, AnimationCurve curve)
     {
-        float dirSign = Mathf.Sign((gfxFlipRoot ? gfxFlipRoot.localScale.x : transform.localScale.x));
+        float dirSign = FacingRight ? 1f : -1f;
         Vector3 p0 = transform.position;
         Vector3 p1 = p0 + Vector3.right * (distance * dirSign);
 
@@ -424,7 +447,7 @@ public class BossDueoksiniController : MonoBehaviour
         while (t < time)
         {
             float a = Mathf.Clamp01(t / Mathf.Max(0.0001f, time));
-            float k = curve != null && curve.keys != null && curve.length > 0 ? curve.Evaluate(a) : EaseInOut(a);
+            float k = (curve != null && curve.keys != null && curve.length > 0) ? curve.Evaluate(a) : EaseInOut(a);
             transform.position = Vector3.Lerp(p0, p1, k);
             t += Time.deltaTime;
             yield return null;
@@ -476,17 +499,34 @@ public class BossDueoksiniController : MonoBehaviour
 
     int DirToPlayer()
     {
-        if (!player) return transform.localScale.x >= 0f ? 1 : -1;
+        if (!player) return FacingRight ? 1 : -1;
         return (player.position.x - transform.position.x) >= 0f ? 1 : -1;
     }
 
+    void SetFacing(bool right)
+    {
+        FacingRight = right;
+
+        if (pairSync) pairSync.facingRight = right;
+
+        if (gfxFlipRoot)
+        {
+            var s = gfxFlipRoot.localScale;
+            s.x = Mathf.Abs(s.x); // 스케일 뒤집기 금지(좌/우 별도 애니 사용)
+            gfxFlipRoot.localScale = s;
+        }
+
+        if (gfxRenderer) gfxRenderer.flipX = false;
+    }
+
+    public void FaceRight() => SetFacing(true);
+    public void FaceLeft() => SetFacing(false);
+
     void FaceTowardPlayer()
     {
-        int dir = DirToPlayer();
-        var target = gfxFlipRoot ? gfxFlipRoot : transform;
-        Vector3 s = target.localScale;
-        s.x = Mathf.Abs(s.x) * (dir >= 0 ? 1f : -1f);
-        target.localScale = s;
+        if (!player) return;
+        bool right = (player.position.x - transform.position.x) >= 0f;
+        SetFacing(right);
     }
 
     static void ToggleColliders(List<Collider2D> list, bool on)
@@ -507,13 +547,13 @@ public class BossDueoksiniController : MonoBehaviour
     // =========================
     public void AnimEvent_PrepReady() { _waitingPrepEvent = false; }
 
-    // 심플 공격용 범용 On/Off (현재 선택된 _currentHitboxes 토글)
     public void AnimEvent_GenericHitOn() { if (_currentHitboxes != null) ToggleColliders(_currentHitboxes, true); }
     public void AnimEvent_GenericHitOff() { if (_currentHitboxes != null) ToggleColliders(_currentHitboxes, false); }
 
-    // 기존 이벤트 유지(과거 애니들이 참조할 수 있으니)
-    public void AnimEvent_SwipeHitOn() { ToggleColliders(slamHitboxes, true); }
-    public void AnimEvent_SwipeHitOff() { ToggleColliders(slamHitboxes, false); }
+    // 레거시 이름 유지 → 범용으로 위임
+    public void AnimEvent_SwipeHitOn() { AnimEvent_GenericHitOn(); }
+    public void AnimEvent_SwipeHitOff() { AnimEvent_GenericHitOff(); }
+
     public void AnimEvent_SlamHitOn() { ToggleColliders(slamHitboxes, true); }
     public void AnimEvent_SlamHitOff() { ToggleColliders(slamHitboxes, false); }
 
@@ -524,12 +564,30 @@ public class BossDueoksiniController : MonoBehaviour
     {
         Gizmos.color = Color.cyan;
         Vector3 a = transform.position;
-        float sign = Mathf.Sign(transform.localScale.x == 0 ? 1f : transform.localScale.x);
+        float sign = FacingRight ? 1f : -1f;
         Vector3 b = a + Vector3.right * sign * chargeDistance;
         Gizmos.DrawLine(a, b);
         Gizmos.DrawSphere(b, 0.08f);
 
         Gizmos.color = Color.magenta;
         Gizmos.DrawWireSphere(transform.position, Mathf.Abs(farDistanceThreshold));
+    }
+
+    // =========================
+    // Directional play helper
+    // =========================
+    bool PlayDirectionalState(string baseName, float crossFade = 0f)
+    {
+        if (string.IsNullOrEmpty(baseName) || !_anim) return false;
+
+        // 1) pairSync가 있으면 우선 사용
+        if (pairSync != null && pairSync.PlayByBase(baseName, crossFade))
+            return true;
+
+        // 2) 폴백: 접미사(_R/_L)로 직접 크로스페이드
+        string suffix = (FacingRight ? pairSync?.rightSuffix : pairSync?.leftSuffix) ?? (FacingRight ? "_R" : "_L");
+        string state = baseName + suffix;
+        _anim.CrossFadeInFixedTime(state, crossFade);
+        return true;
     }
 }

@@ -2313,7 +2313,7 @@ SpriteRenderer:
   m_LightmapParameters: {fileID: 0}
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: -1
+  m_SortingOrder: 0
   m_Sprite: {fileID: 7482667652216324306, guid: 311925a002f4447b3a28927169b83ea6, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
@@ -2451,8 +2451,10 @@ MonoBehaviour:
   simpleAttacks:
   - name: Stabbing the regime
     attackTrigger: Stabbing the regime
-    useAnimEvent: 0
-    activeTime: 3
+    directionalBase: Stabbing the regime
+    directionalCrossFade: 0.05
+    useAnimEvent: 1
+    activeTime: 0.5
     hitboxes:
     - {fileID: 0}
     moveDistance: 0
@@ -2463,30 +2465,16 @@ MonoBehaviour:
       m_PreInfinity: 0
       m_PostInfinity: 0
       m_RotationOrder: 4
-  - name: Stabbing the regime
-    attackTrigger: Stabbing the regime
-    useAnimEvent: 0
-    activeTime: 0
-    hitboxes:
-    - {fileID: 0}
-    moveDistance: 2
-    moveTime: 2
-    moveCurve:
-      serializedVersion: 2
-      m_Curve: []
-      m_PreInfinity: 0
-      m_PostInfinity: 0
-      m_RotationOrder: 4
   preps:
-  - prepTrigger: Atk_Swipe
-    prepHoldTime: 2
+  - prepTrigger: Ready_Kwon Geuk
+    prepHoldTime: 0.75
     weight: 0
     useAnimEventEnd: 0
+    prepDirectionalBase: Ready_Kwon Geuk
+    prepCrossFade: 0.05
     attack: 0
     simpleIndex: 0
-    simpleChoices:
-    - simpleIndex: 0
-      weight: 0
+    simpleChoices: []
     attackTriggerOverride: 
   attackPrepEndByAnimEvent: 0
   projectilePrefab: {fileID: 1658260126}
@@ -4562,7 +4550,7 @@ SpriteRenderer:
   m_LightmapParameters: {fileID: 0}
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 1
   m_Sprite: {fileID: -5594720606183481802, guid: b14bef970b8967e41bbee9da19ca935a, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
@@ -4594,6 +4582,12 @@ MonoBehaviour:
   - baseName: Charge
     rightState: Charge_R
     leftState: Charge_L
+  - baseName: Stabbing the regime
+    rightState: Stabbing the regime_R
+    leftState: Stabbing the regime_L
+  - baseName: Ready_Kwon Geuk
+    rightState: Ready_Kwon Geuk_R
+    leftState: Ready_Kwon Geuk_L
   defaultCrossFadeSeconds: 0
   facingRight: 0
   mirrorXOnFlip: 0

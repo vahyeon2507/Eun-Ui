@@ -609,7 +609,7 @@ public class BossDueoksiniController : MonoBehaviour
         // 2) 폴백: 접미사(_R/_L)로 직접 크로스페이드
         if (_anim == null) return false;
         string suffix = (FacingRight ? (pairSync ? pairSync.rightSuffix : "_R")
-                                     : (pairSync ? pairSync.leftSuffix : "_L"));
+                                     : (pairSync ? pairSync.leftSuffix  : "_L"));
         _anim.CrossFadeInFixedTime(baseName + suffix, crossFade);
         return true;
     }

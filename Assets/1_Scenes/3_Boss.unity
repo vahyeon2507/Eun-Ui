@@ -2354,6 +2354,7 @@ GameObject:
   - component: {fileID: 935758119}
   - component: {fileID: 935758123}
   - component: {fileID: 935758124}
+  - component: {fileID: 935758125}
   m_Layer: 0
   m_Name: Dueoksini
   m_TagString: Untagged
@@ -2562,6 +2563,39 @@ BoxCollider2D:
   m_AutoTiling: 0
   m_Size: {x: 1.38, y: 2.38}
   m_EdgeRadius: 0
+--- !u!114 &935758125
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 935758115}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fce40a1a43ea0324c979d5a6a559c983, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  maxHp: 20
+  currentHp: 0
+  hpBar: {fileID: 0}
+  hpText: {fileID: 0}
+  invulnTime: 0.6
+  staggerTime: 0.18
+  hitMoveDistance: 0.25
+  useScriptPush: 1
+  hitEffectPrefab: {fileID: 0}
+  hitSfx: {fileID: 0}
+  deathSfx: {fileID: 0}
+  hitEffectYOffset: 0.5
+  animator: {fileID: 0}
+  spriteRenderer: {fileID: 0}
+  playerTransform: {fileID: 0}
+  onDamaged:
+    m_PersistentCalls:
+      m_Calls: []
+  onDied:
+    m_PersistentCalls:
+      m_Calls: []
 --- !u!1001 &1037797841
 PrefabInstance:
   m_ObjectHideFlags: 0

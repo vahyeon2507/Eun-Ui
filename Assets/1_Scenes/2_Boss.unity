@@ -1319,6 +1319,35 @@ MonoBehaviour:
   onDied:
     m_PersistentCalls:
       m_Calls: []
+  flashDuration: 0.15
+  flashCurve:
+    serializedVersion: 2
+    m_Curve: []
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  flashSwapMaterial: {fileID: 2100000, guid: 8115bb05a91f13745b4aa3aef6734500, type: 2}
+  useSquashOnHit: 1
+  squashTarget: {fileID: 0}
+  squashDuration: 0.1
+  reboundDuration: 0.08
+  squashX: 0.99
+  squashY: 1.01
+  squashCurve:
+    serializedVersion: 2
+    m_Curve: []
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  reboundCurve:
+    serializedVersion: 2
+    m_Curve: []
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  reboundOvershoot: 0
+  reboundFactor: 0
+  allowSquashOverlap: 0
 --- !u!50 &276129722
 Rigidbody2D:
   serializedVersion: 5

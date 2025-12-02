@@ -67,7 +67,7 @@ Material:
     m_Ints: []
     m_Floats:
     - _EnableExternalAlpha: 0
-    - _GlowAmount: 0.15
+    - _GlowAmount: 0.25
     - _ZWrite: 0
     m_Colors:
     - _Color: {r: 5.053538, g: 3.522893, b: 3.3610797, a: 1}

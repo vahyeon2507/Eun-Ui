@@ -2354,10 +2354,11 @@ GameObject:
   - component: {fileID: 935758119}
   - component: {fileID: 935758123}
   - component: {fileID: 935758124}
-  - component: {fileID: 935758125}
-  m_Layer: 0
+  - component: {fileID: 935758126}
+  - component: {fileID: 935758127}
+  m_Layer: 6
   m_Name: Dueoksini
-  m_TagString: Untagged
+  m_TagString: Boss
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -2445,8 +2446,8 @@ MonoBehaviour:
   chargePrepEndByAnimEvent: 0
   chargePrepHoldTime: 0.5
   farDistanceThreshold: 10
-  jumpDuration: 0.8
-  jumpArcHeight: 3.5
+  jumpDuration: 0.65
+  jumpArcHeight: 5
   jumpTrigger: JumpAtk
   jumpEndsWithSlam: 1
   simpleAttacks:
@@ -2563,7 +2564,22 @@ BoxCollider2D:
   m_AutoTiling: 0
   m_Size: {x: 1.38, y: 2.38}
   m_EdgeRadius: 0
---- !u!114 &935758125
+--- !u!114 &935758126
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 935758115}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 43e04de683dd7634692437094b1a3f6f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  owner: {fileID: 0}
+  damageMultiplier: 1
+  ignoreWhileOwnerInvuln: 1
+--- !u!114 &935758127
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -2575,27 +2591,56 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fce40a1a43ea0324c979d5a6a559c983, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  maxHp: 20
+  maxHp: 175
   currentHp: 0
-  hpBar: {fileID: 0}
+  hpBar: {fileID: 1384591960}
   hpText: {fileID: 0}
   invulnTime: 0.6
   staggerTime: 0.18
   hitMoveDistance: 0.25
-  useScriptPush: 1
+  useScriptPush: 0
   hitEffectPrefab: {fileID: 0}
   hitSfx: {fileID: 0}
   deathSfx: {fileID: 0}
   hitEffectYOffset: 0.5
-  animator: {fileID: 0}
-  spriteRenderer: {fileID: 0}
-  playerTransform: {fileID: 0}
+  animator: {fileID: 2012914637}
+  spriteRenderer: {fileID: 2012914638}
+  playerTransform: {fileID: 1946008997}
   onDamaged:
     m_PersistentCalls:
       m_Calls: []
   onDied:
     m_PersistentCalls:
       m_Calls: []
+  flashDuration: 0.15
+  flashCurve:
+    serializedVersion: 2
+    m_Curve: []
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  flashSwapMaterial: {fileID: 2100000, guid: 8115bb05a91f13745b4aa3aef6734500, type: 2}
+  useSquashOnHit: 1
+  squashTarget: {fileID: 0}
+  squashDuration: 0.1
+  reboundDuration: 0.08
+  squashX: 0.99
+  squashY: 1.01
+  squashCurve:
+    serializedVersion: 2
+    m_Curve: []
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  reboundCurve:
+    serializedVersion: 2
+    m_Curve: []
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  reboundOvershoot: 0
+  reboundFactor: 0
+  allowSquashOverlap: 0
 --- !u!1001 &1037797841
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -2836,7 +2881,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1223122963}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: FootAnchor
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -3646,7 +3691,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1637889249}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: FacingPivot
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -3680,7 +3725,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1658260128}
   - component: {fileID: 1658260127}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: GameObject
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -4466,7 +4511,7 @@ GameObject:
   - component: {fileID: 2012914639}
   - component: {fileID: 2012914638}
   - component: {fileID: 2012914637}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: GfxRoot
   m_TagString: Untagged
   m_Icon: {fileID: 0}

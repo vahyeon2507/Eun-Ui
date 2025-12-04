@@ -1,45 +1,56 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Events; // ← 조합 이벤트용
+using UnityEngine.Events; // 조합 이벤트용
 
 public enum TalismanType { Fire, Earth, Water, Metal, Wood }
 
 [DisallowMultipleComponent]
 public class PlayerTalismanUnified : MonoBehaviour
 {
+    // ───────────────────────── Refs
     [Header("Refs")]
     public PlayerController player;
     public Transform throwOrigin;
 
-    [Header("Input")]
-    public KeyCode toggleKey = KeyCode.E;
-    public KeyCode cycleKey = KeyCode.Q;
-    public KeyCode fireKey = KeyCode.D; // 우클릭에서 D키로 변경
-    public int fireMouseButton = 0; // 호환성을 위해 유지
+    // ───────────────────────── UI 연동
+    [Header("UI Integration")]
+    [Tooltip("씬에 UI가 있으면 여기 연결(비워두면 자동 탐색)")]
+    public TalismanSelectionUI ui;
+    [Tooltip("true면 예전처럼 토글이 ON일 때만 발사 허용")]
+    public bool requireToggleToFire = false;
 
+    // ───────────────────────── Input (오직 F만 사용)
+    [Header("Input")]
+    [Tooltip("부적 발사 전용 키 (일반 공격과 분리)")]
+    public KeyCode fireKey = KeyCode.F;
+    [Tooltip("부적 선택 폴백 키(UI 없을 때만 사용)")]
+    public KeyCode cycleKey = KeyCode.Q;
+    [Tooltip("구버전 호환용 토글 키(원하면 꺼둬도 됨)")]
+    public KeyCode toggleKey = KeyCode.E;
+
+    // ───────────────────────── Charges
     [Header("Charges")]
     public int maxCharges = 2;
     public float rechargeInterval = 15f;
     public int currentCharges = 2;
 
-    
-
+    // ───────────────────────── Projectile Visuals
     [Header("Projectile Visuals (Optional)")]
     public GameObject[] perElementProjectileVisual = new GameObject[5];
     public GameObject genericProjectileVisual;
 
+    // ───────────────────────── Field Prefabs
     [Header("Field Prefabs (장판)")]
     public GameObject[] perElementField = new GameObject[5];
     public GameObject genericField;
 
+    // ───────────────────────── Field Animation
     [Header("Field Animation")]
-    [Tooltip("장판 프리팹에 Animator가 있으면 트리거를 쏴서 애니메이션을 재생한다.")]
     public bool fieldUseAnimator = true;
-    [Tooltip("요소별 트리거가 비어있으면 이 공통 트리거를 사용")]
     public string fieldAnimatorTrigger = "Spawn";
-    [Tooltip("요소별 트리거(선택). 공백이면 공통 트리거 사용")]
     public string[] fieldAnimatorTriggerPerElement = new string[5];
 
+    // ───────────────────────── Tuning
     [Header("Tuning")]
     public float projectileSpeed = 12f;
     public float projectileRadius = 0.15f;
@@ -47,36 +58,40 @@ public class PlayerTalismanUnified : MonoBehaviour
     public int projectileDamage = 1;
     public float fireCooldown = 0.25f;
 
+    // ───────────────────────── Projectile Rotation
     [Header("Projectile Rotation")]
     public float projectileZRight = -90f;
     public float projectileZLeft = 90f;
     public float projectileSpinXSpeed = 720f;
     public bool spinXReverseOnLeft = true;
 
+    // ───────────────────────── Layers
     [Header("Layers")]
     public LayerMask enemyLayer;
     public LayerMask terrainLayer;
     public LayerMask playerLayer;
 
+    // ───────────────────────── Safety
     [Header("Safety")]
     public string noCollisionLayerName = "Ignore Raycast";
     public bool forceNoCollisionLayer = true;
 
+    // ───────────────────────── Field Combo hook
     [Header("Field Combo (hook only)")]
-    [Tooltip("장판 겹침 판정에 여유 반경을 더한다.")]
     public float comboCheckExtraRadius = 0.1f;
-    [Tooltip("장판-장판 조합이 발생했을 때 호출되는 이벤트 (요소A, 요소B, 위치). 구현은 나중에!")]
     public UnityEvent<TalismanType, TalismanType, Vector2> onFieldCombo;
 
     [Header("Debug")]
     public bool logEvents = false;
 
-    public bool talismanMode { get; private set; } = false;
+    // ───────────────────────── State
+    public bool talismanMode { get; private set; } = false; // 호환 유지
     public TalismanType current = TalismanType.Fire;
 
     float _cooldownTimer = 0f;
     float _rechargeTimer = 0f;
     int _noCollisionLayer = -1;
+    bool _uiBound = false;
 
     class P
     {
@@ -91,7 +106,6 @@ public class PlayerTalismanUnified : MonoBehaviour
     }
     readonly List<P> _projs = new List<P>(16);
 
-    // 활성 장판 관리
     class F
     {
         public TalismanType element;
@@ -106,6 +120,14 @@ public class PlayerTalismanUnified : MonoBehaviour
         player = GetComponent<PlayerController>();
     }
 
+    void Awake()
+    {
+        if (!ui) ui = FindObjectOfType<TalismanSelectionUI>(true);
+    }
+
+    void OnEnable() { BindUI(); }
+    void OnDisable() { UnbindUI(); }
+
     void Start()
     {
         if (_noCollisionLayer < 0 && !string.IsNullOrEmpty(noCollisionLayerName))
@@ -115,6 +137,35 @@ public class PlayerTalismanUnified : MonoBehaviour
         if (throwOrigin == null && player != null && player.attackPoint != null) throwOrigin = player.attackPoint;
 
         currentCharges = Mathf.Clamp(currentCharges, 0, maxCharges);
+    }
+
+    void BindUI()
+    {
+        if (_uiBound || !ui) return;
+        ui.onChanged.AddListener(OnUIChanged);
+        ui.onRequestFire.AddListener(OnUIRequestFire);
+        _uiBound = true;
+        if (player) player.ExternalRangedOverride = false; // 일반 공격 잠그지 않음
+    }
+
+    void UnbindUI()
+    {
+        if (!_uiBound || !ui) return;
+        ui.onChanged.RemoveListener(OnUIChanged);
+        ui.onRequestFire.RemoveListener(OnUIRequestFire);
+        _uiBound = false;
+    }
+
+    void OnUIChanged(TalismanType t)
+    {
+        current = t;
+        if (logEvents) Debug.Log($"[Talisman] UI → Current {current}");
+    }
+
+    void OnUIRequestFire(TalismanType t)
+    {
+        // UI에서 F를 눌러 요청 들어오면 즉발
+        TryFire(t);
     }
 
     void Update()
@@ -134,7 +185,7 @@ public class PlayerTalismanUnified : MonoBehaviour
 
         if (_cooldownTimer > 0f) _cooldownTimer -= Time.deltaTime;
 
-        // 토글
+        // 구버전 토글(필요 없으면 무시)
         if (Input.GetKeyDown(toggleKey))
         {
             talismanMode = !talismanMode;
@@ -142,30 +193,28 @@ public class PlayerTalismanUnified : MonoBehaviour
             if (logEvents) Debug.Log($"[Talisman] Mode {(talismanMode ? "ON" : "OFF")}");
         }
 
-        if (talismanMode)
+        // UI 없을 때만 폴백으로 속성 순환
+        if (!HasUsableUI() && Input.GetKeyDown(cycleKey))
         {
-            // 부적 변경은 이제 TalismanSelectionUI에서 처리
-            // 호환성을 위해 기존 키도 유지 (UI가 없을 때 사용)
-            TalismanSelectionUI uiSystem = FindObjectOfType<TalismanSelectionUI>();
-            if (uiSystem == null || !uiSystem.enabled)
-            {
-                if (Input.GetKeyDown(cycleKey))
-                {
-                    current = (TalismanType)(((int)current + 1) % 5);
-                    if (logEvents) Debug.Log($"[Talisman] Selected {current} (fallback)");
-                }
-            }
+            current = (TalismanType)(((int)current + 1) % 5);
+            if (logEvents) Debug.Log($"[Talisman] Selected {current} (fallback)");
+        }
 
-            // 발사 키 변경: 우클릭 또는 D키
-            if (Input.GetMouseButtonDown(fireMouseButton) || Input.GetKeyDown(fireKey))
-                TryFire();
+        // 👉 오직 F키로만 발사
+        if (Input.GetKeyDown(fireKey))
+        {
+            if (!requireToggleToFire || talismanMode)
+                TryFire(current);
         }
 
         UpdateProjectiles();
-        PruneDeadFields(); // 파괴된 장판 정리
+        PruneDeadFields();
     }
 
-    void TryFire()
+    bool HasUsableUI() => ui != null && ui.isActiveAndEnabled;
+
+    // ───────────────────────── Fire
+    public void TryFire(TalismanType elementToFire)
     {
         if (_cooldownTimer > 0f) return;
         if (currentCharges <= 0)
@@ -174,8 +223,9 @@ public class PlayerTalismanUnified : MonoBehaviour
             return;
         }
 
-        Vector2 origin = (throwOrigin != null ? (Vector2)throwOrigin.position : (Vector2)transform.position);
-        origin.y = throwOrigin != null ? origin.y : transform.position.y;
+        Vector2 origin = (throwOrigin ? (Vector2)throwOrigin.position : (Vector2)transform.position);
+        origin.y = throwOrigin ? origin.y : transform.position.y;
+
         float dirSign = (transform.localScale.x >= 0f ? 1f : -1f);
         Vector2 vel = new Vector2(dirSign * projectileSpeed, 0f);
 
@@ -184,14 +234,14 @@ public class PlayerTalismanUnified : MonoBehaviour
 
         var p = new P
         {
-            element = current,
+            element = elementToFire,
             pos = origin,
             start = origin,
             vel = vel,
             damage = projectileDamage,
             radius = projectileRadius,
             maxDist = projectileMaxRange,
-            visual = SpawnProjectileVisual(current, origin, dirSign, zRot),
+            visual = SpawnProjectileVisual(elementToFire, origin, dirSign, zRot),
             rotZ = zRot,
             spinX = 0f,
             spinXSpeed = xSpinSpeed
@@ -200,12 +250,11 @@ public class PlayerTalismanUnified : MonoBehaviour
 
         currentCharges--;
         _cooldownTimer = fireCooldown;
-        
-        // 부적 발사 사운드 초고속 재생
+
         if (AudioManager.Instance != null)
             AudioManager.Instance.PlaySFXInstant(AudioManager.Instance.talismanFireSFX);
-            
-        if (logEvents) Debug.Log($"[Talisman] Fire {current} (remain {currentCharges})");
+
+        if (logEvents) Debug.Log($"[Talisman] Fire {elementToFire} (remain {currentCharges})");
     }
 
     GameObject SpawnProjectileVisual(TalismanType t, Vector2 pos, float dirSign, float zRot)
@@ -220,7 +269,7 @@ public class PlayerTalismanUnified : MonoBehaviour
         if (forceNoCollisionLayer && _noCollisionLayer >= 0) go.layer = _noCollisionLayer;
 
         var sr = go.GetComponent<SpriteRenderer>();
-        if (sr != null) sr.flipX = (dirSign < 0f);
+        if (sr) sr.flipX = (dirSign < 0f);
 
         var rb = go.GetComponent<Rigidbody2D>(); if (rb) rb.simulated = false;
         foreach (var col in go.GetComponents<Collider2D>()) col.enabled = false;
@@ -272,7 +321,6 @@ public class PlayerTalismanUnified : MonoBehaviour
                               ?? hitE.collider.GetComponentInChildren<IDamageable>();
                     if (dmg != null) dmg.TakeDamage(p.damage);
 
-                    // 부적 충돌 사운드 초고속 재생
                     if (AudioManager.Instance != null)
                         AudioManager.Instance.PlaySFXInstant(AudioManager.Instance.talismanImpactSFX);
 
@@ -297,7 +345,7 @@ public class PlayerTalismanUnified : MonoBehaviour
             if (p.visual != null)
             {
                 p.visual.transform.position = new Vector3(nextPos.x, nextPos.y, 0f);
-                p.spinX += p.spinXSpeed * Time.deltaTime;
+                p.spinX += projectileSpinXSpeed * Time.deltaTime;
                 p.visual.transform.rotation = Quaternion.Euler(p.spinX, 0f, p.rotZ);
             }
         }
@@ -326,7 +374,6 @@ public class PlayerTalismanUnified : MonoBehaviour
         if (forceNoCollisionLayer && _noCollisionLayer >= 0) go.layer = _noCollisionLayer;
         foreach (var col in go.GetComponentsInChildren<Collider2D>()) col.isTrigger = true;
 
-        // 애니메이션 재생
         if (fieldUseAnimator)
         {
             var an = go.GetComponentInChildren<Animator>();
@@ -344,7 +391,6 @@ public class PlayerTalismanUnified : MonoBehaviour
             }
         }
 
-        // 장판 데이터 채우기(있다면)
         var tf = go.GetComponent<TalismanField>();
         if (tf != null)
         {
@@ -353,9 +399,7 @@ public class PlayerTalismanUnified : MonoBehaviour
             if (tf.duration <= 0f) tf.duration = 6f;
         }
 
-        // 활성 장판 목록에 등록
-        var rec = new F { element = element, pos = pos, radius = (tf != null ? tf.radius : 1.5f), go = go };
-        // 기존 장판과 겹침 검사 → 조합 훅 호출
+        var rec = new F { element = element, pos = pos, radius = (tf ? tf.radius : 1.5f), go = go };
         for (int i = 0; i < _fields.Count; i++)
         {
             var f = _fields[i];
@@ -366,7 +410,6 @@ public class PlayerTalismanUnified : MonoBehaviour
             {
                 if (logEvents) Debug.Log($"[Talisman] COMBO {f.element} + {rec.element} at {rec.pos}");
                 onFieldCombo?.Invoke(f.element, rec.element, rec.pos);
-                // 실제 조합 효과/파괴는 나중에 구현하도록 남김
             }
         }
         _fields.Add(rec);
@@ -375,8 +418,6 @@ public class PlayerTalismanUnified : MonoBehaviour
     void PruneDeadFields()
     {
         for (int i = _fields.Count - 1; i >= 0; i--)
-        {
             if (_fields[i].go == null) _fields.RemoveAt(i);
-        }
     }
 }

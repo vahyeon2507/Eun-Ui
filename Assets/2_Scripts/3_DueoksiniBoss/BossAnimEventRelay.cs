@@ -12,5 +12,5 @@ public class BossAnimEventRelay : MonoBehaviour
     public void AnimEvent_GenericHitOn() { controller?.AnimEvent_GenericHitOn(); }
     public void AnimEvent_GenericHitOff() { controller?.AnimEvent_GenericHitOff(); }
     public void AnimEvent_SlamHitOn() { controller?.AnimEvent_SlamHitOn(); }
-    public void AnimEvent_SlamHitOff() { controller?.AnimEvent_SlamHitOff(); }
+    public void AnimEvent_SlamHitOff() { controller?.AnimEvent_SlamHitOff(); }  
 }

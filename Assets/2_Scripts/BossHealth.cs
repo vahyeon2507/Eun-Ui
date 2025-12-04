@@ -10,13 +10,16 @@ public class BossHealth : MonoBehaviour, IDamageable
     [SerializeField] private int currentHp = 0;
     public int CurrentHp => currentHp;
 
+    [Header("Damage Modifiers")]
+    [Range(0.1f, 10f)] public float damageTakenMultiplier = 1f; // 외부에서 일시 변경 가능
+
     [Header("UI (optional)")]
     public Slider hpBar;
     public Text hpText;
 
     [Header("Hit Reaction")]
     [Tooltip("※ 무적시간은 사용하지 않습니다(호환용 필드).")]
-    public float invulnTime = 0.6f;   // 논리적으로 사용하지 않음(호환만)
+    public float invulnTime = 0.6f;   // 논리적 미사용(레거시 호환)
     public float staggerTime = 0.18f;
     public float hitMoveDistance = 0.25f;
     public bool useScriptPush = true;
@@ -68,17 +71,14 @@ public class BossHealth : MonoBehaviour, IDamageable
     [Tooltip("복귀 시 살짝 오버슈트(탄성)")]
     public bool reboundOvershoot = true;
     [Range(0f, 1f)] public float reboundFactor = 0.6f;
-
-    [Tooltip("이미 실행 중일 때 또 맞으면 겹치게 둘지(권장: 끄기). 켜도 동시 중첩은 막고, 기존 효과를 유지만 함.")]
+    [Tooltip("이미 실행 중일 때 또 맞으면 겹치게 둘지(권장: 끄기)")]
     public bool allowSquashOverlap = false;
 
     private Coroutine _squashCR;
-
-    // 드리프트 방지용 ‘중립 스케일’ 절대값 보관
     private Vector3 _squashRestAbs;
     private bool _squashRestCaptured;
 
-    // ── 무적 플래그는 호환만 유지(항상 false)
+    // (레거시) 무적 플래그 — 항상 false
     private bool isInvulnerable = false;
 
     private Rigidbody2D rb;
@@ -135,7 +135,7 @@ public class BossHealth : MonoBehaviour, IDamageable
     void OnEnable()
     {
         CacheSquashRestFromCurrent();
-        EnsureRestScale(); // 에디터에서 값 만지다가 플레이 시작해도 중립 보장
+        EnsureRestScale();
     }
 
     // === ‘중립 스케일’ 캡처/복구 ===
@@ -156,7 +156,7 @@ public class BossHealth : MonoBehaviour, IDamageable
     void EnsureRestScale()
     {
         if (!squashTarget || !_squashRestCaptured) return;
-        var sign = SignVec(squashTarget.localScale);               // 현재 방향 유지
+        var sign = SignVec(squashTarget.localScale);
         squashTarget.localScale = Vector3.Scale(_squashRestAbs, sign);
     }
 
@@ -165,7 +165,9 @@ public class BossHealth : MonoBehaviour, IDamageable
         if (amount <= 0) return;
         if (currentHp <= 0) return;
 
-        // ※ 무적 제거 → 항상 대미지 적용
+        // ▼ 받뎀 배율 적용
+        amount = Mathf.CeilToInt(amount * Mathf.Max(0.1f, damageTakenMultiplier));
+
         currentHp = Mathf.Clamp(currentHp - amount, 0, maxHp);
         if (hpBar) hpBar.value = currentHp;
         if (hpText) hpText.text = $"{currentHp} / {maxHp}";
@@ -192,7 +194,7 @@ public class BossHealth : MonoBehaviour, IDamageable
         if (_flashCR != null) { StopCoroutine(_flashCR); RestoreSpriteVisual(); }
         _flashCR = StartCoroutine(FlashWhiteOnce());
 
-        // 스쿼시 — 드리프트 방지: 항상 ‘중립 스케일’ 기준
+        // 스쿼시
         if (useSquashOnHit && squashTarget)
         {
             if (_squashCR != null)
@@ -201,10 +203,9 @@ public class BossHealth : MonoBehaviour, IDamageable
                 {
                     StopCoroutine(_squashCR);
                     _squashCR = null;
-                    EnsureRestScale();    // 기준점 재고정
+                    EnsureRestScale();
                     _squashCR = StartCoroutine(CoSquashPulse());
                 }
-                // 겹침 허용이면 현재 효과 유지(새로 시작 안 함) → 누적 깨짐 방지
             }
             else
             {
@@ -212,7 +213,7 @@ public class BossHealth : MonoBehaviour, IDamageable
             }
         }
 
-        // 넉백/스태거( i-frame 없음 )
+        // 넉백/스태거
         StartCoroutine(HitReactionCoroutine());
 
         if (currentHp <= 0) Die();
@@ -303,13 +304,12 @@ public class BossHealth : MonoBehaviour, IDamageable
     void OnDisable() { RestoreSpriteVisual(); EnsureRestScale(); }
     void OnDestroy() { RestoreSpriteVisual(); }
 
-    // --- Squash & Stretch (절대값 기반: 드리프트 없음) ---
+    // --- Squash & Stretch (절대값 기반) ---
     IEnumerator CoSquashPulse()
     {
         if (!_squashRestCaptured) CacheSquashRestFromCurrent();
         if (!_squashRestCaptured) yield break;
 
-        // 목표 스케일들(절대값 기준)
         Vector3 restAbs = _squashRestAbs;
         Vector3 squashedAbs = new Vector3(restAbs.x * squashX, restAbs.y * squashY, restAbs.z);
 
@@ -321,10 +321,8 @@ public class BossHealth : MonoBehaviour, IDamageable
             stretchAbs = new Vector3(restAbs.x * stretchMulX, restAbs.y * stretchMulY, restAbs.z);
         }
 
-        // 1) Squash
         yield return ScaleOverTimeAbs(squashTarget, restAbs, squashedAbs, squashDuration, squashCurve);
 
-        // 2) Rebound → 3) Rest
         if (reboundOvershoot)
         {
             yield return ScaleOverTimeAbs(squashTarget, squashedAbs, stretchAbs, reboundDuration, reboundCurve);
@@ -335,7 +333,6 @@ public class BossHealth : MonoBehaviour, IDamageable
             yield return ScaleOverTimeAbs(squashTarget, squashedAbs, restAbs, reboundDuration, reboundCurve);
         }
 
-        // 완료 후 정확히 중립 세팅(부동소수 오차 제거)
         EnsureRestScale();
         _squashCR = null;
     }
@@ -346,11 +343,8 @@ public class BossHealth : MonoBehaviour, IDamageable
 
         if (time <= 0f)
         {
-            var sign = new Vector3(
-                Mathf.Sign(target.localScale.x == 0 ? 1 : target.localScale.x),
-                Mathf.Sign(target.localScale.y == 0 ? 1 : target.localScale.y),
-                Mathf.Sign(target.localScale.z == 0 ? 1 : target.localScale.z)
-            );
+            var sign0 = target.localScale;
+            var sign = new Vector3(Mathf.Sign(sign0.x == 0 ? 1 : sign0.x), Mathf.Sign(sign0.y == 0 ? 1 : sign0.y), Mathf.Sign(sign0.z == 0 ? 1 : sign0.z));
             target.localScale = Vector3.Scale(toAbs, sign);
             yield break;
         }
@@ -361,11 +355,8 @@ public class BossHealth : MonoBehaviour, IDamageable
             float a = Mathf.Clamp01(t / time);
             float k = (curve != null && curve.length > 0) ? curve.Evaluate(a) : a;
 
-            var sign = new Vector3(
-                Mathf.Sign(target.localScale.x == 0 ? 1 : target.localScale.x),
-                Mathf.Sign(target.localScale.y == 0 ? 1 : target.localScale.y),
-                Mathf.Sign(target.localScale.z == 0 ? 1 : target.localScale.z)
-            );
+            var sign0 = target.localScale;
+            var sign = new Vector3(Mathf.Sign(sign0.x == 0 ? 1 : sign0.x), Mathf.Sign(sign0.y == 0 ? 1 : sign0.y), Mathf.Sign(sign0.z == 0 ? 1 : sign0.z));
 
             Vector3 v = Vector3.LerpUnclamped(fromAbs, toAbs, k);
             target.localScale = Vector3.Scale(v, sign);
@@ -375,11 +366,8 @@ public class BossHealth : MonoBehaviour, IDamageable
         }
 
         {
-            var sign = new Vector3(
-                Mathf.Sign(target.localScale.x == 0 ? 1 : target.localScale.x),
-                Mathf.Sign(target.localScale.y == 0 ? 1 : target.localScale.y),
-                Mathf.Sign(target.localScale.z == 0 ? 1 : target.localScale.z)
-            );
+            var sign0 = target.localScale;
+            var sign = new Vector3(Mathf.Sign(sign0.x == 0 ? 1 : sign0.x), Mathf.Sign(sign0.y == 0 ? 1 : sign0.y), Mathf.Sign(sign0.z == 0 ? 1 : sign0.z));
             target.localScale = Vector3.Scale(toAbs, sign);
         }
     }
@@ -433,6 +421,21 @@ public class BossHealth : MonoBehaviour, IDamageable
         if (hpText) hpText.text = $"{currentHp} / {maxHp}";
     }
 
-    // 호환용: 항상 false (무적 없음)
+    // (호환) 항상 false
     public bool IsInvulnerable() => false;
+
+    // ▼ 외부에서 ‘받뎀 배율’을 일정 시간 적용 (예: 나무벽 기절)
+    public void ApplyVulnerability(float multiplier, float duration)
+    {
+        StopCoroutine(nameof(CoVuln));
+        StartCoroutine(CoVuln(multiplier, duration));
+    }
+    IEnumerator CoVuln(float mul, float time)
+    {
+        float prev = damageTakenMultiplier;
+        damageTakenMultiplier = Mathf.Max(0.1f, mul);
+        float t = 0f;
+        while (t < time) { t += Time.deltaTime; yield return null; }
+        damageTakenMultiplier = prev;
+    }
 }

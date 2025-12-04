@@ -80,7 +80,7 @@ SpriteRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 2
   m_Sprite: {fileID: 5204210314729977314, guid: 3ece54b97a935f6448a7d150499c0704, type: 3}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Color: {r: 1, g: 0, b: 0, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
@@ -146,17 +146,17 @@ BoxCollider2D:
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
-  m_Offset: {x: -0.21862212, y: 0.008003056}
+  m_Offset: {x: 0.011058338, y: -0.0063159764}
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.5}
-    oldSize: {x: 1.62, y: 0.94}
+    oldSize: {x: 2.7, y: 1.5666667}
     newSize: {x: 1.62, y: 0.94}
     adaptiveTilingThreshold: 0.5
     drawMode: 0
     adaptiveTiling: 0
   m_AutoTiling: 0
-  m_Size: {x: 0.52975446, y: 0.8236941}
+  m_Size: {x: 0.14715283, y: 0.5919861}
   m_EdgeRadius: 0
 --- !u!114 &6037892554510603958
 MonoBehaviour:
@@ -171,10 +171,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   damage: 1
-  startSpeed: 3
-  fastSpeed: 14
-  accelDelay: 0.12
-  accelTime: 0.35
+  startSpeed: 2
+  fastSpeed: 1000
+  accelDelay: 0.25
+  accelTime: 10
   speedCurve:
     serializedVersion: 2
     m_Curve: []
@@ -186,3 +186,22 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 128
   destroyOnHit: 1
+  gfxAnimator: {fileID: 0}
+  spriteRenderer: {fileID: 0}
+  gfxFlipRoot: {fileID: 0}
+  pairSync: {fileID: 0}
+  flyBase: Fly
+  animCrossFade: 0
+  flipIfNoPairSync: 1
+  scaleMorph: 1
+  scaleTarget: {fileID: 7537494726372019904}
+  scaleX_From: 1
+  scaleX_To: 10
+  scaleY_From: 1
+  scaleY_To: 0.3
+  scaleCurve:
+    serializedVersion: 2
+    m_Curve: []
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4

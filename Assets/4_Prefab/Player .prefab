@@ -17,7 +17,6 @@ GameObject:
   - component: {fileID: 1768041895077863587}
   - component: {fileID: 647002003967274913}
   - component: {fileID: 1158506147126392599}
-  - component: {fileID: 3878306766743461896}
   - component: {fileID: 4155843384369479141}
   - component: {fileID: 8192336067740108139}
   - component: {fileID: 8293455664977284783}
@@ -427,35 +426,36 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   player: {fileID: 1290639557195873711}
   throwOrigin: {fileID: 0}
-  toggleKey: 101
-  cycleKey: 113
-  fireKey: 100
-  fireMouseButton: 0
+  ui: {fileID: 6955621181004074726}
+  requireToggleToFire: 0
+  fireKey: 102
+  cycleKey: 0
+  toggleKey: 0
   maxCharges: 2
-  rechargeInterval: 15
+  rechargeInterval: 1
   currentCharges: 2
   perElementProjectileVisual:
-  - {fileID: 7367448548128833882, guid: 6ed577e7cae8b0c46ba817982b106709, type: 3}
-  - {fileID: 2470183167536124741, guid: 3748c46af524814498d15c03fba44032, type: 3}
   - {fileID: 7406380064749202353, guid: 1f1f9e8e44b2a544aba9f56a5b0ebaec, type: 3}
-  - {fileID: 86356831298489571, guid: f0e0ef949def56947a25650f4f467c0e, type: 3}
   - {fileID: 1963355775188421582, guid: 6c098116463d0da4fb77ff41fef13387, type: 3}
+  - {fileID: 2470183167536124741, guid: 3748c46af524814498d15c03fba44032, type: 3}
+  - {fileID: 86356831298489571, guid: f0e0ef949def56947a25650f4f467c0e, type: 3}
+  - {fileID: 7367448548128833882, guid: 6ed577e7cae8b0c46ba817982b106709, type: 3}
   genericProjectileVisual: {fileID: 0}
   perElementField:
-  - {fileID: 7367448548128833882, guid: 6ed577e7cae8b0c46ba817982b106709, type: 3}
-  - {fileID: 2470183167536124741, guid: 3748c46af524814498d15c03fba44032, type: 3}
   - {fileID: 7406380064749202353, guid: 1f1f9e8e44b2a544aba9f56a5b0ebaec, type: 3}
-  - {fileID: 86356831298489571, guid: f0e0ef949def56947a25650f4f467c0e, type: 3}
   - {fileID: 1963355775188421582, guid: 6c098116463d0da4fb77ff41fef13387, type: 3}
+  - {fileID: 2470183167536124741, guid: 3748c46af524814498d15c03fba44032, type: 3}
+  - {fileID: 86356831298489571, guid: f0e0ef949def56947a25650f4f467c0e, type: 3}
+  - {fileID: 7367448548128833882, guid: 6ed577e7cae8b0c46ba817982b106709, type: 3}
   genericField: {fileID: 0}
   fieldUseAnimator: 1
-  fieldAnimatorTrigger: Spawn
+  fieldAnimatorTrigger: 
   fieldAnimatorTriggerPerElement:
-  - Spawn_Wood
-  - Spawn_Water
   - Spawn_Fire
-  - Spawn_Metal
   - Spawn_Earth
+  - Spawn_Water
+  - Spawn_Metal
+  - Spawn_Wood
   projectileSpeed: 12
   projectileRadius: 0.15
   projectileMaxRange: 9
@@ -479,21 +479,21 @@ MonoBehaviour:
   comboCheckExtraRadius: 0.1
   onFieldCombo:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 0}
+        m_TargetAssemblyTypeName: 
+        m_MethodName: 
+        m_Mode: 0
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: 
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
   logEvents: 1
   current: 0
---- !u!114 &3878306766743461896
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 422704032455422116}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b7c2739f11403db4f9f76974b2786b9a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!114 &4155843384369479141
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -641,13 +641,22 @@ MonoBehaviour:
   - {fileID: -2414954927019188512, guid: 53adf0e35c10a8f4d90b0d5ac1940073, type: 3}
   player: {fileID: 2186251996989526959}
   offset: {x: 0, y: 2, z: 0}
+  faceCamera: 1
   toggleKey: 9
   prevKey: 113
   nextKey: 101
+  fireKey: 102
   moveDistance: 150
   moveDuration: 0.3
   sideScale: 0.7
   sideAlpha: 0.5
+  typeOrder: 0000000001000000020000000300000004000000
+  onChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  onRequestFire:
+    m_PersistentCalls:
+      m_Calls: []
 --- !u!1 &607013942946884702
 GameObject:
   m_ObjectHideFlags: 0
@@ -1034,7 +1043,7 @@ Transform:
   m_GameObject: {fileID: 743404579822116477}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 2.3, z: 0}
+  m_LocalPosition: {x: 0, y: 2, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []

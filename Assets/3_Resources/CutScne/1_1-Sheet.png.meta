@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: e0909ea571ead5a45b2cf58b88fd21b3
+guid: 8ff77513015457046926a8f2a1667ce6
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 8455141076206018171
-    second: deviders3_0
+      213: -3716749190864303982
+    second: 1_1-Sheet_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -37,7 +37,7 @@ TextureImporter:
   maxTextureSize: 2048
   textureSettings:
     serializedVersion: 2
-    filterMode: 0
+    filterMode: 1
     aniso: 1
     mipBias: 0
     wrapU: 1
@@ -100,23 +100,89 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: deviders3_0
+      name: 1_1-Sheet_0
       rect:
         serializedVersion: 2
         x: 0
-        y: 5
-        width: 160
-        height: 7
+        y: 0
+        width: 800
+        height: 450
       alignment: 0
-      pivot: {x: 0.5, y: 0.5}
-      border: {x: 63, y: 1, z: 63, w: 1}
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: b7ed215f202b65570800000000000000
-      internalID: 8455141076206018171
+      spriteID: 6565c1aebd52a314d9368af2f1bac73a
+      internalID: -256433357
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: 1_1-Sheet_1
+      rect:
+        serializedVersion: 2
+        x: 800
+        y: 0
+        width: 800
+        height: 450
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 0848c382ec6a45346bcf40fa89f0603c
+      internalID: 1899812056
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: 1_1-Sheet_2
+      rect:
+        serializedVersion: 2
+        x: 1600
+        y: 0
+        width: 800
+        height: 450
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 41876e8c0503342459524485567b7cd4
+      internalID: -832115848
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: 1_1-Sheet_3
+      rect:
+        serializedVersion: 2
+        x: 2400
+        y: 0
+        width: 800
+        height: 450
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 79817312cdc72a048a6f55498fd26453
+      internalID: -1645232577
       vertices: []
       indices: 
       edges: []
@@ -125,7 +191,7 @@ TextureImporter:
     customData: 
     physicsShape: []
     bones: []
-    spriteID: a481dffb9bea19b40bd7134f95957a38
+    spriteID: eaba165b881e0914c9296386eb030128
     internalID: 0
     vertices: []
     indices: 
@@ -135,9 +201,10 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      deviders3_0: 8455141076206018171
-      deviders3_1: -649553593
-      deviders3_2: 210030932
+      1_1-Sheet_0: -256433357
+      1_1-Sheet_1: 1899812056
+      1_1-Sheet_2: -832115848
+      1_1-Sheet_3: -1645232577
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

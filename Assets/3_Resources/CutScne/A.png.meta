@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: e0909ea571ead5a45b2cf58b88fd21b3
+guid: b5aba8a106afcf34da1d2ffff152a3c5
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 8455141076206018171
-    second: deviders3_0
+      213: -8680797543115379092
+    second: A_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -37,7 +37,7 @@ TextureImporter:
   maxTextureSize: 2048
   textureSettings:
     serializedVersion: 2
-    filterMode: 0
+    filterMode: 1
     aniso: 1
     mipBias: 0
     wrapU: 1
@@ -100,23 +100,23 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: deviders3_0
+      name: A_0
       rect:
         serializedVersion: 2
         x: 0
-        y: 5
-        width: 160
-        height: 7
+        y: 0
+        width: 800
+        height: 450
       alignment: 0
-      pivot: {x: 0.5, y: 0.5}
-      border: {x: 63, y: 1, z: 63, w: 1}
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: b7ed215f202b65570800000000000000
-      internalID: 8455141076206018171
+      spriteID: c6e268b90ac978780800000000000000
+      internalID: -8680797543115379092
       vertices: []
       indices: 
       edges: []
@@ -125,7 +125,7 @@ TextureImporter:
     customData: 
     physicsShape: []
     bones: []
-    spriteID: a481dffb9bea19b40bd7134f95957a38
+    spriteID: 
     internalID: 0
     vertices: []
     indices: 
@@ -134,10 +134,7 @@ TextureImporter:
     secondaryTextures: []
     spriteCustomMetadata:
       entries: []
-    nameFileIdTable:
-      deviders3_0: 8455141076206018171
-      deviders3_1: -649553593
-      deviders3_2: 210030932
+    nameFileIdTable: {}
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

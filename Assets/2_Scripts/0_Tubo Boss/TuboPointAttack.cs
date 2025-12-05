@@ -2,19 +2,19 @@ using System.Collections;
 using UnityEngine;
 
 [DisallowMultipleComponent]
-public class TuboPointAttack : MonoBehaviour, ITuboAttack
+public class TuboPointAttack : MonoBehaviour
 {
     [Header("Owner")]
     public BossTuboController owner;
 
     [Header("Hitbox")]
-    public Collider2D hitbox;              // isTrigger 권장
+    public Collider2D hitbox;      // isTrigger 권장
     public LayerMask playerLayer;
 
     [Header("Damage")]
     public int damage = 1;
-    public float activeTime = 0.15f;       // 실제 유효 시간
-    public float extraParryGrace = 0.15f;  // 끝나고도 약간 패링 인정
+    public float activeTime = 0.15f;
+    public float extraParryGrace = 0.15f;
 
     [Header("FX/SFX (optional)")]
     public string spawnFxId;
@@ -22,7 +22,6 @@ public class TuboPointAttack : MonoBehaviour, ITuboAttack
 
     bool _active = false;
     bool _consumed = false;
-    Coroutine _lifeCR;
 
     void Reset()
     {
@@ -32,60 +31,71 @@ public class TuboPointAttack : MonoBehaviour, ITuboAttack
 
     void OnEnable()
     {
-        if (!owner) owner = GetComponentInParent<BossTuboController>();
-        if (owner) owner.RegisterAttack(this);
-
-        // 그로기 중에 스폰되면 즉시 폐기
+        // 그로기 중이면 스폰 즉시 무시
         if (owner && !owner.AttacksEnabled) { Destroy(gameObject); return; }
-
-        _lifeCR = StartCoroutine(CoLife());
-    }
-
-    void OnDisable()
-    {
-        if (owner) owner.UnregisterAttack(this);
+        StartCoroutine(CoLife());
     }
 
     IEnumerator CoLife()
     {
         _active = true;
-
-        // 패링 윈도우 알림(원하면)
-        if (owner) owner.NotifyAttackWindow(true, activeTime + extraParryGrace);
-
+        if (owner) owner.NotifyAttackWindow(true, activeTime + extraParryGrace); // 열림
         yield return new WaitForSeconds(activeTime);
-
         _active = false;
-        if (owner) owner.NotifyAttackWindow(false);
-
-        // 한 틱 뒤 안전 제거
+        if (owner) owner.NotifyAttackWindow(false); // 닫힘
         Destroy(gameObject, 0.02f);
     }
 
     void OnTriggerEnter2D(Collider2D other)
     {
         if (!_active || _consumed) return;
-        if (owner && !owner.AttacksEnabled) return; // 그로기 가드
-
         if (((1 << other.gameObject.layer) & playerLayer) == 0) return;
 
         var pc = other.GetComponentInParent<PlayerController>() ?? other.GetComponent<PlayerController>();
         if (!pc) return;
+        Debug.Log($"[TPA] active={_active} consumed={_consumed} isParry={pc?.IsParrying}");
 
+        // --- 패링 창일 때: 소비 + 튜보에게 '패링 성공' 알림 ---
+        if (pc.IsParrying)
+        {
+            bool consumed = pc.ConsumeHitboxIfParrying(other); // 플레이어 쪽 패링 소비
+            if (consumed)
+            {
+                _consumed = true;
+                if (hitbox) hitbox.enabled = false;
+                owner?.NotifyParrySuccessDirect();  // ★ 이 한 줄이 튜토 진행의 열쇠
+                return;
+            }
+            // consume 못했으면 일반 피격으로 계속 진행
+        }
+
+        // 기존 OnTriggerEnter2D는 유지하고, 아래 Stay 추가
+        void OnTriggerStay2D(Collider2D other)
+        {
+            if (!_active || _consumed) return;
+            if (((1 << other.gameObject.layer) & playerLayer) == 0) return;
+
+            var pc = other.GetComponentInParent<PlayerController>() ?? other.GetComponent<PlayerController>();
+            if (!pc) return;
+
+            // 재개 후에라도 패링이면 소비 + 알림
+            if (pc.IsParrying)
+            {
+                if (pc.ConsumeHitboxIfParrying(other))
+                {
+                    _consumed = true;
+                    if (hitbox) hitbox.enabled = false;
+                    owner?.NotifyParrySuccessDirect();   // ★ 튜토 진행 신호
+                }
+            }
+        }
+
+
+
+
+        // --- 일반 피격 ---
         _consumed = true;
-
-        // 플레이어가 패링 중이면 PlayerController 내부 로직이 소비/보상 처리
         pc.TakeDamage(damage);
-
         if (hitbox) hitbox.enabled = false;
-    }
-
-    // === ITuboAttack ===
-    public void CancelAttack()
-    {
-        _active = false;
-        if (hitbox) hitbox.enabled = false;
-        if (_lifeCR != null) { StopCoroutine(_lifeCR); _lifeCR = null; }
-        Destroy(gameObject);
     }
 }

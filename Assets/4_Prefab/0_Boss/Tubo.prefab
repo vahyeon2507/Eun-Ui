@@ -60,12 +60,17 @@ MonoBehaviour:
   telegraphTime: 0.6
   attackCooldown: 1.8
   attackTrigger: Attack
-  groggyTrigger: Groggy
-  groggyDuration: 10
+  groggyDuration: 5
   parryAttributionGrace: 0.25
+  groggyDamageMultiplier: 2
+  groggyBool: isGroggy
+  groggyRecoverTrigger: Recover
+  enterGroggyTrigger: 
+  disableDuringGroggy: []
   playerLayer:
     serializedVersion: 2
     m_Bits: 128
+  debugLog: 1
   groggyOnlyWhenAttacking: 1
 --- !u!50 &8748828248321551542
 Rigidbody2D:

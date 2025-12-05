@@ -67,6 +67,9 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     public int CurrentParryStreak => parrySuccessCount;
     public event Action<int> OnParryStreakChanged;
 
+    public static System.Func<PlayerAction, bool> TutorialAllow = null;
+    public enum PlayerAction { Attack, Parry, Dash, Jump, Move }
+
     [Header("Movement")]
     public float moveSpeed = 5f;
     public float jumpForce = 12f;
@@ -238,10 +241,12 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
         if (attackLockTimer > 0f) attackLockTimer -= Time.deltaTime;
     }
 
+
+    bool Allow(PlayerAction a) => (TutorialAllow == null) || TutorialAllow(a);
     void HandleInputs()
     {
         // 기본 공격 입력(좌클릭 또는 extraAttackKey)
-        bool attackPressed = Input.GetMouseButtonDown(0) || Input.GetKeyDown(extraAttackKey);
+        bool attackPressed = (Input.GetMouseButtonDown(0) || Input.GetKeyDown(extraAttackKey)) && Allow(PlayerAction.Attack);
         if (attackPressed)
         {
             lastAttackButtonTime = Time.time;
@@ -267,7 +272,7 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
         }
 
         // 패링
-        if (Input.GetKeyDown(KeyCode.C) || Input.GetKeyDown(KeyCode.LeftControl))
+        if ((Input.GetKeyDown(KeyCode.C) || Input.GetKeyDown(KeyCode.LeftControl)) && Allow(PlayerAction.Parry))
         {
             if (canParry && !isParrying)
             {

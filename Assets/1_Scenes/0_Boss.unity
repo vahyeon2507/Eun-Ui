@@ -2656,7 +2656,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   overlayImage: {fileID: 1142509090}
   targetCam: {fileID: 519420031}
-  canvasGroup: {fileID: 0}
   darkAlpha: 0.65
   defaultRadius: 0.25
   defaultFeather: 0.08
@@ -3637,66 +3636,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1569446067}
   m_CullTransparentMesh: 1
---- !u!1 &1601914923
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1601914925}
-  - component: {fileID: 1601914924}
-  m_Layer: 0
-  m_Name: TuboTutorialDirector
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1601914924
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1601914923}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 1163f04dc50c38b488f59aced9b79741, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  tubo: {fileID: 1344952896}
-  player: {fileID: 2058350873}
-  cam2d: {fileID: 0}
-  spotlight: {fileID: 1142509092}
-  slideUI: {fileID: 1678341518}
-  promptUI: {fileID: 1460082701}
-  promptText: {fileID: 1422931978}
-  runOnce: 1
-  playerPrefsKey: 
-  approachDistance: 3
-  camZoomGroggy: 0.8
-  camZoomTime: 0.45
-  slidesParry:
-  - video: {fileID: 32900000, guid: 300c957f945ba334482ee2b3b8631ade, type: 3}
-    caption: "\uD798\uB4E4\uC5B4 \uB514\uC9C0\uACA0\uB124\n"
-  slidesCombo: []
---- !u!4 &1601914925
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1601914923}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -3.0122943, y: -0.8580334, z: -0.1343214}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1616253084
 GameObject:
   m_ObjectHideFlags: 0
@@ -3803,17 +3742,6 @@ Rigidbody2D:
   m_SleepingMode: 1
   m_CollisionDetection: 0
   m_Constraints: 0
---- !u!114 &1678341518 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 4183585753946666108, guid: 89700abed80d6ec42973435627cd4d86, type: 3}
-  m_PrefabInstance: {fileID: 6929157658448715326}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 07153bbe3cd798949a785f6fb7ae0e3f, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!4 &1678341519 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 1902834657600796119, guid: 89700abed80d6ec42973435627cd4d86, type: 3}
@@ -4580,28 +4508,14 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 2000232533}
-  - component: {fileID: 2000232532}
+  - component: {fileID: 2000232534}
   m_Layer: 0
-  m_Name: GameObject (1)
+  m_Name: TuboTutorialLite
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &2000232532
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2000232531}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 06bf806a64de07040b83fd9133ec3de9, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  overlay: {fileID: 1142509092}
-  focus: {fileID: 2058350871}
 --- !u!4 &2000232533
 Transform:
   m_ObjectHideFlags: 0
@@ -4617,6 +4531,30 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2000232534
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2000232531}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 64afe5163b84966419357e9b9200defd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  tubo: {fileID: 1344952896}
+  player: {fileID: 2058350873}
+  overlay: {fileID: 1142509092}
+  slideUI: {fileID: 0}
+  promptUI: {fileID: 1460082701}
+  promptText: {fileID: 1422931978}
+  slidesParry: []
+  slidesCombo: []
+  runOnce: 1
+  playerPrefsKey: TuboTutorialDone
+  camZoomGroggy: 0.8
+  camZoomTime: 0.45
 --- !u!1 &2013718076
 GameObject:
   m_ObjectHideFlags: 0
@@ -5598,5 +5536,4 @@ SceneRoots:
   - {fileID: 1846078705}
   - {fileID: 2053310625}
   - {fileID: 155040279}
-  - {fileID: 1601914925}
   - {fileID: 2000232533}

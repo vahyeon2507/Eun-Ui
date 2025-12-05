@@ -597,7 +597,7 @@ MonoBehaviour:
   imageParent: {fileID: 1627467898}
   titleText: {fileID: 399820227}
   openingText: {fileID: 1185216019}
-  nextSceneName: 1_Boss
+  nextSceneName: CutScene
   fadeDuration: 1
   blinkSpeed: 1.5
 --- !u!4 &660955838

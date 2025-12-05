@@ -1026,6 +1026,58 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 648857359bd665946b81f3387a8d80c8, type: 3}
+--- !u!1 &250490633
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 250490635}
+  - component: {fileID: 250490634}
+  m_Layer: 0
+  m_Name: BossKillTeleportDirector
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &250490634
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 250490633}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 726a0a28d84efa544905e870e0e6092a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  spawnPoint: {fileID: 426411824}
+  gatePrefab: {fileID: 9005272765653838779, guid: c645b2d3dff1244438eca8d0dd6b70c4, type: 3}
+  preplacedGate: {fileID: 0}
+  hidePreplacedOnStart: 1
+  nextSceneName: 3_Boss
+  barriersToRemove:
+  - {fileID: 1962146811}
+  justDisableBarriers: 0
+--- !u!4 &250490635
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 250490633}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 3.5749772, y: 1.7509217, z: -0.09883204}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &263395145
 GameObject:
   m_ObjectHideFlags: 0
@@ -1300,6 +1352,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   maxHp: 175
   currentHp: 0
+  damageTakenMultiplier: 1
   hpBar: {fileID: 1384591960}
   hpText: {fileID: 0}
   invulnTime: 0.6
@@ -1991,7 +2044,7 @@ Transform:
   m_GameObject: {fileID: 426411823}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 3.5749772, y: 1.7509217, z: -0.09883204}
+  m_LocalPosition: {x: 8.92, y: 1.7509217, z: -0.09883204}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -6705,3 +6758,4 @@ SceneRoots:
   - {fileID: 1538400924}
   - {fileID: 1401423574}
   - {fileID: 1037797841}
+  - {fileID: 250490635}

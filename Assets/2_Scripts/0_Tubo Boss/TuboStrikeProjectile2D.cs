@@ -1,70 +1,129 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 [RequireComponent(typeof(Collider2D))]
 public class TuboStrikeProjectile2D : MonoBehaviour
+
 {
     [Header("Hit")]
     public int damage = 1;
-    public LayerMask hitMask;            // º¸Åë Player
-    public bool destroyOnHit = true;
-    public float activeTime = 0.08f;     // È÷Æ® °¡´É ½Ã°£
-    public float lifeTime = 0.6f;        // ÀüÃ¼ »ı¸í
+    public LayerMask hitMask;          // Player(È¤ï¿½ï¿½ PlayerHurtbox) ï¿½ï¿½ï¿½Ì¾ï¿½ ï¿½ï¿½ï¿½ï¿½
+    public bool destroyOnHit = false;
+    public float activeTime = 0.10f;   // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Ö´ï¿½ ï¿½Ã°ï¿½
+    public float lifeTime = 0.9f;      // ï¿½Ö´ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ã°ï¿½
 
     [Header("Anim (optional)")]
     public Animator animator;
-    public string playTrigger = "Play";  // ¾Ö´Ï¸ŞÀÌÅÍ Æ®¸®°Å¸í
+    public string playTrigger = "Play";
 
     Collider2D _col;
-    bool _playing;
-
-    void Reset()
-    {
-        _col = GetComponent<Collider2D>();
-        _col.isTrigger = true;
-        animator = GetComponentInChildren<Animator>();
-    }
+    bool _didDamage;
+    ContactFilter2D _filter;
+    static readonly List<Collider2D> _buf = new(8);
 
     void Awake()
     {
         _col = GetComponent<Collider2D>();
-        if (_col) _col.enabled = false;
-        if (!animator) animator = GetComponentInChildren<Animator>();
+        if (_col) _col.isTrigger = true; // Æ®ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+        _filter = new ContactFilter2D { useLayerMask = true, useTriggers = true };
+        _filter.SetLayerMask(hitMask);
     }
 
-    public void Play()
+    void OnEnable()
     {
-        if (_playing) return;
-        StartCoroutine(CoPlay());
-    }
-
-    IEnumerator CoPlay()
-    {
-        _playing = true;
-
+        _didDamage = false;
         if (animator && !string.IsNullOrEmpty(playTrigger))
             animator.SetTrigger(playTrigger);
 
-        // Âª°Ô È÷Æ® °¡´É
-        if (_col) _col.enabled = true;
-        yield return new WaitForSeconds(activeTime);
-        if (_col) _col.enabled = false;
+        StartCoroutine(CoLife());
+    }
 
-        // ÀÜ»ó/¿¬±â µî º¸ÀÌµµ·Ï ¿©À¯
-        yield return new WaitForSeconds(Mathf.Max(0f, lifeTime - activeTime));
+    public BossTuboController owner;   // â˜… ì¶”ê°€
+    IEnumerator CoLife()
+    {
+        float t = 0f, alive = 0f;
+
+        while (t < lifeTime)
+        {
+            // È°ï¿½ï¿½ Ã¢ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ë»ï¿½ (ï¿½ï¿½ï¿½Ì¾ï¿½ ï¿½ï¿½Æ®ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
+            if (alive < activeTime)
+            {
+                if (TryDamageOnce())
+                {
+                    if (destroyOnHit) break;
+                }
+                alive += Time.deltaTime;
+            }
+
+            t += Time.deltaTime;
+            yield return null;
+        }
+
         Destroy(gameObject);
     }
 
+    bool TryDamageOnce()
+    {
+        if (_didDamage || !_col) return false;
+
+        _buf.Clear();
+        int count = _col.Overlap(_filter, _buf);
+        for (int i = 0; i < count; i++)
+        {
+
+            var c = _buf[i];
+            if (!c) continue;
+
+            // ï¿½Ğ¸ï¿½ ï¿½ï¿½ï¿½Ì¸ï¿½ ï¿½Ã·ï¿½ï¿½Ì¾î°¡ ï¿½Òºï¿½ï¿½Ïµï¿½ï¿½ï¿½
+            var pc = c.GetComponentInParent<PlayerController>() ?? c.GetComponent<PlayerController>();
+            if (pc != null && pc.ConsumeHitboxIfParrying(c))
+
+            {
+                owner?.OnParried(c);       // â˜… ë³´ìŠ¤ì— ì§ì ‘ ì•Œë¦¼
+                // ï¿½ï¿½Æ®ï¿½Ñ·ï¿½(ï¿½Ç´ï¿½ ï¿½ï¿½ï¿½ï¿½)ï¿½ï¿½ ï¿½Ë·ï¿½ï¿½ï¿½ ï¿½×·Î±ï¿½ Ã³ï¿½ï¿½(ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½)
+                SendMessageUpwards("OnParried", c, SendMessageOptions.DontRequireReceiver);
+                _didDamage = true;
+                return true;
+            }
+
+            var dmg = c.GetComponent<IDamageable>()
+                   ?? c.GetComponentInParent<IDamageable>()
+                   ?? c.GetComponentInChildren<IDamageable>();
+            if (dmg != null)
+            {
+                dmg.TakeDamage(damage);
+                _didDamage = true;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // ï¿½ï¿½ï¿½Å½ï¿½/ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½: ï¿½ï¿½Æ®ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Â¾ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     void OnTriggerEnter2D(Collider2D other)
     {
+        if (_didDamage) return;
         if (((1 << other.gameObject.layer) & hitMask) == 0) return;
 
-        // ÇÃ·¹ÀÌ¾î¿¡ ÇÇÇØ
+        var pc = other.GetComponentInParent<PlayerController>() ?? other.GetComponent<PlayerController>();
+        if (pc != null && pc.ConsumeHitboxIfParrying(other))
+        {
+            owner?.OnParried(other);   // â˜… ì—¬ê¸°ì„œë„ ë³´ìŠ¤ì— ì§ì ‘ ì•Œë¦¼
+            SendMessageUpwards("OnParried", other, SendMessageOptions.DontRequireReceiver);
+            _didDamage = true;
+            if (destroyOnHit) Destroy(gameObject);
+            return;
+        }
+
         var dmg = other.GetComponent<IDamageable>()
                ?? other.GetComponentInParent<IDamageable>()
                ?? other.GetComponentInChildren<IDamageable>();
-        if (dmg != null) dmg.TakeDamage(damage);
-
-        if (destroyOnHit) Destroy(gameObject);
+        if (dmg != null)
+        {
+            dmg.TakeDamage(damage);
+            _didDamage = true;
+            if (destroyOnHit) Destroy(gameObject);
+        }
     }
 }

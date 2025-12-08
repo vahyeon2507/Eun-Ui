@@ -24,6 +24,9 @@ public class BossTuboController : MonoBehaviour
     public event System.Action onAttackWindowClose;
     public event System.Action onParrySuccessDirect;
 
+    // ★ 추가: 첫 공격이 발사되기 직전에 한 번만 호출되는 이벤트
+    public event System.Action onFirstAttackIssued;
+
     [Header("Attack Timing")]
     public float telegraphTime = 0.6f;
     public float attackCooldown = 1.2f;
@@ -66,6 +69,9 @@ public class BossTuboController : MonoBehaviour
 
     bool _attacksEnabled = true;
     public bool AttacksEnabled => _attacksEnabled;
+
+    // ★ 추가: 첫 공격 이벤트를 이미 쐈는지 추적
+    bool _firstAttackEventSent = false;
 
     void Reset()
     {
@@ -143,7 +149,17 @@ public class BossTuboController : MonoBehaviour
 
             // 3) 공격 애니
             if (animator && !string.IsNullOrEmpty(attackTrigger))
+            {
                 animator.SetTrigger(attackTrigger);
+
+                // ★ 첫 공격 시작 시점에 한 번만 튜토리얼용 이벤트 발사
+                if (!_firstAttackEventSent)
+                {
+                    _firstAttackEventSent = true;
+                    onFirstAttackIssued?.Invoke();
+                    if (debugLog) Debug.Log("[Tubo] First attack issued → tutorial event fired");
+                }
+            }
 
             // 4) 텔레그래프 대기
             yield return new WaitForSeconds(telegraphTime);

@@ -1,169 +1,80 @@
-Ôªøusing System.Collections;
-using System.Collections.Generic;
-using TMPro;
 using UnityEngine;
 
-[DisallowMultipleComponent]
 public class TuboTutorialLite : MonoBehaviour
 {
-    [Header("Refs")]
-    public BossTuboController tubo;                 // Ïù¥Î≤§Ìä∏: onAttackWindowOpen, onParrySuccessDirect
-    public PlayerController player;                 // ÏûÖÎ†•ÎùΩ: PlayerController.TutorialAllow ÏÇ¨Ïö©
-    public SpotlightOverlayController overlay;      // ÌôîÎ©¥ Ïñ¥Îë°Í≤å + Ïä§Ìåü
-    public TutorialSlideShow slideUI;               // ÏóÜÏúºÎ©¥ ÏûêÎèô ÏÉùÎûµ
-    public CanvasGroup promptUI; public TMP_Text promptText;
+    public RectTransform anchorRect;
+    public Canvas overlayCanvas;
 
-    [Header("Slides")]
-    public List<TutorialSlideShow.Slide> slidesParry = new List<TutorialSlideShow.Slide>();
-    public List<TutorialSlideShow.Slide> slidesCombo = new List<TutorialSlideShow.Slide>();
-
-    [Header("Settings")]
-    public bool runOnce = true;
-    public string playerPrefsKey = "TuboTutorialDone";
-    public float camZoomGroggy = 0.8f;
-    public float camZoomTime = 0.45f;
-
-    bool firstAttackSeen = false;
-    bool waitingParry = false;
-    bool finished = false;
+    GuideMask guide;
+    bool started;
 
     void Awake()
     {
-#if UNITY_2023_1_OR_NEWER
-        if (!player) player = Object.FindFirstObjectByType<PlayerController>();
-        if (!tubo) tubo = Object.FindFirstObjectByType<BossTuboController>();
-#else
-        if (!player) player = FindObjectOfType<PlayerController>();
-        if (!tubo)   tubo   = FindObjectOfType<BossTuboController>();
-#endif
+        guide = FindAnyObjectByType<GuideMask>();
+        if (guide != null)
+            guide.Init();
     }
 
-    void OnEnable()
+    void Update()
     {
-        if (runOnce && PlayerPrefs.GetInt(playerPrefsKey, 0) == 1) { enabled = false; return; }
-        if (tubo != null)
-        {
-            tubo.onAttackWindowOpen += OnTuboFirstAttackWindow;
-            tubo.onParrySuccessDirect += OnParryDirect;
-        }
+        // ≈◊Ω∫∆ÆøÎ: T ≈∞∑Œ ∆©≈‰ Ω√¿€
+        if (Input.GetKeyDown(KeyCode.T))
+            StartTutorial();
+
+        if (!started) return;
+
+        // === ∆©≈‰ ¡§¡ˆ ªÛ≈¬ø°º≠∏∏ Ω««‡ ===
+
+        // ∆–∏µ ≈∞(C / LeftControl)∞° ¥≠∏Æ∏È ∆©≈‰ ¡æ∑·
+        if (Input.GetKeyDown(KeyCode.C) || Input.GetKeyDown(KeyCode.LeftControl))
+            EndTutorial();
+
+        // µπˆ±◊øÎ: Y∑Œ ±◊≥… √Îº“
+        if (Input.GetKeyDown(KeyCode.Y))
+            CancelTutorial();
     }
 
-    void OnDisable()
+    void StartTutorial()
     {
-        if (tubo != null)
-        {
-            tubo.onAttackWindowOpen -= OnTuboFirstAttackWindow;
-            tubo.onParrySuccessDirect -= OnParryDirect;
-        }
-        PlayerController.TutorialAllow = null;
-        SetPrompt(false);
-        if (overlay) overlay.Enable(false);
-    }
+        if (started || guide == null) return;
+        started = true;
 
-    // ===== Ïù¥Î≤§Ìä∏ =====
-    void OnTuboFirstAttackWindow()
-    {
-        if (finished || firstAttackSeen) return;
-        firstAttackSeen = true;
-        StartCoroutine(CoStartParryFrozen());
-    }
+        // ∏’¿˙ «√∑π¿ÃæÓ «‡µø ¿·±◊∞Ì, ±◊ ¥Ÿ¿Ω Ω√∞£ ∏ÿ√ﬂ¿⁄ (1«¡∑π¿” πÃ≤Ù∑Ø¡¸ πÊ¡ˆ)
+        PlayerController.TutorialInputLocked = true;
+        Time.timeScale = 0f;
 
-    void OnParryDirect()
-    {
-        if (!waitingParry || finished) return;
-        waitingParry = false;
-        StartCoroutine(CoAfterParrySuccess());
-    }
-
-    // ===== Ïú†Ìã∏ =====
-    void Pause(bool on) => Time.timeScale = on ? 0f : 1f;
-
-    void GateParryOnly() => PlayerController.TutorialAllow = (a) => a == PlayerController.PlayerAction.Parry;
-    void GateAttackOnly() => PlayerController.TutorialAllow = (a) => a == PlayerController.PlayerAction.Attack;
-    void GateFree() => PlayerController.TutorialAllow = null;
-
-    void SetPrompt(bool on, string text = null)
-    {
-        if (!promptUI) return;
-        promptUI.alpha = on ? 1f : 0f;
-        promptUI.blocksRaycasts = on;
-        if (on && promptText && !string.IsNullOrEmpty(text)) promptText.text = text;
-    }
-
-    IEnumerator CamFocus(Transform target, float zoom, float time)
-    {
-        if (!target || !Camera.main) yield break;
-        var camTr = Camera.main.transform;
-        Vector3 startPos = camTr.position;
-        Vector3 endPos = new Vector3(target.position.x, target.position.y, startPos.z);
-        float t = 0f;
-        float s0 = Camera.main.orthographicSize, s1 = s0 * zoom;
-        while (t < time)
-        {
-            float a = t / time;
-            camTr.position = Vector3.Lerp(startPos, endPos, a);
-            Camera.main.orthographicSize = Mathf.Lerp(s0, s1, a);
-            t += Time.unscaledDeltaTime; // Ï†ïÏßÄ Ï§ëÏóêÎèÑ ÏßÑÌñâ
-            yield return null;
-        }
-        camTr.position = endPos;
-        Camera.main.orthographicSize = s1;
-    }
-
-    // ===== 1) Ï≤´ Í≥µÍ≤©: Ï†ïÏßÄ Ïú†ÏßÄ + Ïä¨ÎùºÏù¥Îìú Î®ºÏ†Ä =====
-    IEnumerator CoStartParryFrozen()
-    {
-        Pause(true);
-
-        if (overlay && player)
-        {
-            overlay.SetSingleWorldSpot(player.transform, 0.24f, 0.10f);
-            overlay.Enable(true);
-        }
-        SetPrompt(true, "Ìå®ÎßÅ ÌÉÄÏù¥Î∞ç ÏïàÎÇ¥ (C ÎòêÎäî Ctrl)");
-        GateParryOnly(); // Ïã§Ï†ú Ìå®ÎßÅÏùÄ Ïä¨ÎùºÏù¥Îìú Îã´Ìûå Îí§Î∂ÄÌÑ∞ ÌóàÏö©
-
-        // Ïä¨ÎùºÏù¥Îìú(Ìå®ÎßÅÌé∏) ‚Äî Ï†ïÏßÄ ÏÉÅÌÉúÏóêÏÑú ÎùÑÏõÄ
-        if (slideUI)
-        {
-            bool done = false;
-            slideUI.Open(slidesParry, () => done = true);
-            // Ïä¨ÎùºÏù¥Îìú Îã´Ìûê ÎïåÍπåÏßÄ Ï†ïÏßÄ Ïú†ÏßÄ
-            while (!done) yield return null;
-        }
-
-        // Ïä¨ÎùºÏù¥Îìú Îã´Ìûò ‚Üí Ìå®ÎßÅ Î∞õÎèÑÎ°ù Ìï¥Ï†ú
-        SetPrompt(true, "Ïù¥Ï†ú Ìå®ÎßÅÏùÑ ÏÑ±Í≥µÌï¥ Î¥ê! (C ÎòêÎäî Ctrl)");
-        Pause(false);
-        waitingParry = true;
-    }
-
-    // ===== 2) Ìå®ÎßÅ ÏÑ±Í≥µ: Îã§Ïãú Ï†ïÏßÄ + Î≥¥Ïä§ Í∞ïÏ°∞ + Ï§å + ÏΩ§Î≥¥ Ïä¨ÎùºÏù¥Îìú =====
-    IEnumerator CoAfterParrySuccess()
-    {
-        Pause(true);
-        SetPrompt(false);
-        if (overlay && tubo) overlay.SetSingleWorldSpot(tubo.transform, 0.28f, 0.12f);
-        if (tubo) yield return CamFocus(tubo.transform, camZoomGroggy, camZoomTime);
-
-        if (slideUI)
-        {
-            bool done = false;
-            slideUI.Open(slidesCombo, () => done = true);
-            while (!done) yield return null;
-        }
-
-        EndTutorial();
+        guide.Play(anchorRect);
+        Debug.Log("[Tuto] START (lock ON)");
     }
 
     void EndTutorial()
     {
-        finished = true;
-        Pause(false);
-        GateFree();
-        if (overlay) overlay.Enable(false);
-        SetPrompt(false);
-        if (runOnce) { PlayerPrefs.SetInt(playerPrefsKey, 1); PlayerPrefs.Save(); }
-        enabled = false;
+        if (!started) return;
+        started = false;
+
+        Time.timeScale = 1f;
+        PlayerController.TutorialInputLocked = false;
+
+        if (guide != null)
+            guide.Close();
+
+        Debug.Log("[Tuto] END by parry key");
+        // ø©±‚º≠ ¡§∏ª πŸ∑Œ ∆–∏µ±Ó¡ˆ Ω√≈∞∞Ì ΩÕ¿∏∏È:
+        // var player = FindAnyObjectByType<PlayerController>();
+        // if (player != null) player.ForceParryFromTutorial();
+    }
+
+    void CancelTutorial()
+    {
+        if (!started) return;
+        started = false;
+
+        Time.timeScale = 1f;
+        PlayerController.TutorialInputLocked = false;
+
+        if (guide != null)
+            guide.Close();
+
+        Debug.Log("[Tuto] CANCEL");
     }
 }

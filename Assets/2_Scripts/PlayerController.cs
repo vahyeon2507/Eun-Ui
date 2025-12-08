@@ -177,6 +177,9 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     public bool IsDashing => isDashing;
     public bool IsParrying => isParrying;
 
+    // 튜토리얼 전체 입력 락
+    public static bool TutorialInputLocked = false;
+
     // ===== PATCH: PlayerHealth 강타입 캐시/자동 연결 =====
     PlayerHealth _hpCached;
     PlayerHealth HP
@@ -232,6 +235,12 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
 
     void Update()
     {
+        // 튜토리얼 중이면 어떤 행동도 하지 않음
+        if (TutorialInputLocked)
+        {
+            return;
+        }
+
         HandleInputs();
         HandleMovement();
         HandleGravity();
@@ -241,8 +250,8 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
         if (attackLockTimer > 0f) attackLockTimer -= Time.deltaTime;
     }
 
-
     bool Allow(PlayerAction a) => (TutorialAllow == null) || TutorialAllow(a);
+
     void HandleInputs()
     {
         // 기본 공격 입력(좌클릭 또는 extraAttackKey)

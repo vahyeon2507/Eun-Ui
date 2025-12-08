@@ -9,6 +9,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 5960395815875783122}
+  - component: {fileID: 4220667968380911794}
   - component: {fileID: 6300476374462289580}
   - component: {fileID: 8748828248321551542}
   - component: {fileID: 8003465352537611181}
@@ -38,6 +39,26 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &4220667968380911794
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1913591216418290314}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 307a338b12d5f4a46aefb4b3d0828ca8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  boss: {fileID: 6300476374462289580}
+  guide: {fileID: 0}
+  focusRect: {fileID: 0}
+  firstTutorialRoot: {fileID: 0}
+  slideTutorialRoot: {fileID: 0}
+  firstAttackDelay: 0.2
+  slideUI: {fileID: 0}
+  slideTutorialDelay: 3
 --- !u!114 &6300476374462289580
 MonoBehaviour:
   m_ObjectHideFlags: 0

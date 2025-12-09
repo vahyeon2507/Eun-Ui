@@ -14,7 +14,6 @@ public class BossTuboController : MonoBehaviour
 
     public bool IsParryWindowActive => _parryWatchActive;
 
-
     [Header("Prefabs")]
     public GameObject telegraphPrefab;
     public GameObject pointAttackPrefab;
@@ -24,7 +23,7 @@ public class BossTuboController : MonoBehaviour
     public event System.Action onAttackWindowClose;
     public event System.Action onParrySuccessDirect;
 
-    // ★ 추가: 첫 공격이 발사되기 직전에 한 번만 호출되는 이벤트
+    // ★ 첫 공격이 발사되기 직전에 한 번만 호출되는 이벤트
     public event System.Action onFirstAttackIssued;
 
     [Header("Attack Timing")]
@@ -70,7 +69,7 @@ public class BossTuboController : MonoBehaviour
     bool _attacksEnabled = true;
     public bool AttacksEnabled => _attacksEnabled;
 
-    // ★ 추가: 첫 공격 이벤트를 이미 쐈는지 추적
+    // ★ 첫 공격 이벤트를 이미 쐈는지 추적
     bool _firstAttackEventSent = false;
 
     void Reset()
@@ -132,10 +131,16 @@ public class BossTuboController : MonoBehaviour
     IEnumerator MainLoop()
     {
         _inLoop = true;
+
+        // ★ 한 프레임 기다렸다가 공격 루프 시작
+        //    → 다른 스크립트(OnEnable)들이 이벤트 구독할 시간을 확보해줌
+        yield return null;
+
         while (true)
         {
             // 그로기 중엔 대기
-            while (!_attacksEnabled) yield return null;
+            while (!_attacksEnabled)
+                yield return null;
 
             // 1) 목표 포인트
             Vector3 targetPos = GetPlayerPoint();
@@ -165,7 +170,8 @@ public class BossTuboController : MonoBehaviour
             yield return new WaitForSeconds(telegraphTime);
 
             // 그로기 들어갔으면 스폰 스킵
-            if (!_attacksEnabled) continue;
+            if (!_attacksEnabled)
+                continue;
 
             // 5) 실제 공격 스폰
             if (pointAttackPrefab)
@@ -190,6 +196,7 @@ public class BossTuboController : MonoBehaviour
         }
     }
 
+
     Vector3 GetPlayerPoint()
     {
         if (playerPointOverride) return playerPointOverride.position;
@@ -203,7 +210,6 @@ public class BossTuboController : MonoBehaviour
         Debug.Log($"[Tubo] AttackWindow {(active ? "OPEN" : "CLOSE")} dur+={extraGrace}");
         if (active) OpenParryAttributionWindow(extraGrace);
         else CloseParryAttributionWindow();
-
 
         if (active) onAttackWindowOpen?.Invoke();
         else onAttackWindowClose?.Invoke();
@@ -228,7 +234,6 @@ public class BossTuboController : MonoBehaviour
         if (debugLog) Debug.Log($"[Tubo] ParryStreak {newCount} (last {_lastParryCount}) / window={_parryWatchActive}");
         if (_parryWatchActive && newCount > _lastParryCount)
         {
-            // ★ 여기서도 튜토리얼 이벤트 쏴줘야 함
             onParrySuccessDirect?.Invoke();
 
             TriggerGroggy();
@@ -250,7 +255,6 @@ public class BossTuboController : MonoBehaviour
 
         SetAttacksEnabled(false);
 
-        // 입장: Bool 우선, 비어있으면 레거시 트리거 사용
         if (animator)
         {
             if (!string.IsNullOrEmpty(groggyBool)) animator.SetBool(groggyBool, true);
@@ -262,7 +266,6 @@ public class BossTuboController : MonoBehaviour
         float t = 0f;
         while (t < groggyDuration) { t += Time.deltaTime; yield return null; }
 
-        // 퇴장
         if (animator)
         {
             if (!string.IsNullOrEmpty(groggyBool)) animator.SetBool(groggyBool, false);
@@ -278,7 +281,6 @@ public class BossTuboController : MonoBehaviour
     {
         _attacksEnabled = on;
 
-        // 지정한 스크립트 토글
         if (disableDuringGroggy != null)
         {
             for (int i = 0; i < disableDuringGroggy.Length; i++)

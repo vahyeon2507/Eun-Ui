@@ -51,6 +51,14 @@ public class BulgasariAttackAI : MonoBehaviour
     public float globalMinDistance = 0f;
     public float globalMaxDistance = 999f;
 
+    // === Heat System ===
+    [Header("Floor Heat")]
+    [Tooltip("불가사리 열기 시스템 (바닥용)")]
+    public BulgasariFloorHeatSystem floorHeat;
+
+    [Tooltip("공격 1회당 올릴 열기량")]
+    public int heatPerAttack = 1;
+
     Coroutine _loop;
     int _attackTagHash;
 
@@ -59,6 +67,7 @@ public class BulgasariAttackAI : MonoBehaviour
         if (!animator) animator = GetComponentInChildren<Animator>();
         if (!player) player = GameObject.FindGameObjectWithTag("Player")?.transform;
         if (!hooks) hooks = GetComponentInChildren<BulgasariAttackHooks>();
+        if (!floorHeat) floorHeat = FindObjectOfType<BulgasariFloorHeatSystem>();
     }
 
     void Awake()
@@ -93,6 +102,10 @@ public class BulgasariAttackAI : MonoBehaviour
             // 2) 모든 트리거 클리어 후, 선택 트리거만 쏨
             ClearAllTriggers();
             animator.SetTrigger(pick.animTrigger);
+
+            // 👉 여기서 열기 스택 올려준다
+            if (floorHeat != null && heatPerAttack > 0)
+                floorHeat.AddHeat(heatPerAttack);
 
             // 3) 공격 태그에 "들어갈 때"까지 대기 (enterTimeout)
             float t = 0f;

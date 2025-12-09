@@ -56,7 +56,7 @@ MonoBehaviour:
   focusRect: {fileID: 0}
   firstTutorialRoot: {fileID: 0}
   slideTutorialRoot: {fileID: 0}
-  firstAttackDelay: 0.2
+  firstAttackDelay: 1.6
   slideUI: {fileID: 0}
   slideTutorialDelay: 3
 --- !u!114 &6300476374462289580

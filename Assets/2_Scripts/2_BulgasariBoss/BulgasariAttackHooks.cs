@@ -55,12 +55,14 @@ public class BulgasariAttackHooks : MonoBehaviour
         public Transform originOverride;   // 이 공격만 특정 원점 사용(선택)
         public int defaultBurst;           // 버스트 기본 횟수(0/1이면 단발)
         public float defaultInterval;      // 버스트 기본 간격(초)
+
+        [Tooltip("이 공격이 '강공격'(일반 패링 불가, 쇠+불 부적으로만 강패링 가능)인지 여부")]
+        public bool isStrongAttack;
     }
 
     [Header("Attack Table (ID ↔ Def)")]
     public List<DefEntry> attackDefs = new();
 
-    // ===== OnAt (지정 프레임 히트) 기본값 =====
     [Header("OnAt Defaults")]
     public float defaultOnAtDuration = 0.20f;
 
@@ -109,7 +111,8 @@ public class BulgasariAttackHooks : MonoBehaviour
                 def = attackDefs[i].def,
                 originOverride = attackDefs[i].originOverride,
                 defaultBurst = attackDefs[i].defaultBurst,
-                defaultInterval = attackDefs[i].defaultInterval
+                defaultInterval = attackDefs[i].defaultInterval,
+                isStrongAttack = attackDefs[i].isStrongAttack   // ★ 새 필드 유지
             };
         }
 
@@ -150,11 +153,12 @@ public class BulgasariAttackHooks : MonoBehaviour
         return false;
     }
 
-    // 애니 없이 즉시 실행
+    // 애니 없이 즉시 실행 (레거시용)
     public void ExecById(string id)
     {
-        if (!TryGetDefById(id, out var def)) return;
-        Perform(def);
+        var de = FindDef(id);
+        if (!de.HasValue || !de.Value.def) return;
+        Perform(de.Value.def, de.Value.isStrongAttack);
     }
 
     // ====== 지정 프레임 히트(OnAt) ======
@@ -183,7 +187,14 @@ public class BulgasariAttackHooks : MonoBehaviour
     }
 
     // ====== 공통 실행 ======
+    // 기존 시그니처 유지 (외부 호환용) → 항상 '일반 공격'으로 처리
     public void Perform(AttackDefinition2D def, Transform originOverride = null)
+    {
+        Perform(def, false, originOverride);
+    }
+
+    // ★ 강공격 여부를 함께 받는 실제 실행 버전
+    public void Perform(AttackDefinition2D def, bool isStrongAttack, Transform originOverride = null)
     {
         if (!def) return;
 
@@ -192,18 +203,78 @@ public class BulgasariAttackHooks : MonoBehaviour
 
         HitExec2D.ExecuteAttack(def, origin, facingRight, col =>
         {
-            // 패링 소비 우선
+            if (!col) return;
+
+            // 1) 플레이어 우선 처리
             var pc = col.GetComponent<PlayerController>() ??
                      col.GetComponentInParent<PlayerController>() ??
                      col.GetComponentInChildren<PlayerController>();
-            if (pc != null && pc.IsParrying && pc.ConsumeHitboxIfParrying(col)) return;
 
-            // 대미지 전달
-            var dmg = col.GetComponent<IDamageable>() ??
-                      col.GetComponentInParent<IDamageable>() ??
-                      col.GetComponentInChildren<IDamageable>();
-            if (dmg != null) dmg.TakeDamage(def.damage);
+            if (pc != null)
+            {
+                int dmg = Mathf.Max(1, def.damage);
+
+                if (isStrongAttack)
+                {
+                    // ▼ 강공격: 먼저 강패링 존에 의한 강패링 시도
+                    if (TalismanStrongParryZone.TryHandleStrongAttackHit(pc))
+                    {
+                        // 강패링 성공 → 대미지 없음, 히트 소비
+                        return;
+                    }
+
+                    // ▲ 강패링 실패 → 일반 패링으로는 막을 수 없음
+                    DealStrongDamageToPlayer(pc, dmg);
+                    return;
+                }
+                else
+                {
+                    // ▼ 일반 공격: 기존 패링 로직 유지
+                    if (pc.IsParrying)
+                    {
+                        bool consumed = pc.ConsumeHitboxIfParrying(col);
+                        if (consumed) return;
+                    }
+
+                    pc.TakeDamage(dmg);
+                    return;
+                }
+            }
+
+            // 2) 기타 IDamageable 대상 처리
+            var dmgTarget = col.GetComponent<IDamageable>() ??
+                            col.GetComponentInParent<IDamageable>() ??
+                            col.GetComponentInChildren<IDamageable>();
+            if (dmgTarget != null)
+            {
+                int dmg = Mathf.Max(1, def.damage);
+                dmgTarget.TakeDamage(dmg);
+            }
         });
+    }
+
+    void DealStrongDamageToPlayer(PlayerController pc, int amount)
+    {
+        if (pc == null || amount <= 0) return;
+
+        // 1순위: PlayerController가 들고 있는 healthComponent 사용
+        var hc = pc.healthComponent;
+        if (hc != null)
+        {
+            var mi = hc.GetType().GetMethod("TakeDamage", new Type[] { typeof(int) });
+            if (mi != null)
+            {
+                mi.Invoke(hc, new object[] { amount });
+                return;
+            }
+        }
+
+        // 폴백: IDamageable 직접 찾기
+        var dmg = pc.GetComponent<IDamageable>() ??
+                  pc.GetComponentInParent<IDamageable>() ??
+                  pc.GetComponentInChildren<IDamageable>();
+        if (dmg != null)
+            dmg.TakeDamage(amount);
     }
 
     // ====== 애니메이션 이벤트 API ======
@@ -217,7 +288,7 @@ public class BulgasariAttackHooks : MonoBehaviour
         }
         var a = FindAnchor(id);
         var origin = ResolveOrigin(de.Value, a, null);
-        Perform(de.Value.def, origin);
+        Perform(de.Value.def, de.Value.isStrongAttack, origin);
     }
 
     // "id,횟수,간격[,앵커키]"
@@ -245,7 +316,7 @@ public class BulgasariAttackHooks : MonoBehaviour
 
         var a = string.IsNullOrEmpty(keyOverride) ? FindAnchor(id) : FindAnchor(keyOverride);
         var origin = ResolveOrigin(de.Value, a, keyOverride);
-        StartCoroutine(BurstRoutine(de.Value.def, origin, count, interval));
+        StartCoroutine(BurstRoutine(de.Value, origin, count, interval));
     }
 
     public void Anim_ATK_ID_At(string id, string key)
@@ -258,14 +329,14 @@ public class BulgasariAttackHooks : MonoBehaviour
         }
         var a = FindAnchor(key);
         var origin = ResolveOrigin(de.Value, a, key);
-        Perform(de.Value.def, origin);
+        Perform(de.Value.def, de.Value.isStrongAttack, origin);
     }
 
-    IEnumerator BurstRoutine(AttackDefinition2D def, Transform origin, int count, float interval)
+    IEnumerator BurstRoutine(DefEntry de, Transform origin, int count, float interval)
     {
         for (int i = 0; i < count; i++)
         {
-            Perform(def, origin);
+            Perform(de.def, de.isStrongAttack, origin);
             if (i < count - 1 && interval > 0f) yield return new WaitForSeconds(interval);
         }
     }

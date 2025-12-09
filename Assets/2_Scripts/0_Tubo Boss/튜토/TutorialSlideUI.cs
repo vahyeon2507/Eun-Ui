@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Video;
+using TMPro;   // ★ 추가
 
 public class TutorialSlideUI : MonoBehaviour
 {
@@ -14,9 +15,10 @@ public class TutorialSlideUI : MonoBehaviour
     }
 
     [Header("UI")]
-    public Image slideImage;             // 이미지 표시용
-    public VideoPlayer videoPlayer;      // 동영상이 필요하면 연결 (없으면 null로 둬도 됨)
-    public Text descriptionText;         // 설명 텍스트
+    public Image slideImage;             // 이미지 표시용 (Sprite)
+    public RawImage videoImage;          // ★ 비디오 출력용 UI
+    public VideoPlayer videoPlayer;      // VideoPlayer (RenderTexture로 출력)
+    public TMP_Text descriptionText;     // ★ TMP 텍스트
 
     [Header("Slides")]
     public SlideData[] slides;
@@ -61,37 +63,48 @@ public class TutorialSlideUI : MonoBehaviour
 
         var s = slides[_index];
 
-        // 이미지 / 비디오 토글
-        if (videoPlayer != null && s.videoClip != null)
+        bool useVideo = (videoPlayer != null && videoImage != null && s.videoClip != null);
+
+        if (useVideo)
         {
-            // 비디오 모드
+            // ---- 비디오 모드 ----
+            if (slideImage != null)
+                slideImage.gameObject.SetActive(false);
+
+            videoImage.gameObject.SetActive(true);
             videoPlayer.gameObject.SetActive(true);
-            if (slideImage != null) slideImage.gameObject.SetActive(false);
 
             if (videoPlayer.clip != s.videoClip)
             {
+                videoPlayer.Stop();
                 videoPlayer.clip = s.videoClip;
-                videoPlayer.Play();
+                videoPlayer.time = 0;
             }
+
+            if (!videoPlayer.isPlaying)
+                videoPlayer.Play();
         }
         else
         {
-            // 이미지 모드
+            // ---- 이미지 모드 ----
             if (videoPlayer != null)
             {
                 videoPlayer.Stop();
                 videoPlayer.gameObject.SetActive(false);
             }
+            if (videoImage != null)
+                videoImage.gameObject.SetActive(false);
 
             if (slideImage != null)
             {
                 slideImage.gameObject.SetActive(true);
                 slideImage.sprite = s.image;
+                slideImage.enabled = (s.image != null);
             }
         }
 
         if (descriptionText != null)
-            descriptionText.text = s.description;
+            descriptionText.text = s.description ?? string.Empty;
     }
 
     void Update()

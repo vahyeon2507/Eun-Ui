@@ -13,6 +13,14 @@ public class BossHealth : MonoBehaviour, IDamageable
     [Header("Damage Modifiers")]
     [Range(0.1f, 10f)] public float damageTakenMultiplier = 1f; // 외부에서 일시 변경 가능
 
+    [Header("Strong Parry Groggy")]
+    [Tooltip("강패링 시 받는 대미지 배율")]
+    public float strongParryDamageMultiplier = 2.0f;
+    [Tooltip("강패링 그로기 지속 시간(초)")]
+    public float strongParryGroggyDuration = 4.0f;
+    [Tooltip("강패링 전용 그로기 애니메이션 트리거 이름(일반 Groggy와 분리)")]
+    public string strongParryGroggyTrigger = "StrongGroggy";
+
     [Header("UI (optional)")]
     public Slider hpBar;
     public Text hpText;
@@ -423,6 +431,30 @@ public class BossHealth : MonoBehaviour, IDamageable
 
     // (호환) 항상 false
     public bool IsInvulnerable() => false;
+
+    /// <summary>
+    /// 강공격이 패링으로 카운터됐을 때 호출될 범용 API.
+    /// - 일반 Groggy와는 다른 트리거(strongParryGroggyTrigger)를 사용
+    /// - 받는 대미지 배율을 일정 시간 올려준다.
+    /// </summary>
+    public void ApplyStrongParryGroggy()
+    {
+        // 애니메이션 트리거(일반 Groggy 혹은 Hurt와 별개)
+        if (animator && !string.IsNullOrEmpty(strongParryGroggyTrigger))
+        {
+            foreach (var p in animator.parameters)
+            {
+                if (p.name == strongParryGroggyTrigger && p.type == AnimatorControllerParameterType.Trigger)
+                {
+                    animator.SetTrigger(strongParryGroggyTrigger);
+                    break;
+                }
+            }
+        }
+
+        // 받뎀 배율 버프
+        ApplyVulnerability(strongParryDamageMultiplier, strongParryGroggyDuration);
+    }
 
     // ▼ 외부에서 ‘받뎀 배율’을 일정 시간 적용 (예: 나무벽 기절)
     public void ApplyVulnerability(float multiplier, float duration)

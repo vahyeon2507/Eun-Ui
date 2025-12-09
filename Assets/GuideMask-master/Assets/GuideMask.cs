@@ -7,6 +7,10 @@ public class GuideMask : MaskableGraphic, ICanvasRaycastFilter
 {
     public static GuideMask Self;
 
+    [Header("Target")]
+    [Tooltip("구멍 위치를 표시할 RectTransform. 비워두면 자식에서 'TargetArea' 이름으로 찾음.")]
+    public RectTransform targetAreaExplicit;
+
     private RectTransform _target;      // 현재 포커스할 타겟(RectTransform)
     private Vector2 _targetMin;
     private Vector2 _targetMax;
@@ -15,26 +19,38 @@ public class GuideMask : MaskableGraphic, ICanvasRaycastFilter
     [Header("Debug")]
     public bool debugLog = false;
 
-    void Awake()
+    // MaskableGraphic / UIBehaviour 의 Awake를 제대로 이어받기
+    protected override void Awake()
     {
+        base.Awake();
         Init();
     }
 
+    // ==== Raycast 방지 ====
     public bool IsRaycastLocationValid(Vector2 sp, Camera eventCamera)
     {
-        // _targetArea가 아직 초기화 안 됐으면 그냥 통과시키고, NRE 방지
-        if (_targetArea == null) return true;
+        // 꺼져 있거나 타겟이 없으면 그냥 통과
+        if (!gameObject.activeInHierarchy || _targetArea == null)
+            return true;
 
         return !RectTransformUtility.RectangleContainsScreenPoint(_targetArea, sp, eventCamera);
     }
 
+    // ==== 외부에서 호출 ====
     public void Close()
     {
+        if (debugLog)
+            Debug.Log("[GuideMask] Close()", this);
+
+        _target = null;
         gameObject.SetActive(false);
     }
 
     public void Play(RectTransform target)
     {
+        if (debugLog)
+            Debug.Log($"[GuideMask] Play() called, target={target}", this);
+
         if (target == null)
         {
             Debug.LogWarning("[GuideMask] Play() 호출 시 target 이 null 입니다.");
@@ -42,27 +58,39 @@ public class GuideMask : MaskableGraphic, ICanvasRaycastFilter
             return;
         }
 
-        // 혹시 Init이 안 돌았다면 방어적으로 한 번 더
+        EnsureTargetArea();
         if (_targetArea == null)
         {
-            Init();
-            if (_targetArea == null)
-            {
-                Debug.LogError("[GuideMask] 'TargetArea' 를 찾지 못해 마스크를 표시할 수 없습니다.");
-                Close();
-                return;
-            }
+            Debug.LogError("[GuideMask] 'TargetArea' 를 찾지 못해 마스크를 표시할 수 없습니다.");
+            Close();
+            return;
         }
 
         gameObject.SetActive(true);
 
+        // Canvas / Camera 결정
+        var canvas = GetComponentInParent<Canvas>();
+        Camera cam = null;
+        if (canvas != null)
+        {
+            if (canvas.renderMode == RenderMode.ScreenSpaceOverlay)
+                cam = null;
+            else
+                cam = canvas.worldCamera != null ? canvas.worldCamera : Camera.main;
+        }
+        else
+        {
+            cam = Camera.main;
+        }
+
         // 타겟의 화면 좌표 → 이 마스크(RectTransform) 기준 로컬 좌표로 변환
-        var screenPoint = RectTransformUtility.WorldToScreenPoint(Camera.main, target.position);
+        var screenPoint = RectTransformUtility.WorldToScreenPoint(cam, target.position);
 
         Vector2 localPoint;
         if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                rectTransform, screenPoint, Camera.main, out localPoint))
+                rectTransform, screenPoint, cam, out localPoint))
         {
+            Debug.LogWarning("[GuideMask] ScreenPointToLocalPointInRectangle 실패. 마스크를 닫습니다.");
             Close();
             return;
         }
@@ -87,19 +115,40 @@ public class GuideMask : MaskableGraphic, ICanvasRaycastFilter
         RefreshView();
     }
 
+    // ==== 초기 설정 ====
     public void Init()
     {
-        // 자식에서 "TargetArea" 찾기
-        _targetArea = transform.Find("TargetArea") as RectTransform;
+        EnsureTargetArea();
+
+        if (Self == null)
+            Self = this;
+
+        if (debugLog)
+            Debug.Log($"[GuideMask] Init() done. active={gameObject.activeSelf}, targetArea={_targetArea}", this);
+        // 여기서 Close() 안 한다. 초기 활성/비활성은 외부(TutorialController)에서 제어.
+    }
+
+    void EnsureTargetArea()
+    {
+        if (_targetArea != null) return;
+
+        if (targetAreaExplicit != null)
+        {
+            _targetArea = targetAreaExplicit;
+        }
+        else
+        {
+            var found = transform.Find("TargetArea");
+            _targetArea = found as RectTransform;
+        }
+
         if (_targetArea == null)
         {
             Debug.LogError($"[GuideMask] 자식 'TargetArea' 를 찾지 못했습니다. ({name})");
         }
-
-        Self = this;
-        Close();
     }
 
+    // ==== 메쉬 그리기 ====
     protected override void OnPopulateMesh(VertexHelper toFill)
     {
         toFill.Clear();
@@ -163,9 +212,7 @@ public class GuideMask : MaskableGraphic, ICanvasRaycastFilter
         if (_targetMin != newMin || _targetMax != newMax)
         {
             if (debugLog)
-            {
-                Debug.Log($"[GuideMask] bounds updated: min={newMin}, max={newMax}");
-            }
+                Debug.Log($"[GuideMask] bounds updated: min={newMin}, max={newMax}", this);
 
             _targetMin = newMin;
             _targetMax = newMax;

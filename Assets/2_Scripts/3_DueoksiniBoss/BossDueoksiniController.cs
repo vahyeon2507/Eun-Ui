@@ -58,16 +58,31 @@ public class BossDueoksiniController : MonoBehaviour
         public string attackTrigger;
 
         [Header("Hit Window")]
+        [Tooltip("true면 히트박스 On/Off를 애니메이션 이벤트(AnimEvent_GenericHitOn/Off)로 제어")]
         public bool useAnimEvent = false;
+
+        [Tooltip("useAnimEvent=false일 때 자동으로 켜져있는 시간(초)")]
         public float activeTime = 0.12f;
+
+        [Tooltip("방향과 상관없이 공통으로 쓸 히트박스(선택). 좌/우 리스트가 비어 있을 때 폴백으로 사용")]
         public List<Collider2D> hitboxes = new List<Collider2D>();
 
+        [Tooltip("오른쪽을 바라볼 때 우선 사용할 히트박스들")]
+        public List<Collider2D> rightHitboxes = new List<Collider2D>();
+
+        [Tooltip("왼쪽을 바라볼 때 우선 사용할 히트박스들")]
+        public List<Collider2D> leftHitboxes = new List<Collider2D>();
+
+        [Header("Damage")]
+        [Tooltip("AnimEvent_SimpleDamage() 호출 시 기본으로 사용할 대미지")]
+        public int baseDamage = 1;
+
+        // ---------- Projectile (event-driven) ----------
         [Header("Move During Attack (optional)")]
         public float moveDistance = 0f;
         public float moveTime = 0f;
         public AnimationCurve moveCurve;
 
-        // ---------- Projectile (event-driven) ----------
         [Header("Projectile (optional)")]
         [Tooltip("체크 시, 어택 시작 시 자동 1회 발사(이벤트와 중복 방지).")]
         public bool spawnProjectileAuto = false;
@@ -159,6 +174,9 @@ public class BossDueoksiniController : MonoBehaviour
     SimpleAttack _playingSimpleAttack;
     bool _autoProjFiredThisAttack = false;
 
+    // ─────────────────────────────────────────────
+    // 외부 스턴
+    // ─────────────────────────────────────────────
     public void ExternalStun(float duration)
     {
         if (_isStunned) return;
@@ -185,17 +203,29 @@ public class BossDueoksiniController : MonoBehaviour
 
     void Awake()
     {
-        if (!player) { var p = GameObject.FindGameObjectWithTag("Player"); if (p) player = p.transform; }
+        if (!player)
+        {
+            var p = GameObject.FindGameObjectWithTag("Player");
+            if (p) player = p.transform;
+        }
+
         if (!gfxAnimator) gfxAnimator = GetComponentInChildren<Animator>(true);
         if (!gfxRenderer) gfxRenderer = GetComponentInChildren<SpriteRenderer>(true);
-        if (!gfxFlipRoot) gfxFlipRoot = gfxRenderer ? gfxRenderer.transform : (gfxAnimator ? gfxAnimator.transform : transform);
+        if (!gfxFlipRoot)
+            gfxFlipRoot = gfxRenderer ? gfxRenderer.transform :
+                           (gfxAnimator ? gfxAnimator.transform : transform);
         if (!pairSync) pairSync = GetComponentInChildren<DirectionalAnimPairSync>(true);
+
         _anim = gfxAnimator;
         _rb = GetComponent<Rigidbody2D>();
         _health = GetComponent<BossHealth>();
     }
 
-    void OnEnable() { if (!_inRoutine) StartCoroutine(MainLoop()); }
+    void OnEnable()
+    {
+        if (!_inRoutine)
+            StartCoroutine(MainLoop());
+    }
 
     IEnumerator MainLoop()
     {
@@ -209,8 +239,15 @@ public class BossDueoksiniController : MonoBehaviour
             yield return DoChargePrep();
 
             bool far = IsPlayerFar(farDistanceThreshold);
-            if (far) { yield return DoJumpAttack(); continue; }
-            else { yield return DoCharge(); }
+            if (far)
+            {
+                yield return DoJumpAttack();
+                continue;
+            }
+            else
+            {
+                yield return DoCharge();
+            }
 
             if (facePlayer) FaceTowardPlayer();
 
@@ -220,20 +257,31 @@ public class BossDueoksiniController : MonoBehaviour
         }
     }
 
+    // ───────────────── Charge Prep ─────────────────
     IEnumerator DoChargePrep()
     {
         if (_anim) PlayDirectionalState(chargePrepTrigger, 0f);
-        if (chargePrepEndByAnimEvent) { _waitingPrepEvent = true; while (_waitingPrepEvent) yield return null; }
-        else yield return new WaitForSeconds(chargePrepHoldTime);
+
+        if (chargePrepEndByAnimEvent)
+        {
+            _waitingPrepEvent = true;
+            while (_waitingPrepEvent) yield return null;
+        }
+        else
+        {
+            yield return new WaitForSeconds(chargePrepHoldTime);
+        }
     }
 
+    // ───────────────── Charge ─────────────────
     IEnumerator DoCharge()
     {
         IsChargingNow = true;
         if (_anim)
         {
             PlayDirectionalState(chargeTrigger);
-            if (!string.IsNullOrEmpty(isChargingBool)) _anim.SetBool(isChargingBool, true);
+            if (!string.IsNullOrEmpty(isChargingBool))
+                _anim.SetBool(isChargingBool, true);
         }
 
         int dir = DirToPlayer();
@@ -253,36 +301,43 @@ public class BossDueoksiniController : MonoBehaviour
 
         // 이동
         float t = 0f;
-        Vector3 p0 = transform.position, p1 = new Vector3(targetX, p0.y, p0.z);
+        Vector3 p0 = transform.position;
+        Vector3 p1 = new Vector3(targetX, p0.y, p0.z);
         while (t < chargeTime)
         {
             float a = Mathf.Clamp01(t / Mathf.Max(0.0001f, chargeTime));
             float k = EaseInOut(a);
-            Vector3 pos = Vector3.Lerp(p0, p1, k); pos.y = p0.y;
+            Vector3 pos = Vector3.Lerp(p0, p1, k);
+            pos.y = p0.y;
             transform.position = pos;
-            t += Time.deltaTime; yield return null;
+            t += Time.deltaTime;
+            yield return null;
         }
         transform.position = p1;
 
-        if (_anim && !string.IsNullOrEmpty(isChargingBool)) _anim.SetBool(isChargingBool, false);
+        if (_anim && !string.IsNullOrEmpty(isChargingBool))
+            _anim.SetBool(isChargingBool, false);
         IsChargingNow = false;
 
-        // ▶ TreeWall에 부딪혔으면: 나무 파괴(선택), 즉시 기절+받뎀배율
+        // TreeWall 충돌 처리
         if (hitTree != null)
         {
             if (breakTreeOnHit) hitTree.BreakAndDestroy();
             if (_health) _health.ApplyVulnerability(wallVulnMultiplier, wallStunDuration);
             ExternalStun(wallStunDuration);
-            // 기절 해제까지 대기 — 다음 단계로 못 넘어가게
             while (_isStunned) yield return null;
         }
     }
 
+    // ───────────────── Jump Attack ─────────────────
     IEnumerator DoJumpAttack()
     {
-        if (_anim && !string.IsNullOrEmpty(jumpTrigger)) _anim.SetTrigger(jumpTrigger);
+        if (_anim && !string.IsNullOrEmpty(jumpTrigger))
+            _anim.SetTrigger(jumpTrigger);
+
         Vector3 start = transform.position;
         Vector3 end = new Vector3(player ? player.position.x : start.x, start.y, start.z);
+
         if (facePlayer) FaceTowardPlayer();
 
         float t = 0f;
@@ -293,36 +348,65 @@ public class BossDueoksiniController : MonoBehaviour
             float x = Mathf.Lerp(start.x, end.x, a);
             float y = start.y + yOffset;
             transform.position = new Vector3(x, y, start.z);
-            t += Time.deltaTime; yield return null;
+            t += Time.deltaTime;
+            yield return null;
         }
         transform.position = new Vector3(end.x, start.y, start.z);
-        if (jumpEndsWithSlam) yield return DoSlamOnce();
+
+        if (jumpEndsWithSlam)
+            yield return DoSlamOnce();
     }
 
+    // ───────────────── Attack Prep & 선택 ─────────────────
     PrepOption PickPrep()
     {
         if (preps == null || preps.Count == 0) return new PrepOption();
+
         float total = 0f;
-        for (int i = 0; i < preps.Count; i++) { if (i == _lastPrepIndex) continue; total += Mathf.Max(0f, preps[i].weight); }
+        for (int i = 0; i < preps.Count; i++)
+        {
+            if (i == _lastPrepIndex) continue;
+            total += Mathf.Max(0f, preps[i].weight);
+        }
+
         float r = Random.value * (total <= 0f ? 1f : total);
         for (int i = 0; i < preps.Count; i++)
         {
             if (i == _lastPrepIndex) continue;
             float w = Mathf.Max(0f, preps[i].weight);
-            if (r < w) { _lastPrepIndex = i; return preps[i]; }
+            if (r < w)
+            {
+                _lastPrepIndex = i;
+                return preps[i];
+            }
             r -= w;
         }
-        _lastPrepIndex = 0; return preps[0];
+
+        _lastPrepIndex = 0;
+        return preps[0];
     }
 
     IEnumerator DoAttackPrep(PrepOption opt)
     {
-        if (!string.IsNullOrEmpty(opt.prepDirectionalBase)) PlayDirectionalState(opt.prepDirectionalBase, opt.prepCrossFade);
-        else if (_anim && !string.IsNullOrEmpty(opt.prepTrigger)) _anim.SetTrigger(opt.prepTrigger);
+        if (!string.IsNullOrEmpty(opt.prepDirectionalBase))
+        {
+            PlayDirectionalState(opt.prepDirectionalBase, opt.prepCrossFade);
+        }
+        else if (_anim && !string.IsNullOrEmpty(opt.prepTrigger))
+        {
+            _anim.SetTrigger(opt.prepTrigger);
+        }
 
         bool useEvent = attackPrepEndByAnimEvent || opt.useAnimEventEnd;
-        if (useEvent) { _waitingPrepEvent = true; while (_waitingPrepEvent) yield return null; }
-        else yield return new WaitForSeconds(Mathf.Max(0f, opt.prepHoldTime));
+        if (useEvent)
+        {
+            _waitingPrepEvent = true;
+            while (_waitingPrepEvent) yield return null;
+        }
+        else
+        {
+            yield return new WaitForSeconds(Mathf.Max(0f, opt.prepHoldTime));
+        }
     }
 
     IEnumerator DoAttack(PrepOption opt)
@@ -331,10 +415,17 @@ public class BossDueoksiniController : MonoBehaviour
         {
             case AttackKind.Simple:
                 int idx = PickSimpleIndex(opt);
-                if (idx >= 0 && idx < simpleAttacks.Count) yield return DoSimpleAttack(simpleAttacks[idx], opt.attackTriggerOverride);
+                if (idx >= 0 && idx < simpleAttacks.Count)
+                    yield return DoSimpleAttack(simpleAttacks[idx], opt.attackTriggerOverride);
                 break;
-            case AttackKind.ProjectileBurst: yield return DoProjectileBurst(); break;
-            case AttackKind.GroundSlam: yield return DoSlamOnce(); break;
+
+            case AttackKind.ProjectileBurst:
+                yield return DoProjectileBurst();
+                break;
+
+            case AttackKind.GroundSlam:
+                yield return DoSlamOnce();
+                break;
         }
     }
 
@@ -342,39 +433,88 @@ public class BossDueoksiniController : MonoBehaviour
     {
         if (opt.simpleChoices != null && opt.simpleChoices.Count > 0)
         {
-            float total = 0f; foreach (var c in opt.simpleChoices) total += Mathf.Max(0f, c.weight);
-            if (total <= 0f) return Mathf.Clamp(opt.simpleChoices[0].simpleIndex, 0, simpleAttacks.Count - 1);
+            float total = 0f;
+            foreach (var c in opt.simpleChoices)
+                total += Mathf.Max(0f, c.weight);
+
+            if (total <= 0f)
+                return Mathf.Clamp(opt.simpleChoices[0].simpleIndex, 0, simpleAttacks.Count - 1);
+
             float r = Random.value * total;
             foreach (var c in opt.simpleChoices)
             {
                 float w = Mathf.Max(0f, c.weight);
-                if (r < w) return Mathf.Clamp(c.simpleIndex, 0, simpleAttacks.Count - 1);
+                if (r < w)
+                    return Mathf.Clamp(c.simpleIndex, 0, simpleAttacks.Count - 1);
                 r -= w;
             }
         }
+
         return Mathf.Clamp(opt.simpleIndex, 0, simpleAttacks.Count - 1);
     }
 
+    // ───────────────── Simple Attack 본체 ─────────────────
     IEnumerator DoSimpleAttack(SimpleAttack sa, string triggerOverride)
     {
-        _playingSimpleAttack = sa; _autoProjFiredThisAttack = false;
+        _playingSimpleAttack = sa;
+        _autoProjFiredThisAttack = false;
 
         string trig = string.IsNullOrEmpty(triggerOverride) ? sa.attackTrigger : triggerOverride;
-        if (_anim && !string.IsNullOrEmpty(trig)) _anim.SetTrigger(trig);
+        if (_anim && !string.IsNullOrEmpty(trig))
+            _anim.SetTrigger(trig);
 
-        if (sa.spawnProjectileAuto) TryFireSimpleProjectile(sa);
+        if (sa.spawnProjectileAuto)
+            TryFireSimpleProjectile(sa);
 
         Coroutine moveCR = null;
         if (sa.moveTime > 0f && Mathf.Abs(sa.moveDistance) > 0f)
             moveCR = StartCoroutine(CoAdvance(sa.moveDistance, sa.moveTime, sa.moveCurve));
 
-        if (sa.useAnimEvent) { _currentHitboxes = sa.hitboxes; yield return new WaitForSeconds(Mathf.Max(0.01f, sa.activeTime)); }
-        else { ToggleColliders(sa.hitboxes, true); yield return new WaitForSeconds(Mathf.Max(0.01f, sa.activeTime)); ToggleColliders(sa.hitboxes, false); }
+        var hbList = GetSimpleHitboxList(sa);
 
-        if (moveCR != null) yield return moveCR;
-        _currentHitboxes = null; _playingSimpleAttack = null; _autoProjFiredThisAttack = false;
+        if (sa.useAnimEvent)
+        {
+            // 애니메이션 이벤트(AnimEvent_GenericHitOn/Off)에서 켜고 끄는 모드
+            _currentHitboxes = hbList;
+            yield return new WaitForSeconds(Mathf.Max(0.01f, sa.activeTime));
+        }
+        else
+        {
+            // activeTime 동안 자동 On → Off
+            ToggleColliders(hbList, true);
+            yield return new WaitForSeconds(Mathf.Max(0.01f, sa.activeTime));
+            ToggleColliders(hbList, false);
+        }
+
+        if (moveCR != null)
+            yield return moveCR;
+
+        _currentHitboxes = null;
+        _playingSimpleAttack = null;
+        _autoProjFiredThisAttack = false;
     }
 
+    // 현재 바라보는 방향에 따라 적절한 히트박스 리스트 반환
+    List<Collider2D> GetSimpleHitboxList(SimpleAttack sa)
+    {
+        if (sa == null) return null;
+
+        if (FacingRight)
+        {
+            if (sa.rightHitboxes != null && sa.rightHitboxes.Count > 0)
+                return sa.rightHitboxes;
+        }
+        else
+        {
+            if (sa.leftHitboxes != null && sa.leftHitboxes.Count > 0)
+                return sa.leftHitboxes;
+        }
+
+        // 좌/우가 비어 있으면 공통 hitboxes 사용
+        return sa.hitboxes;
+    }
+
+    // ───────────────── Projectile (Simple) ─────────────────
     void TryFireSimpleProjectile(SimpleAttack src)
     {
         var sa = src ?? _playingSimpleAttack;
@@ -383,15 +523,20 @@ public class BossDueoksiniController : MonoBehaviour
 
         // 1) 발사지점
         Transform muzzle =
-            (FacingRight ? (sa.projectileMuzzleRight ? sa.projectileMuzzleRight : sa.projectileMuzzle)
-                         : (sa.projectileMuzzleLeft ? sa.projectileMuzzleLeft : sa.projectileMuzzle));
+            (FacingRight
+                ? (sa.projectileMuzzleRight ? sa.projectileMuzzleRight : sa.projectileMuzzle)
+                : (sa.projectileMuzzleLeft ? sa.projectileMuzzleLeft : sa.projectileMuzzle));
 
         Vector3 spawnPos;
-        if (muzzle) spawnPos = muzzle.position;
+        if (muzzle)
+        {
+            spawnPos = muzzle.position;
+        }
         else
         {
             float sign = FacingRight ? 1f : -1f;
-            spawnPos = transform.position + new Vector3(sa.projectileMuzzleOffset.x * sign, sa.projectileMuzzleOffset.y, 0f);
+            spawnPos = transform.position +
+                       new Vector3(sa.projectileMuzzleOffset.x * sign, sa.projectileMuzzleOffset.y, 0f);
         }
 
         // 2) 방향
@@ -406,7 +551,10 @@ public class BossDueoksiniController : MonoBehaviour
         // 3) 인스턴스 & 런치
         var go = Instantiate(sa.projectilePrefab, spawnPos, Quaternion.identity);
         var pr = go.GetComponent<SlashProjectile2D>();
-        if (pr) pr.LaunchWithPrefabDefaults(dir, transform, dirRightForAnim);
+        if (pr)
+        {
+            pr.LaunchWithPrefabDefaults(dir, transform, dirRightForAnim);
+        }
         else
         {
             var rb = go.GetComponent<Rigidbody2D>();
@@ -419,21 +567,25 @@ public class BossDueoksiniController : MonoBehaviour
     IEnumerator CoAdvance(float distance, float time, AnimationCurve curve)
     {
         float dirSign = Mathf.Sign((gfxFlipRoot ? gfxFlipRoot.localScale.x : transform.localScale.x));
-        Vector3 p0 = transform.position, p1 = p0 + Vector3.right * (distance * dirSign);
+        Vector3 p0 = transform.position;
+        Vector3 p1 = p0 + Vector3.right * (distance * dirSign);
         float t = 0f;
         while (t < time)
         {
             float a = Mathf.Clamp01(t / Mathf.Max(0.0001f, time));
             float k = (curve != null && curve.keys != null && curve.length > 0) ? curve.Evaluate(a) : EaseInOut(a);
             transform.position = Vector3.Lerp(p0, p1, k);
-            t += Time.deltaTime; yield return null;
+            t += Time.deltaTime;
+            yield return null;
         }
         transform.position = p1;
     }
 
+    // ───────────────── Projectile Burst ─────────────────
     IEnumerator DoProjectileBurst()
     {
         if (!projectilePrefab || projectileMuzzles.Count == 0) yield break;
+
         for (int i = 0; i < projectileCount; i++)
         {
             foreach (var m in projectileMuzzles)
@@ -441,49 +593,173 @@ public class BossDueoksiniController : MonoBehaviour
                 if (!m) continue;
                 var go = GameObject.Instantiate(projectilePrefab, m.position, m.rotation);
                 var rb = go.GetComponent<Rigidbody2D>();
+
                 Vector2 dir = Vector2.right * DirToPlayer();
                 if (player) dir = (player.position - m.position).normalized;
                 if (rb) rb.linearVelocity = dir * projectileSpeed;
             }
-            if (projectileInterval > 0f) yield return new WaitForSeconds(projectileInterval);
-            else yield return null;
+
+            if (projectileInterval > 0f)
+                yield return new WaitForSeconds(projectileInterval);
+            else
+                yield return null;
         }
     }
 
+    // ───────────────── Ground Slam ─────────────────
     IEnumerator DoSlamOnce()
     {
         var cam = Camera.main ? Camera.main.GetComponent<CameraSimple2D>() : null;
         if (cam) cam.Shake(slamShakeAmp, slamShakeDur, slamShakeFreq);
+
         ToggleColliders(slamHitboxes, true);
         yield return new WaitForSeconds(slamActiveTime);
         ToggleColliders(slamHitboxes, false);
     }
 
     // ===== Helpers =====
-    bool IsPlayerFar(float threshold) { if (!player) return false; return Mathf.Abs(player.position.x - transform.position.x) > Mathf.Abs(threshold); }
-    int DirToPlayer() { if (!player) return transform.localScale.x >= 0f ? 1 : -1; return (player.position.x - transform.position.x) >= 0f ? 1 : -1; }
+    bool IsPlayerFar(float threshold)
+    {
+        if (!player) return false;
+        return Mathf.Abs(player.position.x - transform.position.x) > Mathf.Abs(threshold);
+    }
+
+    int DirToPlayer()
+    {
+        if (!player)
+            return transform.localScale.x >= 0f ? 1 : -1;
+        return (player.position.x - transform.position.x) >= 0f ? 1 : -1;
+    }
 
     void SetFacing(bool right)
     {
         FacingRight = right;
         if (pairSync) pairSync.facingRight = right;
-        if (gfxFlipRoot) { var s = gfxFlipRoot.localScale; s.x = Mathf.Abs(s.x); gfxFlipRoot.localScale = s; }
-        if (gfxRenderer) gfxRenderer.flipX = false;
+
+        if (gfxFlipRoot)
+        {
+            var s = gfxFlipRoot.localScale;
+            s.x = Mathf.Abs(s.x);
+            gfxFlipRoot.localScale = s;
+        }
+
+        if (gfxRenderer)
+            gfxRenderer.flipX = false;
     }
+
     public void FaceRight() => SetFacing(true);
     public void FaceLeft() => SetFacing(false);
-    void FaceTowardPlayer() { if (!player) return; SetFacing((player.position.x - transform.position.x) >= 0f); }
 
-    static void ToggleColliders(List<Collider2D> list, bool on) { if (list == null) return; for (int i = 0; i < list.Count; i++) if (list[i]) list[i].enabled = on; }
-    static float EaseInOut(float x) { x = Mathf.Clamp01(x); return x * x * (3f - 2f * x); }
+    void FaceTowardPlayer()
+    {
+        if (!player) return;
+        SetFacing((player.position.x - transform.position.x) >= 0f);
+    }
 
-    // ===== Anim Events =====
+    static void ToggleColliders(List<Collider2D> list, bool on)
+    {
+        if (list == null) return;
+        for (int i = 0; i < list.Count; i++)
+        {
+            if (list[i]) list[i].enabled = on;
+        }
+    }
+
+    static float EaseInOut(float x)
+    {
+        x = Mathf.Clamp01(x);
+        return x * x * (3f - 2f * x);
+    }
+
+    // ───────────────── Anim Events ─────────────────
     public void AnimEvent_PrepReady() { _waitingPrepEvent = false; }
-    public void AnimEvent_GenericHitOn() { if (_currentHitboxes != null) ToggleColliders(_currentHitboxes, true); }
-    public void AnimEvent_GenericHitOff() { if (_currentHitboxes != null) ToggleColliders(_currentHitboxes, false); }
+
+    public void AnimEvent_GenericHitOn()
+    {
+        if (_currentHitboxes != null)
+            ToggleColliders(_currentHitboxes, true);
+    }
+
+    public void AnimEvent_GenericHitOff()
+    {
+        if (_currentHitboxes != null)
+            ToggleColliders(_currentHitboxes, false);
+    }
+
     public void AnimEvent_SlamHitOn() { ToggleColliders(slamHitboxes, true); }
     public void AnimEvent_SlamHitOff() { ToggleColliders(slamHitboxes, false); }
     public void AnimEvent_FireSimpleProjectile() { TryFireSimpleProjectile(_playingSimpleAttack); }
+
+    // ★★★ 여기부터: 심플 어택 대미지 애니메이션 이벤트 ★★★
+
+    /// <summary>
+    /// 현재 재생 중인 SimpleAttack의 baseDamage로 히트박스 안의 Player(IDamageable)에 대미지
+    /// </summary>
+    public void AnimEvent_SimpleDamage()
+    {
+        if (_playingSimpleAttack == null) return;
+        int dmg = (_playingSimpleAttack.baseDamage > 0) ? _playingSimpleAttack.baseDamage : 1;
+        ApplySimpleDamage(dmg);
+    }
+
+    /// <summary>
+    /// 애니메이션 이벤트 인자로 들어온 damage 값으로 히트 처리
+    /// </summary>
+    public void AnimEvent_SimpleDamageInt(int damage)
+    {
+        if (damage <= 0)
+        {
+            if (_playingSimpleAttack == null) return;
+            damage = (_playingSimpleAttack.baseDamage > 0) ? _playingSimpleAttack.baseDamage : 1;
+        }
+        ApplySimpleDamage(damage);
+    }
+
+    // 히트박스 안에 들어있는 Player(IDamageable)에게 한 번씩 대미지 적용
+    static readonly List<Collider2D> _hitOverlapBuffer = new List<Collider2D>(8);
+    static readonly HashSet<IDamageable> _damagedCache = new HashSet<IDamageable>();
+
+    void ApplySimpleDamage(int amount)
+    {
+        if (amount <= 0) return;
+        if (_playingSimpleAttack == null) return;
+
+        var hbList = GetSimpleHitboxList(_playingSimpleAttack);
+        if (hbList == null || hbList.Count == 0) return;
+
+        var filter = new ContactFilter2D
+        {
+            useLayerMask = false,
+            useTriggers = true
+        };
+
+        _damagedCache.Clear();
+
+        for (int i = 0; i < hbList.Count; i++)
+        {
+            var hb = hbList[i];
+            if (!hb || !hb.enabled) continue;
+
+            _hitOverlapBuffer.Clear();
+            int count = hb.Overlap(filter, _hitOverlapBuffer);
+            for (int j = 0; j < count; j++)
+            {
+                var col = _hitOverlapBuffer[j];
+                if (!col) continue;
+
+                // 플레이어만 맞게 태그 필터
+                if (!col.CompareTag("Player")) continue;
+
+                var dmg = col.GetComponent<IDamageable>()
+                        ?? col.GetComponentInParent<IDamageable>()
+                        ?? col.GetComponentInChildren<IDamageable>();
+                if (dmg == null || _damagedCache.Contains(dmg)) continue;
+
+                _damagedCache.Add(dmg);
+                dmg.TakeDamage(amount);
+            }
+        }
+    }
 
     // ===== Gizmos / Animator helper =====
     void OnDrawGizmosSelected()
@@ -492,7 +768,8 @@ public class BossDueoksiniController : MonoBehaviour
         Vector3 a = transform.position;
         float sign = Mathf.Sign(transform.localScale.x == 0 ? 1f : transform.localScale.x);
         Vector3 b = a + Vector3.right * sign * chargeDistance;
-        Gizmos.DrawLine(a, b); Gizmos.DrawSphere(b, 0.08f);
+        Gizmos.DrawLine(a, b);
+        Gizmos.DrawSphere(b, 0.08f);
 
         Gizmos.color = Color.magenta;
         Gizmos.DrawWireSphere(transform.position, Mathf.Abs(farDistanceThreshold));
@@ -502,17 +779,24 @@ public class BossDueoksiniController : MonoBehaviour
     {
         if (pairSync && pairSync.PlayByBase(baseName, crossFade)) return true;
         if (!_anim) return false;
-        string suffix = (FacingRight ? pairSync?.rightSuffix : pairSync?.leftSuffix) ?? (FacingRight ? "_R" : "_L");
+
+        string suffix = (FacingRight ? pairSync?.rightSuffix : pairSync?.leftSuffix) ??
+                        (FacingRight ? "_R" : "_L");
         string state = baseName + suffix;
         _anim.CrossFadeInFixedTime(state, crossFade);
         return true;
     }
+
     public void StunFromTreeWall(TreeWall wall)
     {
-        if (_isStunned) return;                    // 중복 방지
-        if (breakTreeOnHit && wall != null) wall.BreakAndDestroy();   // 나무 부수기(옵션)
-        if (_health) _health.ApplyVulnerability(wallVulnMultiplier, wallStunDuration); // 받뎀 × 배율
-        ExternalStun(wallStunDuration);            // 기절
+        if (_isStunned) return;
+        if (breakTreeOnHit && wall != null) wall.BreakAndDestroy();
+        if (_health) _health.ApplyVulnerability(wallVulnMultiplier, wallStunDuration);
+        ExternalStun(wallStunDuration);
     }
-    void Start() { if (facePlayer) FaceTowardPlayer(); }
+
+    void Start()
+    {
+        if (facePlayer) FaceTowardPlayer();
+    }
 }

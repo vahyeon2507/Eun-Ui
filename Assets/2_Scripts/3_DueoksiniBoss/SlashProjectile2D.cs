@@ -28,7 +28,7 @@ public class SlashProjectile2D : MonoBehaviour
     public bool flipIfNoPairSync = true;
 
     // =========================
-    // NEW: Scale morph over life (visual-only)
+    // Scale morph over life (visual-only)
     // =========================
     [Header("Scale Morph Over Life (visual)")]
     [Tooltip("활성화 시, 수명 진행에 따라 X↑, Y↓로 비주얼 스케일 변화")]
@@ -66,10 +66,12 @@ public class SlashProjectile2D : MonoBehaviour
         if (!gfxAnimator) gfxAnimator = GetComponentInChildren<Animator>(true);
         if (!gfxFlipRoot) gfxFlipRoot = spriteRenderer ? spriteRenderer.transform : transform;
         if (!pairSync) pairSync = GetComponentInChildren<DirectionalAnimPairSync>(true);
-        if (speedCurve == null || speedCurve.length == 0) speedCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
+        if (speedCurve == null || speedCurve.length == 0)
+            speedCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
 
         if (!scaleTarget) scaleTarget = gfxFlipRoot ? gfxFlipRoot : transform;
-        if (scaleCurve == null || scaleCurve.length == 0) scaleCurve = AnimationCurve.Linear(0, 0, 1, 1);
+        if (scaleCurve == null || scaleCurve.length == 0)
+            scaleCurve = AnimationCurve.Linear(0, 0, 1, 1);
 
         var col = GetComponent<Collider2D>();
         col.isTrigger = true;
@@ -92,19 +94,33 @@ public class SlashProjectile2D : MonoBehaviour
     {
         _owner = owner;
         _dir = dir.sqrMagnitude > 0.0001f ? dir.normalized : Vector2.right;
-        _age = 0f; _accelT = 0f;
+        _age = 0f;
+        _accelT = 0f;
 
         ApplyFacingForGraphics(facingRightForAnim);
         CacheBaseScale(); // 발사 시점 스케일을 기준으로 사용
         enabled = true;
     }
 
-    public void Launch(Vector2 dir, Transform owner, int dmg, float start, float fast, float dly, float time,
-                       AnimationCurve curve, float life, LayerMask mask, bool destroyOnContact, bool facingRightForAnim)
+    public void Launch(
+        Vector2 dir, Transform owner,
+        int dmg, float start, float fast,
+        float dly, float time,
+        AnimationCurve curve,
+        float life, LayerMask mask,
+        bool destroyOnContact,
+        bool facingRightForAnim)
     {
-        damage = dmg; startSpeed = start; fastSpeed = fast;
-        accelDelay = dly; accelTime = time; if (curve != null && curve.length > 0) speedCurve = curve;
-        lifeTime = life; hitMask = mask; destroyOnHit = destroyOnContact;
+        damage = dmg;
+        startSpeed = start;
+        fastSpeed = fast;
+        accelDelay = dly;
+        accelTime = time;
+        if (curve != null && curve.length > 0) speedCurve = curve;
+        lifeTime = life;
+        hitMask = mask;
+        destroyOnHit = destroyOnContact;
+
         LaunchWithPrefabDefaults(dir, owner, facingRightForAnim);
     }
 
@@ -118,14 +134,17 @@ public class SlashProjectile2D : MonoBehaviour
         else if (flipIfNoPairSync)
         {
             if (spriteRenderer) spriteRenderer.flipX = !right;
-            // 스케일 부호는 _sign로 관리하므로 여기선 건드리지 않음
         }
     }
 
     void Update()
     {
         _age += Time.deltaTime;
-        if (_age >= lifeTime) { Destroy(gameObject); return; }
+        if (_age >= lifeTime)
+        {
+            Destroy(gameObject);
+            return;
+        }
 
         // 이동 속도
         float speed;
@@ -139,7 +158,7 @@ public class SlashProjectile2D : MonoBehaviour
         }
         transform.position += (Vector3)(_dir * speed * Time.deltaTime);
 
-        // NEW: 수명 진행 비율로 비주얼 스케일 보간 (드리프트 없이 절대 계산)
+        // 수명 진행 비율로 비주얼 스케일 보간
         if (scaleMorph && lifeTime > 0f && scaleTarget)
         {
             float u = Mathf.Clamp01(_age / Mathf.Max(0.0001f, lifeTime));
@@ -153,14 +172,73 @@ public class SlashProjectile2D : MonoBehaviour
         }
     }
 
+    // ================== 여기부터 충돌 & 패링 처리 ==================
     void OnTriggerEnter2D(Collider2D other)
     {
+        // 0) 자기 주인 맞으면 무시
         if (_owner && other.transform == _owner) return;
+
+        // 1) 레이어 마스크 체크
         if (((1 << other.gameObject.layer) & hitMask) == 0) return;
 
+        // 2) PlayerHealth 있으면 = 플레이어 계열 처리
+        var ph = other.GetComponentInParent<PlayerHealth>();
+        if (ph != null)
+        {
+            // 2-1) 몸통 콜라이더 필터 (자식 히트박스 무시)
+            Collider2D main = ph.mainBodyCollider != null
+                ? ph.mainBodyCollider
+                : ph.GetComponent<Collider2D>();
+
+            if (main != null && other != main)
+            {
+                Debug.Log(
+                    $"[SlashProjectile2D] Ignore child collider '{other.name}' " +
+                    $"(tag={other.tag}, layer={LayerMask.LayerToName(other.gameObject.layer)}) → main='{main.name}'"
+                );
+                return;
+            }
+
+            // 2-2) 패링/대미지 처리는 PlayerController 쪽으로 위임
+            var pc = ph.GetComponent<PlayerController>();
+            if (pc != null)
+            {
+                bool handled = pc.TryHandleProjectileHit(this, other, damage);
+                if (handled)
+                {
+                    // 플레이어가 패링 등으로 처리 완료 → 투사체 정리하고 끝
+                    if (destroyOnHit) Destroy(gameObject);
+                    return;
+                }
+            }
+
+            // 2-3) 패링으로 처리되지 않음 → 그냥 플레이어가 맞은 걸로
+            Debug.Log($"[SlashProjectile2D] Hit PLAYER via '{other.name}' → {damage} dmg");
+            ph.TakeDamageFromHitbox(damage, other);
+
+            if (destroyOnHit) Destroy(gameObject);
+            return;
+        }
+
+        // 3) 그 외 IDamageable (몹, 오브젝트 등)
         var dmgTarget = other.GetComponentInParent<IDamageable>();
-        if (dmgTarget != null) dmgTarget.TakeDamage(damage);
+        if (dmgTarget != null)
+        {
+            Debug.Log(
+                $"[SlashProjectile2D] Hit '{other.name}' (tag={other.tag}, layer={LayerMask.LayerToName(other.gameObject.layer)}) " +
+                $"→ {dmgTarget.GetType().Name}에 {damage} 데미지"
+            );
+            dmgTarget.TakeDamage(damage);
+        }
+        else
+        {
+            Debug.Log(
+                $"[SlashProjectile2D] Hit '{other.name}' (tag={other.tag}, layer={LayerMask.LayerToName(other.gameObject.layer)}) " +
+                "but no IDamageable – damage ignored"
+            );
+        }
 
         if (destroyOnHit) Destroy(gameObject);
     }
+
 }

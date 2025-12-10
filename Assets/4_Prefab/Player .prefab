@@ -178,6 +178,8 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 64
   parrySpecialDamage: 15
+  strongParryAssistActive: 0
+  strongParryInvulDuration: 0.12
   groundCheckRadius: 0.14
   groundRememberTime: 0.08
   healthComponent: {fileID: 1407434714894907121}
@@ -344,6 +346,7 @@ MonoBehaviour:
   iFrameDuration: 0.8
   animator: {fileID: 0}
   disableOnDeath: {fileID: 1290639557195873711}
+  mainBodyCollider: {fileID: 1768041895077863587}
 --- !u!61 &1768041895077863587
 BoxCollider2D:
   m_ObjectHideFlags: 0

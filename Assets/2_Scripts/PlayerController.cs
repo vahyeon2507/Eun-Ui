@@ -708,6 +708,23 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
         return true;
     }
 
+    /// <summary>
+    /// 투사체가 플레이어를 맞췄을 때 호출되는 진입점.
+    /// 내부 패링/무적 로직(ConsumeHitboxIfParrying)을 그대로 재사용한다.
+    /// 반환값:
+    ///   true  = 패링/무적으로 히트가 소비됨 (투사체는 대미지 주지 말 것)
+    ///   false = 아무 처리도 안 했으니, PlayerHealth에 대미지 전달해야 함
+    /// </summary>
+    public bool TryHandleProjectileHit(SlashProjectile2D projectile, Collider2D hitCollider, int damage)
+    {
+        bool consumed = ConsumeHitboxIfParrying(hitCollider);
+        if (consumed)
+        {
+            Debug.Log($"[Player] Parried projectile '{(projectile ? projectile.name : "null")}' via collider '{(hitCollider ? hitCollider.name : "null")}'.");
+        }
+        return consumed;
+    }
+
     // --------------------------------------------------------
     // Parry consumption API — 보스에서 호출할 수 있도록 public
     // --------------------------------------------------------

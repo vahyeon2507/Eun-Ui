@@ -29,6 +29,10 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     public Animator animator;
     public MonoBehaviour disableOnDeath;
 
+    [Header("Hitbox Filter")]
+    [Tooltip("실제로 맞는 '몸통' 콜라이더. 이 콜라이더에 맞았을 때만 대미지를 받는다. 비워두면 예전처럼 모든 콜라이더에서 맞음.")]
+    public Collider2D mainBodyCollider;
+
     Rigidbody2D rb;
     SpriteRenderer sr;
 
@@ -57,34 +61,49 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     }
 
     // ===== IDamageable =====
+    // ===== IDamageable =====
     public void TakeDamage(int amount)
-{
-    if (isInvulnerable) return;
+    {
+        if (isInvulnerable) return;
 
         GetComponentInChildren<SpriteFlash>()?.FlashOnce();
 
-        // ✅ 히트 카메라 흔들림 (내장 + 시네머신 임펄스 둘 다 커버)
         var shaker = GetComponent<PlayerHitShake>();
-    if (shaker == null) shaker = FindObjectOfType<PlayerHitShake>(); // 혹시 따로 붙어있다면
-    shaker?.Shake();   // (진짜 중요) 이 한 줄이 빠져있으면 절대 흔들리지 않음
+        if (shaker == null) shaker = FindObjectOfType<PlayerHitShake>();
+        shaker?.Shake();
 
-    Debug.Log($"[PlayerHealth] 피격! 체력: {currentHealth} -> {currentHealth - amount}");
+        Debug.Log($"[PlayerHealth] 피격! 체력: {currentHealth} -> {currentHealth - amount}");
 
-    currentHealth -= amount;
-    if (currentHealth < 0) currentHealth = 0;
+        currentHealth -= amount;
+        if (currentHealth < 0) currentHealth = 0;
 
-    // 빨간/노란 바 갱신 코루틴은 그대로…
-    if (redBar != null) StartCoroutine(AnimateRedBar());
-    if (yellowBar != null) StartCoroutine(UpdateYellowBar());
+        if (redBar != null) StartCoroutine(AnimateRedBar());
+        if (yellowBar != null) StartCoroutine(UpdateYellowBar());
 
-    if (animator != null) animator.SetTrigger("Hurt");
+        if (animator != null) animator.SetTrigger("Hurt");
 
-    // 깜빡이기 + iFrame
-    StartCoroutine(HitFlash());
-    StartCoroutine(IFrameCoroutine());
+        StartCoroutine(HitFlash());
+        StartCoroutine(IFrameCoroutine());
 
-    if (currentHealth <= 0) Die();
-}
+        if (currentHealth <= 0) Die();
+    }
+
+    /// <summary>
+    /// '어떤 콜라이더에 맞았는지'를 함께 넘겨서,
+    /// mainBodyCollider 에 맞았을 때만 실제 데미지를 적용한다.
+    /// </summary>
+    public void TakeDamageFromHitbox(int amount, Collider2D hitCollider)
+    {
+        // mainBodyCollider 가 지정돼 있으면, 그 콜라이더만 인정
+        if (mainBodyCollider != null && hitCollider != mainBodyCollider)
+        {
+            // Debug.Log($"[PlayerHealth] 무시된 피격: {hitCollider.name}");
+            return;
+        }
+
+        TakeDamage(amount);
+    }
+
 
     IEnumerator AnimateRedBar()
     {

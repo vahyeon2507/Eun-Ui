@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;   // ★ 분노 게이지 UI용
 
 [DisallowMultipleComponent]
 public class BossDueoksiniController : MonoBehaviour
@@ -77,12 +78,25 @@ public class BossDueoksiniController : MonoBehaviour
         [Tooltip("AnimEvent_SimpleDamage() 호출 시 기본으로 사용할 대미지")]
         public int baseDamage = 1;
 
-        // ---------- Projectile (event-driven) ----------
+        [Header("Strong Attack")]
+        [Tooltip("체크 시 이 SimpleAttack은 '분노 강공격'으로 취급된다.")]
+        public bool isStrongAttack = false;
+
         [Header("Move During Attack (optional)")]
         public float moveDistance = 0f;
         public float moveTime = 0f;
         public AnimationCurve moveCurve;
 
+        // ---------- AnimEvent Move ----------
+        [Header("AnimEvent Move (optional)")]
+        [Tooltip("true면 이 공격은 AnimEvent_MoveStart/MoveStop 이벤트로 이동을 제어한다. CoAdvance는 사용하지 않음.")]
+        public bool useAnimEventMove = false;
+
+        [Tooltip("AnimEvent_MoveStart가 호출된 순간부터 목표 지점까지 도달하는데 걸리는 시간(초). " +
+                 "이 값을 애니에서 Start~Stop 사이 시간과 맞추면 Stop 프레임에 딱 도착.")]
+        public float animEventMoveDuration = 0.2f;
+
+        // ---------- Projectile (event-driven) ----------
         [Header("Projectile (optional)")]
         [Tooltip("체크 시, 어택 시작 시 자동 1회 발사(이벤트와 중복 방지).")]
         public bool spawnProjectileAuto = false;
@@ -109,6 +123,29 @@ public class BossDueoksiniController : MonoBehaviour
     [Header("Attack ▸ Simple (recommended)")]
     public List<SimpleAttack> simpleAttacks = new List<SimpleAttack>();
 
+    // ===== 분노 / 강공격 게이지 (Fill UI) =====
+    [Header("Rage / Strong Attack")]
+    [Tooltip("분노 게이지 최대 스택 수 (칸 수)")]
+    public int rageMaxStacks = 3;
+
+    [Tooltip("자동으로 분노 1스택이 차오르는 시간(초). 6초면 6초마다 한 칸 분량이 찬다.")]
+    public float rageAutoInterval = 6f;
+
+    [Tooltip("각 분노 칸의 Image (왼쪽→오른쪽). Image.type=Filled 로 설정해야 함.")]
+    public Image[] rageFillImages;
+
+    [Tooltip("각 분노 칸이 '막 가득' 찼을 때 재생할 FX Animator (선택)")]
+    public Animator[] rageSegmentFxAnimators;
+
+    [Tooltip("위 Animator들에 보낼 트리거 이름")]
+    public string rageSegmentFxTrigger = "Play";
+
+    [Tooltip("현재 분노 값 (0 ~ rageMaxStacks, 소수 포함)")]
+    public float rageValue = 0f;
+
+    int RageStacks => Mathf.FloorToInt(rageValue);      // 0,1,2,3...
+    bool RageIsFull => RageStacks >= rageMaxStacks;
+
     // ===== Prep & Attack mapping =====
     public enum AttackKind { Simple, ProjectileBurst, GroundSlam }
     [System.Serializable] public struct SimpleChoice { public int simpleIndex; public float weight; }
@@ -131,6 +168,10 @@ public class BossDueoksiniController : MonoBehaviour
         [Header("Prep Directional (optional)")]
         public string prepDirectionalBase;
         public float prepCrossFade = 0.05f;
+
+        [Header("Strong Prep")]
+        [Tooltip("체크 시 이 Prep은 '분노 강공격'용 준비자세로 취급된다.")]
+        public bool isStrongPrep = false;
     }
 
     [Header("Prep & Attack")]
@@ -173,6 +214,13 @@ public class BossDueoksiniController : MonoBehaviour
     List<Collider2D> _currentHitboxes;
     SimpleAttack _playingSimpleAttack;
     bool _autoProjFiredThisAttack = false;
+
+    // ── AnimEvent-driven move state ──
+    bool _animMoveActive = false;
+    Vector3 _animMoveStartPos;
+    Vector3 _animMoveTargetPos;
+    float _animMoveElapsed = 0f;
+    float _animMoveDuration = 0.2f;
 
     // ─────────────────────────────────────────────
     // 외부 스턴
@@ -219,12 +267,22 @@ public class BossDueoksiniController : MonoBehaviour
         _anim = gfxAnimator;
         _rb = GetComponent<Rigidbody2D>();
         _health = GetComponent<BossHealth>();
+
+        UpdateRageUI(); // ★ 시작 시 분노 UI 초기화
     }
 
     void OnEnable()
     {
         if (!_inRoutine)
             StartCoroutine(MainLoop());
+    }
+
+    void Update()
+    {
+        UpdateAnimEventMove();
+
+        // ★ 분노 자동 채우기 (6초당 1칸 분량)
+        AddRageByTime(Time.deltaTime);
     }
 
     IEnumerator MainLoop()
@@ -360,30 +418,108 @@ public class BossDueoksiniController : MonoBehaviour
     // ───────────────── Attack Prep & 선택 ─────────────────
     PrepOption PickPrep()
     {
-        if (preps == null || preps.Count == 0) return new PrepOption();
+        if (preps == null || preps.Count == 0)
+            return new PrepOption();
 
-        float total = 0f;
+        bool wantStrongPrep = RageIsFull;
+
+        // 강 Prep 존재 여부 확인
+        bool hasStrongPrep = false;
         for (int i = 0; i < preps.Count; i++)
         {
-            if (i == _lastPrepIndex) continue;
-            total += Mathf.Max(0f, preps[i].weight);
+            if (preps[i] != null && preps[i].isStrongPrep)
+            {
+                hasStrongPrep = true;
+                break;
+            }
         }
 
-        float r = Random.value * (total <= 0f ? 1f : total);
+        // 어떤 Prep들이 후보가 될지 결정하는 필터
+        System.Predicate<int> isCandidate;
+
+        if (hasStrongPrep)
+        {
+            if (wantStrongPrep)
+            {
+                // ★ 분노 풀 → 강 Prep만 사용
+                isCandidate = idx => preps[idx].isStrongPrep;
+            }
+            else
+            {
+                // ★ 분노 미만 → 일반 Prep만 사용
+                isCandidate = idx => !preps[idx].isStrongPrep;
+            }
+        }
+        else
+        {
+            // 강 Prep이 하나도 없으면 기존 로직 유지
+            isCandidate = idx => true;
+        }
+
+        // 1차 후보 리스트: 직전 Prep은 제외
+        List<int> candidates = new List<int>();
         for (int i = 0; i < preps.Count; i++)
         {
             if (i == _lastPrepIndex) continue;
+            if (!isCandidate(i)) continue;
+
             float w = Mathf.Max(0f, preps[i].weight);
+            if (w <= 0f) continue;
+
+            candidates.Add(i);
+        }
+
+        // 후보 0이면 직전 것도 허용해서 다시 구성
+        if (candidates.Count == 0)
+        {
+            for (int i = 0; i < preps.Count; i++)
+            {
+                if (!isCandidate(i)) continue;
+
+                float w = Mathf.Max(0f, preps[i].weight);
+                if (w <= 0f) continue;
+
+                candidates.Add(i);
+            }
+        }
+
+        // 여전히 없으면 그냥 0번
+        if (candidates.Count == 0)
+        {
+            _lastPrepIndex = 0;
+            return preps[0];
+        }
+
+        // 가중치 합
+        float total = 0f;
+        foreach (int idx in candidates)
+            total += Mathf.Max(0f, preps[idx].weight);
+
+        if (total <= 0f)
+        {
+            int chosen = candidates[Random.Range(0, candidates.Count)];
+            _lastPrepIndex = chosen;
+            return preps[chosen];
+        }
+
+        // 가중치 랜덤 선택
+        float r = Random.value * total;
+        foreach (int idx in candidates)
+        {
+            float w = Mathf.Max(0f, preps[idx].weight);
+            if (w <= 0f) continue;
+
             if (r < w)
             {
-                _lastPrepIndex = i;
-                return preps[i];
+                _lastPrepIndex = idx;
+                return preps[idx];
             }
             r -= w;
         }
 
-        _lastPrepIndex = 0;
-        return preps[0];
+        int lastIdx = candidates[candidates.Count - 1];
+        _lastPrepIndex = lastIdx;
+        return preps[lastIdx];
     }
 
     IEnumerator DoAttackPrep(PrepOption opt)
@@ -416,7 +552,16 @@ public class BossDueoksiniController : MonoBehaviour
             case AttackKind.Simple:
                 int idx = PickSimpleIndex(opt);
                 if (idx >= 0 && idx < simpleAttacks.Count)
-                    yield return DoSimpleAttack(simpleAttacks[idx], opt.attackTriggerOverride);
+                {
+                    var sa = simpleAttacks[idx];
+                    bool isStrong = sa != null && sa.isStrongAttack;
+
+                    // 분노가 가득 찬 상태에서 강공격 심플어택을 뽑았다면 분노 소모
+                    if (isStrong && RageIsFull)
+                        ClearRage();
+
+                    yield return DoSimpleAttack(sa, opt.attackTriggerOverride);
+                }
                 break;
 
             case AttackKind.ProjectileBurst:
@@ -431,26 +576,62 @@ public class BossDueoksiniController : MonoBehaviour
 
     int PickSimpleIndex(PrepOption opt)
     {
+        if (simpleAttacks == null || simpleAttacks.Count == 0) return -1;
+
+        bool wantStrongOnly = RageIsFull;
+
+        // 1) simpleChoices 우선 (강/일반 필터 적용)
         if (opt.simpleChoices != null && opt.simpleChoices.Count > 0)
         {
             float total = 0f;
             foreach (var c in opt.simpleChoices)
-                total += Mathf.Max(0f, c.weight);
-
-            if (total <= 0f)
-                return Mathf.Clamp(opt.simpleChoices[0].simpleIndex, 0, simpleAttacks.Count - 1);
-
-            float r = Random.value * total;
-            foreach (var c in opt.simpleChoices)
             {
+                int idx = Mathf.Clamp(c.simpleIndex, 0, simpleAttacks.Count - 1);
+                bool isStrong = simpleAttacks[idx].isStrongAttack;
+
+                if (wantStrongOnly && !isStrong) continue;
+                if (!wantStrongOnly && isStrong) continue;
+
                 float w = Mathf.Max(0f, c.weight);
-                if (r < w)
-                    return Mathf.Clamp(c.simpleIndex, 0, simpleAttacks.Count - 1);
-                r -= w;
+                if (w <= 0f) continue;
+                total += w;
+            }
+
+            if (total > 0f)
+            {
+                float r = Random.value * total;
+                foreach (var c in opt.simpleChoices)
+                {
+                    int idx = Mathf.Clamp(c.simpleIndex, 0, simpleAttacks.Count - 1);
+                    bool isStrong = simpleAttacks[idx].isStrongAttack;
+
+                    if (wantStrongOnly && !isStrong) continue;
+                    if (!wantStrongOnly && isStrong) continue;
+
+                    float w = Mathf.Max(0f, c.weight);
+                    if (w <= 0f) continue;
+
+                    if (r < w) return idx;
+                    r -= w;
+                }
             }
         }
 
-        return Mathf.Clamp(opt.simpleIndex, 0, simpleAttacks.Count - 1);
+        // 2) 폴백: opt.simpleIndex 또는 첫 유효 강/일반 공격
+        int fallback = Mathf.Clamp(opt.simpleIndex, 0, simpleAttacks.Count - 1);
+        bool fallbackStrong = simpleAttacks[fallback].isStrongAttack;
+
+        if (wantStrongOnly && fallbackStrong) return fallback;
+        if (!wantStrongOnly && !fallbackStrong) return fallback;
+
+        for (int i = 0; i < simpleAttacks.Count; i++)
+        {
+            bool isStrong = simpleAttacks[i].isStrongAttack;
+            if (wantStrongOnly && isStrong) return i;
+            if (!wantStrongOnly && !isStrong) return i;
+        }
+
+        return fallback;
     }
 
     // ───────────────── Simple Attack 본체 ─────────────────
@@ -467,20 +648,19 @@ public class BossDueoksiniController : MonoBehaviour
             TryFireSimpleProjectile(sa);
 
         Coroutine moveCR = null;
-        if (sa.moveTime > 0f && Mathf.Abs(sa.moveDistance) > 0f)
+
+        if (!sa.useAnimEventMove && sa.moveTime > 0f && Mathf.Abs(sa.moveDistance) > 0f)
             moveCR = StartCoroutine(CoAdvance(sa.moveDistance, sa.moveTime, sa.moveCurve));
 
         var hbList = GetSimpleHitboxList(sa);
 
         if (sa.useAnimEvent)
         {
-            // 애니메이션 이벤트(AnimEvent_GenericHitOn/Off)에서 켜고 끄는 모드
             _currentHitboxes = hbList;
             yield return new WaitForSeconds(Mathf.Max(0.01f, sa.activeTime));
         }
         else
         {
-            // activeTime 동안 자동 On → Off
             ToggleColliders(hbList, true);
             yield return new WaitForSeconds(Mathf.Max(0.01f, sa.activeTime));
             ToggleColliders(hbList, false);
@@ -488,6 +668,8 @@ public class BossDueoksiniController : MonoBehaviour
 
         if (moveCR != null)
             yield return moveCR;
+
+        StopAnimEventMove(false);
 
         _currentHitboxes = null;
         _playingSimpleAttack = null;
@@ -510,7 +692,6 @@ public class BossDueoksiniController : MonoBehaviour
                 return sa.leftHitboxes;
         }
 
-        // 좌/우가 비어 있으면 공통 hitboxes 사용
         return sa.hitboxes;
     }
 
@@ -521,7 +702,6 @@ public class BossDueoksiniController : MonoBehaviour
         if (sa == null || !sa.projectilePrefab) return;
         if (_autoProjFiredThisAttack) return;
 
-        // 1) 발사지점
         Transform muzzle =
             (FacingRight
                 ? (sa.projectileMuzzleRight ? sa.projectileMuzzleRight : sa.projectileMuzzle)
@@ -539,7 +719,6 @@ public class BossDueoksiniController : MonoBehaviour
                        new Vector3(sa.projectileMuzzleOffset.x * sign, sa.projectileMuzzleOffset.y, 0f);
         }
 
-        // 2) 방향
         Vector2 dir = FacingRight ? Vector2.right : Vector2.left;
         if (sa.projAimAtPlayer && player)
         {
@@ -548,7 +727,6 @@ public class BossDueoksiniController : MonoBehaviour
         }
         bool dirRightForAnim = dir.x >= 0f;
 
-        // 3) 인스턴스 & 런치
         var go = Instantiate(sa.projectilePrefab, spawnPos, Quaternion.identity);
         var pr = go.GetComponent<SlashProjectile2D>();
         if (pr)
@@ -671,6 +849,35 @@ public class BossDueoksiniController : MonoBehaviour
         return x * x * (3f - 2f * x);
     }
 
+    // ── AnimEvent Move 업데이트 ──
+    void UpdateAnimEventMove()
+    {
+        if (!_animMoveActive) return;
+
+        _animMoveElapsed += Time.deltaTime;
+
+        float t = (_animMoveDuration <= 0f)
+            ? 1f
+            : Mathf.Clamp01(_animMoveElapsed / _animMoveDuration);
+
+        float k = EaseInOut(t);
+        Vector3 pos = Vector3.Lerp(_animMoveStartPos, _animMoveTargetPos, k);
+        transform.position = pos;
+
+        if (t >= 1f)
+            _animMoveActive = false;
+    }
+
+    void StopAnimEventMove(bool snapToTarget)
+    {
+        if (!_animMoveActive) return;
+
+        if (snapToTarget)
+            transform.position = _animMoveTargetPos;
+
+        _animMoveActive = false;
+    }
+
     // ───────────────── Anim Events ─────────────────
     public void AnimEvent_PrepReady() { _waitingPrepEvent = false; }
 
@@ -690,11 +897,36 @@ public class BossDueoksiniController : MonoBehaviour
     public void AnimEvent_SlamHitOff() { ToggleColliders(slamHitboxes, false); }
     public void AnimEvent_FireSimpleProjectile() { TryFireSimpleProjectile(_playingSimpleAttack); }
 
+    // ★ AnimEvent 이동 시작/정지
+    public void AnimEvent_MoveStart(float deltaX)
+    {
+        float dirSign = FacingRight ? 1f : -1f;
+        float worldDeltaX = deltaX * dirSign;
+
+        _animMoveStartPos = transform.position;
+        _animMoveTargetPos = _animMoveStartPos + new Vector3(worldDeltaX, 0f, 0f);
+        _animMoveElapsed = 0f;
+
+        float duration = 0.2f;
+
+        if (_playingSimpleAttack != null &&
+            _playingSimpleAttack.useAnimEventMove &&
+            _playingSimpleAttack.animEventMoveDuration > 0f)
+        {
+            duration = _playingSimpleAttack.animEventMoveDuration;
+        }
+
+        _animMoveDuration = duration;
+        _animMoveActive = true;
+    }
+
+    public void AnimEvent_MoveStop()
+    {
+        StopAnimEventMove(true);
+    }
+
     // ★★★ 여기부터: 심플 어택 대미지 애니메이션 이벤트 ★★★
 
-    /// <summary>
-    /// 현재 재생 중인 SimpleAttack의 baseDamage로 히트박스 안의 Player(IDamageable)에 대미지
-    /// </summary>
     public void AnimEvent_SimpleDamage()
     {
         if (_playingSimpleAttack == null) return;
@@ -702,9 +934,6 @@ public class BossDueoksiniController : MonoBehaviour
         ApplySimpleDamage(dmg);
     }
 
-    /// <summary>
-    /// 애니메이션 이벤트 인자로 들어온 damage 값으로 히트 처리
-    /// </summary>
     public void AnimEvent_SimpleDamageInt(int damage)
     {
         if (damage <= 0)
@@ -715,7 +944,6 @@ public class BossDueoksiniController : MonoBehaviour
         ApplySimpleDamage(damage);
     }
 
-    // 히트박스 안에 들어있는 Player(IDamageable)에게 한 번씩 대미지 적용
     static readonly List<Collider2D> _hitOverlapBuffer = new List<Collider2D>(8);
     static readonly HashSet<IDamageable> _damagedCache = new HashSet<IDamageable>();
 
@@ -726,6 +954,8 @@ public class BossDueoksiniController : MonoBehaviour
 
         var hbList = GetSimpleHitboxList(_playingSimpleAttack);
         if (hbList == null || hbList.Count == 0) return;
+
+        bool isStrong = _playingSimpleAttack.isStrongAttack;
 
         var filter = new ContactFilter2D
         {
@@ -746,8 +976,6 @@ public class BossDueoksiniController : MonoBehaviour
             {
                 var col = _hitOverlapBuffer[j];
                 if (!col) continue;
-
-                // 플레이어만 맞게 태그 필터
                 if (!col.CompareTag("Player")) continue;
 
                 var dmg = col.GetComponent<IDamageable>()
@@ -756,9 +984,117 @@ public class BossDueoksiniController : MonoBehaviour
                 if (dmg == null || _damagedCache.Contains(dmg)) continue;
 
                 _damagedCache.Add(dmg);
-                dmg.TakeDamage(amount);
+
+                var pc = col.GetComponentInParent<PlayerController>();
+
+                if (isStrong)
+                {
+                    bool consumed = false;
+                    if (pc != null)
+                        consumed = pc.HandleStrongAttackHit(col);
+
+                    if (consumed) continue;
+
+                    if (pc != null)
+                    {
+                        pc.TakeStrongDamage(amount);
+                        AddRage(1f);   // 실제로 맞았으니 분노 +1칸
+                    }
+                    else
+                    {
+                        if (dmg is PlayerHealth phStrong)
+                            phStrong.TakeDamageFromHitbox(amount, col);
+                        else
+                            dmg.TakeDamage(amount);
+
+                        AddRage(1f);
+                    }
+                }
+                else
+                {
+                    if (dmg is PlayerHealth ph)
+                        ph.TakeDamageFromHitbox(amount, col);
+                    else
+                        dmg.TakeDamage(amount);
+
+                    AddRage(1f);  // 일반 공격도 맞으면 분노 +1칸
+                }
             }
         }
+    }
+
+    // ===== 분노 게이지 처리 (fill 방식) =====
+
+    void AddRage(float amount)
+    {
+        if (amount <= 0f) return;
+        if (rageMaxStacks <= 0) return;
+        if (rageValue >= rageMaxStacks) return;
+
+        float prev = rageValue;
+        rageValue = Mathf.Clamp(rageValue + amount, 0f, rageMaxStacks);
+
+        HandleRageThreshold(prev, rageValue);
+        UpdateRageUI();
+    }
+
+    void AddRageByTime(float deltaTime)
+    {
+        if (rageMaxStacks <= 0) return;
+        if (rageAutoInterval <= 0f) return;
+        if (rageValue >= rageMaxStacks) return;
+
+        float prev = rageValue;
+        rageValue = Mathf.Clamp(rageValue + deltaTime / rageAutoInterval, 0f, rageMaxStacks);
+
+        HandleRageThreshold(prev, rageValue);
+        UpdateRageUI();
+    }
+
+    void HandleRageThreshold(float prev, float cur)
+    {
+        int prevStacks = Mathf.FloorToInt(prev);
+        int newStacks = Mathf.FloorToInt(cur);
+
+        for (int s = prevStacks + 1; s <= newStacks && s <= rageMaxStacks; s++)
+        {
+            OnRageSegmentFilled(s - 1);
+        }
+    }
+
+    void OnRageSegmentFilled(int segmentIndex)
+    {
+        if (rageSegmentFxAnimators == null) return;
+        if (segmentIndex < 0 || segmentIndex >= rageSegmentFxAnimators.Length) return;
+
+        var anim = rageSegmentFxAnimators[segmentIndex];
+        if (!anim) return;
+
+        if (!string.IsNullOrEmpty(rageSegmentFxTrigger))
+            anim.SetTrigger(rageSegmentFxTrigger);
+        else
+            anim.Play(0, -1, 0f);
+    }
+
+    void UpdateRageUI()
+    {
+        if (rageFillImages == null) return;
+
+        for (int i = 0; i < rageFillImages.Length; i++)
+        {
+            var img = rageFillImages[i];
+            if (!img) continue;
+
+            float segmentValue = Mathf.Clamp01(rageValue - i); // i번째 칸의 fill (0~1)
+            img.fillAmount = segmentValue;
+        }
+    }
+
+    void ClearRage()
+    {
+        if (rageValue <= 0f) return;
+        rageValue = 0f;
+        UpdateRageUI();
     }
 
     // ===== Gizmos / Animator helper =====

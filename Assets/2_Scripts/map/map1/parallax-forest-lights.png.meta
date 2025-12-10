@@ -184,7 +184,10 @@ TextureImporter:
     secondaryTextures: []
     spriteCustomMetadata:
       entries: []
-    nameFileIdTable: {}
+    nameFileIdTable:
+      parallax-forest-lights_0: -8501991502536195871
+      parallax-forest-lights_1: 1406759276439988489
+      parallax-forest-lights_2: 5121679417566968780
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

@@ -134,7 +134,8 @@ TextureImporter:
     secondaryTextures: []
     spriteCustomMetadata:
       entries: []
-    nameFileIdTable: {}
+    nameFileIdTable:
+      parallax-forest-back-trees_0: 1623158659035209338
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

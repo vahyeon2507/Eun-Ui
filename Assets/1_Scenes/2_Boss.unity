@@ -4888,6 +4888,10 @@ PrefabInstance:
       propertyPath: parryProvider
       value: 
       objectReference: {fileID: 1946008969}
+    - target: {fileID: 5950601930643979826, guid: f5ff98bcabbc5cd4bb0a972aeac12ebf, type: 3}
+      propertyPath: baseDamageMitigation
+      value: 0.9
+      objectReference: {fileID: 0}
     - target: {fileID: 6998738884733054460, guid: f5ff98bcabbc5cd4bb0a972aeac12ebf, type: 3}
       propertyPath: hpBar
       value: 

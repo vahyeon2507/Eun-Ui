@@ -476,7 +476,7 @@ MonoBehaviour:
     m_Bits: 128
   noCollisionLayerName: Ignore Raycast
   forceNoCollisionLayer: 1
-  comboCheckExtraRadius: 0.1
+  comboCheckExtraRadius: 1
   onFieldCombo:
     m_PersistentCalls:
       m_Calls:
@@ -647,7 +647,7 @@ MonoBehaviour:
   nextKey: 101
   fireKey: 102
   moveDistance: 150
-  moveDuration: 0.3
+  moveDuration: 0.02
   sideScale: 0.7
   sideAlpha: 0.5
   typeOrder: 0000000001000000020000000300000004000000

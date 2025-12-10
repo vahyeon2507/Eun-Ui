@@ -45,8 +45,16 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   talisman: {fileID: 0}
+  strongParryZonePrefab: {fileID: 5879631835722291054, guid: 66524f762c974fc4986b5725c178b455, type: 3}
+  strongParryOffset: {x: 0, y: 0}
   treeWallPrefab: {fileID: 277150481103781896, guid: b4c7fd2868dbec14fb9f20f4fe2ac66d, type: 3}
   treeWallOffset: {x: 0, y: 0}
+  flameZonePrefab: {fileID: 8995567316182450347, guid: 9fe42d344c8c0124e944a7d8b7ccdb69, type: 3}
+  flameZoneOffset: {x: 0, y: 0}
+  floorHeatSystem: {fileID: 0}
+  heatClearVFXPrefab: {fileID: 209576006380488737, guid: c55664f64f8afd94699623517df942cb, type: 3}
+  heatClearOffset: {x: 0, y: 0}
+  heatClearVFXLifeTime: 1.25
   groundMask:
     serializedVersion: 2
     m_Bits: 8

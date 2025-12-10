@@ -1,13 +1,13 @@
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
-
 // PlayerController — 패링/스페셜/히트박스 자식 콜라이더판 (디버그 UI 포함)
 // - 3연속 기본공격과 스페셜 공격 모두 "자식 Collider2D"로만 히트 판정.
 // - (호환) attackPoint는 원거리/탈리스만 등의 발사 기준점으로만 사용.
 // - 스페셜 적중 시 BulgasariBoss.OnParrySpecialLanded(col)로 그로기 트리거 신호.
 // - IParryStreakProvider 유지.  AudioManager 즉시 재생 로직 병합.
+
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
 
 [RequireComponent(typeof(Rigidbody2D))]
 [RequireComponent(typeof(Animator))]
@@ -67,6 +67,9 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     public int CurrentParryStreak => parrySuccessCount;
     public event Action<int> OnParryStreakChanged;
 
+    public static System.Func<PlayerAction, bool> TutorialAllow = null;
+    public enum PlayerAction { Attack, Parry, Dash, Jump, Move }
+
     [Header("Movement")]
     public float moveSpeed = 5f;
     public float jumpForce = 12f;
@@ -119,6 +122,19 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
 
     [Tooltip("패링 스페셜 공격의 대미지(인스펙터 조절)")]
     public int parrySpecialDamage = 3;
+
+    [Header("Strong Attack / Strong Parry")]
+    [Tooltip("쇠+불 부적 조합 같은 효과로, 강공격도 패링 가능할 때 true로 켜줌")]
+    public bool strongParryAssistActive = false;
+
+    [Tooltip("강패링 성공 시 잠깐 들어갈 무적 시간")]
+    public float strongParryInvulDuration = 0.12f;
+
+    /// <summary>
+    /// 강패링 성공 시(강공격을 패링으로 받아냈을 때) 호출되는 이벤트.
+    /// 보스별 추가 연출이 필요하면 여기 구독해서 쓰면 됨.
+    /// </summary>
+    public event System.Action<BossHealth> OnStrongParrySuccess;
 
     [Header("Ground Check / Stability")]
     public float groundCheckRadius = 0.14f;
@@ -174,6 +190,9 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     public bool IsDashing => isDashing;
     public bool IsParrying => isParrying;
 
+    // 튜토리얼 전체 입력 락
+    public static bool TutorialInputLocked = false;
+
     // ===== PATCH: PlayerHealth 강타입 캐시/자동 연결 =====
     PlayerHealth _hpCached;
     PlayerHealth HP
@@ -204,6 +223,20 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
         return hb.ClosestPoint(transform.position);
     }
 
+    public void ForceParrySpecialFromStrongParry()
+    {
+        // 이미 스페셜 발동 중이면 무시
+        if (parrySpecialLocked) return;
+
+        // 내부 패링 스택을 최대치로 맞춰줌 (이벤트도 같이 쏴줌)
+        parrySuccessCount = Mathf.Max(parrySuccessNeeded, parrySuccessCount);
+        OnParryStreakChanged?.Invoke(parrySuccessCount);
+
+        // 기존 스페셜 로직 그대로 사용
+        StartCoroutine(TriggerParrySpecial());
+    }
+
+
     void Start()
     {
         rb = GetComponent<Rigidbody2D>();
@@ -229,6 +262,12 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
 
     void Update()
     {
+        // 튜토리얼 중이면 어떤 행동도 하지 않음
+        if (TutorialInputLocked)
+        {
+            return;
+        }
+
         HandleInputs();
         HandleMovement();
         HandleGravity();
@@ -238,10 +277,12 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
         if (attackLockTimer > 0f) attackLockTimer -= Time.deltaTime;
     }
 
+    bool Allow(PlayerAction a) => (TutorialAllow == null) || TutorialAllow(a);
+
     void HandleInputs()
     {
         // 기본 공격 입력(좌클릭 또는 extraAttackKey)
-        bool attackPressed = Input.GetMouseButtonDown(0) || Input.GetKeyDown(extraAttackKey);
+        bool attackPressed = (Input.GetMouseButtonDown(0) || Input.GetKeyDown(extraAttackKey)) && Allow(PlayerAction.Attack);
         if (attackPressed)
         {
             lastAttackButtonTime = Time.time;
@@ -267,7 +308,7 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
         }
 
         // 패링
-        if (Input.GetKeyDown(KeyCode.C) || Input.GetKeyDown(KeyCode.LeftControl))
+        if ((Input.GetKeyDown(KeyCode.C) || Input.GetKeyDown(KeyCode.LeftControl)) && Allow(PlayerAction.Parry))
         {
             if (canParry && !isParrying)
             {
@@ -615,6 +656,58 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
         canParry = true;
     }
 
+    /// <summary>
+    /// 강공격이 플레이어를 때리려고 할 때 보스 쪽에서 호출하는 진입점.
+    /// - isParrying == false  → false 반환(그냥 맞으면 됨)
+    /// - isParrying == true 이지만 strongParryAssistActive == false → false (패링 불가, 그냥 맞음)
+    /// - isParrying == true 이고 strongParryAssistActive == true  → 강패링 성공, 보스 강그로기/받뎀증, true 반환
+    /// </summary>
+    public bool HandleStrongAttackHit(Collider2D sourceCollider)
+    {
+        // 1) 패링 중이 아니면 그냥 일반 히트
+        if (!isParrying)
+            return false;
+
+        // 2) 강패링 보조가 꺼져 있으면, 이 공격은 '절대 패링 불가'
+        if (!strongParryAssistActive)
+        {
+            // 여기서는 어떤 보상도 주지 않고 false 반환
+            // → 호출한 쪽에서 그냥 데미지 처리하게 됨
+            return false;
+        }
+
+        // 3) 여기까지 왔으면 '강패링 성공'
+        //   - 패링 스트릭/게이지는 건드리지 않고,
+        //   - 보스에게 강그로기 + 받뎀 증가를 적용
+
+        BossHealth boss = null;
+        if (sourceCollider != null)
+        {
+            boss = sourceCollider.GetComponentInParent<BossHealth>()
+                ?? sourceCollider.GetComponent<BossHealth>()
+                ?? sourceCollider.GetComponentInChildren<BossHealth>();
+        }
+
+        if (boss != null)
+        {
+            boss.ApplyStrongParryGroggy();
+            OnStrongParrySuccess?.Invoke(boss);
+        }
+
+        // 플레이어 피드백(사운드/애니/짧은 무적)
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlaySFXInstant(AudioManager.Instance.playerParrySFX);
+
+        if (animator != null && !string.IsNullOrEmpty(animParrySuccessTrigger))
+            animator.SetTrigger(animParrySuccessTrigger);
+
+        // 강패링 성공 시 짧은 무적
+        StartCoroutine(TemporaryInvul(strongParryInvulDuration));
+
+        // true → 이 히트는 '소비'되었으므로 공격자가 데미지 주지 말라는 의미
+        return true;
+    }
+
     // --------------------------------------------------------
     // Parry consumption API — 보스에서 호출할 수 있도록 public
     // --------------------------------------------------------
@@ -711,15 +804,33 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     // --------------------------------------------------------
     public void TakeDamage(int amount)
     {
+        // 일반 공격 / 환경 대미지 → 패링 허용
+        TakeDamageInternal(amount, allowParry: true);
+    }
+
+    /// <summary>
+    /// 강공격처럼, 플레이어의 패링으로는 막을 수 없는 대미지에 사용.
+    /// - isInvulnerable 은 그대로 존중
+    /// - 패링 중이어도 ConsumeHitboxIfParrying 을 호출하지 않음
+    /// </summary>
+    public void TakeStrongDamage(int amount)
+    {
+        TakeDamageInternal(amount, allowParry: false);
+    }
+
+    void TakeDamageInternal(int amount, bool allowParry)
+    {
         if (isInvulnerable) return;
 
-        if (isParrying)
+        // ★ 강공격에서는 allowParry == false 이기 때문에 이 블록을 건너뛴다
+        if (allowParry && isParrying)
         {
             bool consumed = ConsumeHitboxIfParrying(null);
             if (consumed) return;
         }
 
-        Debug.Log($"[Player] Took {amount} damage.");
+        Debug.Log($"[Player] Took {amount} damage. (allowParry={allowParry})");
+
         if (healthComponent != null)
         {
             var mi = healthComponent.GetType().GetMethod("TakeDamage");
@@ -891,6 +1002,25 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     }
 
     bool _parryRewardedThisWindow = false;
+
+    void OnGUI()
+    {
+        if (!showParryDebugUI) return;
+
+        if (parryDebugStyle == null)
+        {
+            parryDebugStyle = new GUIStyle(GUI.skin.label);
+            parryDebugStyle.fontSize = 14;
+            parryDebugStyle.normal.textColor = Color.white;
+        }
+
+        string txt =
+            $"Parry: {parrySuccessCount}/{parrySuccessNeeded}\n" +
+            $"Parrying: {isParrying}\n" +
+            $"Dashing: {isDashing}";
+
+        GUI.Label(new Rect(parryDebugPosition.x, parryDebugPosition.y, 260f, 64f), txt, parryDebugStyle);
+    }
 
 #if UNITY_EDITOR
     void OnDrawGizmosSelected()

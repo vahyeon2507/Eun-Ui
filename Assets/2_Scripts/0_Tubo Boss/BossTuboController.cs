@@ -1,135 +1,304 @@
-using System.Collections;
+ï»¿using System.Collections;
 using UnityEngine;
+using UnityEngine.Serialization; // â˜… ì§ë ¬í™” ë§¤í•‘
 
 [DisallowMultipleComponent]
 public class BossTuboController : MonoBehaviour
 {
     [Header("Refs")]
-    public Transform playerPoint;              // ÇÃ·¹ÀÌ¾î Áß¾Ó "Point"
-    public BossHealth bossHealth;              // 2¹è ÇÇÇØ¿ë
-    public Animator animator;                  // Attack/Groggy Æ®¸®°Å Àç»ı
-    public SpriteRenderer gfx;                 // ¹æÇâ ÀüÈ¯¿ë(¼±ÅÃ)
+    public Transform player;
+    public PlayerController playerCtrl;
+    public Transform playerPointOverride;
+    public BossHealth bossHealth;
+    public Animator animator;
 
-    [Header("Telegraph & Attack")]
-    public GameObject telegraphPrefab;         // °æ°í ÇÁ¸®ÆÕ (¼±ÅÃ)
-    public GameObject strikeProjectilePrefab;  // ½ÇÁ¦ Å¸°İ ÇÁ¸®ÆÕ(¿©±â¿¡ È÷Æ®/¾Ö´Ï Á¸Àç)
-    public float telegraphTime = 0.6f;         // °æ°í À¯Áö ½Ã°£
-    public bool telegraphFollowsPoint = true;  // °æ°í°¡ À¯Áö ½Ã°£ µ¿¾È Point¸¦ µû¶ó°¥Áö
-    public float attackCooldown = 1.8f;        // ´ÙÀ½ ÆĞÅÏ±îÁö ´ë±â
+    public bool IsParryWindowActive => _parryWatchActive;
 
-    [Header("Animation Triggers (optional)")]
+    [Header("Prefabs")]
+    public GameObject telegraphPrefab;
+    public GameObject pointAttackPrefab;
+
+    // === Tutorial/Event hooks ===
+    public event System.Action onAttackWindowOpen;
+    public event System.Action onAttackWindowClose;
+    public event System.Action onParrySuccessDirect;
+
+    // â˜… ì²« ê³µê²©ì´ ë°œì‚¬ë˜ê¸° ì§ì „ì— í•œ ë²ˆë§Œ í˜¸ì¶œë˜ëŠ” ì´ë²¤íŠ¸
+    public event System.Action onFirstAttackIssued;
+
+    [Header("Attack Timing")]
+    public float telegraphTime = 0.6f;
+    public float attackCooldown = 1.2f;
+
+    [Header("Animations")]
     public string attackTrigger = "Attack";
-    public string groggyTrigger = "Groggy";
 
-    [Header("Groggy (on Parry)")]
-    public float groggyDuration = 2.0f;        // ±×·Î±â À¯Áö ½Ã°£
-    public float groggyDamageMul = 2.0f;       // ±×·Î±â µ¿¾È ¹Ş´Â ÇÇÇØ ¹è¼ö
+    // ===== Groggy =====
+    [Header("Groggy")]
+    public float groggyDuration = 2.0f;
+    public float parryAttributionGrace = 0.25f;
+    [Range(0.1f, 10f)] public float groggyDamageMultiplier = 2f;
 
-    [Header("Facing")]
-    public bool facePlayer = true;             // ´Ü¼ø ÁÂ¿ì¸¸ ¸ÂÃã
+    [Tooltip("Groggy ì…ì¥: Animator Bool ì´ë¦„. ë¹„ì›Œë‘ë©´ ì•„ë˜ 'enterGroggyTrigger(ë ˆê±°ì‹œ)'ë¥¼ ì‚¬ìš©.")]
+    public string groggyBool = "isGroggy";
 
-    bool _running;
-    bool _groggy;
+    [Tooltip("Groggy íšŒë³µ: Animator Trigger ì´ë¦„(ì„ íƒ).")]
+    public string groggyRecoverTrigger = "Recover";
+
+    [Tooltip("â˜…ë ˆê±°ì‹œ ë§¤í•‘: ì˜ˆì „ 'groggyTrigger'(íŠ¸ë¦¬ê±°ë¡œ ì…ì¥) ê°’ì´ ìë™ ì´í–‰ë©ë‹ˆë‹¤.")]
+    [FormerlySerializedAs("groggyTrigger")]
+    public string enterGroggyTrigger = ""; // ë¹„ì–´ìˆìœ¼ë©´ ë¯¸ì‚¬ìš©
+
+    [Header("Disable During Groggy (optional)")]
+    [Tooltip("ê·¸ë¡œê¸° ë™ì•ˆ êº¼ë‘˜ ìŠ¤í¬ë¦½íŠ¸ë“¤(ê³µê²© ìŠ¤í° ë“±). ëë‚˜ë©´ ìë™ ì¬í™œì„±í™”.")]
+    public MonoBehaviour[] disableDuringGroggy;
+
+    [Header("Player layer")]
+    public LayerMask playerLayer;
+
+    [Header("Debug")]
+    public bool debugLog = false;
+
+    // ---- internals ----
+    int _lastParryCount = 0;
+    bool _parryWatchActive = false;
+    float _parryWatchTimer = 0f;
+    bool _inLoop = false;
+    Coroutine _groggyCR;
+
+    bool _attacksEnabled = true;
+    public bool AttacksEnabled => _attacksEnabled;
+
+    // â˜… ì²« ê³µê²© ì´ë²¤íŠ¸ë¥¼ ì´ë¯¸ ìˆëŠ”ì§€ ì¶”ì 
+    bool _firstAttackEventSent = false;
 
     void Reset()
     {
         bossHealth = GetComponent<BossHealth>();
-        animator = GetComponentInChildren<Animator>();
-        gfx = GetComponentInChildren<SpriteRenderer>();
+        if (!animator) animator = GetComponentInChildren<Animator>(true);
+    }
+
+    public void NotifyParrySuccessDirect()
+    {
+        if (debugLog) Debug.Log($"[Tubo] Direct parry success. window={_parryWatchActive}");
+        if (_parryWatchActive) TriggerGroggy();
+        onParrySuccessDirect?.Invoke();
+    }
+
+    void Awake()
+    {
+        if (!player)
+        {
+            var p = GameObject.FindGameObjectWithTag("Player");
+            if (p) player = p.transform;
+        }
+        if (!playerCtrl && player) playerCtrl = player.GetComponent<PlayerController>();
+        if (!animator) animator = GetComponentInChildren<Animator>(true);
+        if (!bossHealth) bossHealth = GetComponent<BossHealth>();
     }
 
     void OnEnable()
     {
-        if (!_running) StartCoroutine(MainLoop());
+        if (!playerCtrl && player) playerCtrl = player.GetComponent<PlayerController>();
+        if (playerCtrl != null)
+        {
+            playerCtrl.OnParryStreakChanged += OnPlayerParryStreakChanged;
+            _lastParryCount = playerCtrl.CurrentParryStreak;
+        }
+
+        if (!_inLoop) StartCoroutine(MainLoop());
+    }
+
+    void OnDisable()
+    {
+        if (playerCtrl != null)
+            playerCtrl.OnParryStreakChanged -= OnPlayerParryStreakChanged;
+    }
+
+    void Update()
+    {
+        if (_parryWatchActive)
+        {
+            _parryWatchTimer -= Time.deltaTime;
+            if (_parryWatchTimer <= 0f)
+            {
+                _parryWatchActive = false;
+                if (debugLog) Debug.Log("[Tubo] Parry window CLOSED");
+            }
+        }
     }
 
     IEnumerator MainLoop()
     {
-        _running = true;
+        _inLoop = true;
+
+        // â˜… í•œ í”„ë ˆì„ ê¸°ë‹¤ë ¸ë‹¤ê°€ ê³µê²© ë£¨í”„ ì‹œì‘
+        //    â†’ ë‹¤ë¥¸ ìŠ¤í¬ë¦½íŠ¸(OnEnable)ë“¤ì´ ì´ë²¤íŠ¸ êµ¬ë…í•  ì‹œê°„ì„ í™•ë³´í•´ì¤Œ
+        yield return null;
+
         while (true)
         {
-            // ±×·Î±â¸é °ø°İ Àá½Ã È¦µå
-            while (_groggy) yield return null;
+            // ê·¸ë¡œê¸° ì¤‘ì—” ëŒ€ê¸°
+            while (!_attacksEnabled)
+                yield return null;
 
-            if (facePlayer) FaceToPlayerX();
+            // 1) ëª©í‘œ í¬ì¸íŠ¸
+            Vector3 targetPos = GetPlayerPoint();
 
-            // 1) °æ°í »ı¼º
-            Vector3 pos = playerPoint ? playerPoint.position : transform.position;
-            GameObject tg = null;
+            // 2) í…”ë ˆê·¸ë˜í”„
             if (telegraphPrefab)
             {
-                tg = Instantiate(telegraphPrefab, pos, Quaternion.identity);
-                var tgs = tg.GetComponent<TuboTelegraphIndicator2D>();
-                if (tgs) tgs.Setup(telegraphFollowsPoint ? playerPoint : null, telegraphTime);
+                var tele = Instantiate(telegraphPrefab, targetPos, Quaternion.identity);
+                Destroy(tele, telegraphTime + 0.2f);
             }
 
-            // 2) °æ°í À¯Áö
-            float t = 0f;
-            while (t < telegraphTime)
-            {
-                if (facePlayer) FaceToPlayerX();
-                // °æ°í°¡ µû¶ó°¡°Ô ¼³Á¤µÇ¾î ÀÖÁö ¾Ê´Ù¸é, ¸¶Áö¸· 1ÇÁ·¹ÀÓ¸¶´Ù pos °»½ÅÇØµÑ ÇÊ¿ä X
-                // µû¶ó°¡´Â ¸ğµå¿©µµ ¸¶Áö¸· À§Ä¡¸¦ ¾²±â À§ÇØ ¸Å ÇÁ·¹ÀÓ °»½Å
-                if (telegraphFollowsPoint && playerPoint) pos = playerPoint.position;
-                t += Time.deltaTime;
-                yield return null;
-            }
-
-            if (tg) Destroy(tg);
-
-            // 3) °ø°İ ¾Ö´Ï¸ŞÀÌ¼Ç (¼±ÅÃ)
+            // 3) ê³µê²© ì• ë‹ˆ
             if (animator && !string.IsNullOrEmpty(attackTrigger))
+            {
                 animator.SetTrigger(attackTrigger);
 
-            // 4) Å¸°İ ÇÁ¸®ÆÕ ¼ÒÈ¯ (±× ÀÚ¸®)
-            if (strikeProjectilePrefab)
-            {
-                var go = Instantiate(strikeProjectilePrefab, pos, Quaternion.identity);
-                var sp = go.GetComponent<TuboStrikeProjectile2D>();
-                if (sp) sp.Play(); // ¹Ù·Î Àç»ı(È÷Æ®/¾Ö´Ï/ÀÚ¸ê)
+                // â˜… ì²« ê³µê²© ì‹œì‘ ì‹œì ì— í•œ ë²ˆë§Œ íŠœí† ë¦¬ì–¼ìš© ì´ë²¤íŠ¸ ë°œì‚¬
+                if (!_firstAttackEventSent)
+                {
+                    _firstAttackEventSent = true;
+                    onFirstAttackIssued?.Invoke();
+                    if (debugLog) Debug.Log("[Tubo] First attack issued â†’ tutorial event fired");
+                }
             }
 
-            // 5) Äğ´Ù¿î
+            // 4) í…”ë ˆê·¸ë˜í”„ ëŒ€ê¸°
+            yield return new WaitForSeconds(telegraphTime);
+
+            // ê·¸ë¡œê¸° ë“¤ì–´ê°”ìœ¼ë©´ ìŠ¤í° ìŠ¤í‚µ
+            if (!_attacksEnabled)
+                continue;
+
+            // 5) ì‹¤ì œ ê³µê²© ìŠ¤í°
+            if (pointAttackPrefab)
+            {
+                var atk = Instantiate(pointAttackPrefab, targetPos, Quaternion.identity);
+                var tuboAtk = atk.GetComponent<TuboPointAttack>();
+                if (tuboAtk)
+                {
+                    tuboAtk.owner = this;
+                    tuboAtk.playerLayer = playerLayer;
+                }
+            }
+
+            // 6) ì¿¨ë‹¤ìš´
             float cd = attackCooldown;
             while (cd > 0f)
             {
+                if (!_attacksEnabled) break;
                 cd -= Time.deltaTime;
                 yield return null;
             }
         }
     }
 
-    void FaceToPlayerX()
+
+    Vector3 GetPlayerPoint()
     {
-        if (!playerPoint || !gfx) return;
-        bool right = playerPoint.position.x >= transform.position.x;
-        gfx.flipX = !right; // ½ºÇÁ¶óÀÌÆ® ÁÂ¿ì µÚÁı±â(ÆíÀÇ)
+        if (playerPointOverride) return playerPointOverride.position;
+        if (player) return player.position;
+        return transform.position;
     }
 
-    // ÆĞ¸µ ¼º°ø ½Ã ¿ÜºÎ¿¡¼­ È£Ãâ
-    public void OnParried()
+    // ---- ê³µê²© ì°½ ì•Œë¦¼(í¬ì¸íŠ¸ ì–´íƒì—ì„œ í˜¸ì¶œ) ----
+    public void NotifyAttackWindow(bool active, float extraGrace = 0f)
     {
-        if (_groggy) return;
-        StartCoroutine(CoGroggy());
+        Debug.Log($"[Tubo] AttackWindow {(active ? "OPEN" : "CLOSE")} dur+={extraGrace}");
+        if (active) OpenParryAttributionWindow(extraGrace);
+        else CloseParryAttributionWindow();
+
+        if (active) onAttackWindowOpen?.Invoke();
+        else onAttackWindowClose?.Invoke();
+    }
+
+    void OpenParryAttributionWindow(float extra = 0f)
+    {
+        _parryWatchActive = true;
+        _parryWatchTimer = Mathf.Max(_parryWatchTimer, extra);
+        if (debugLog) Debug.Log($"[Tubo] Parry window OPEN ({_parryWatchTimer:F2}s)");
+    }
+
+    void CloseParryAttributionWindow()
+    {
+        _parryWatchActive = false;
+        _parryWatchTimer = 0f;
+    }
+
+    // ---- íŒ¨ë§ ì½œë°± ----
+    void OnPlayerParryStreakChanged(int newCount)
+    {
+        if (debugLog) Debug.Log($"[Tubo] ParryStreak {newCount} (last {_lastParryCount}) / window={_parryWatchActive}");
+        if (_parryWatchActive && newCount > _lastParryCount)
+        {
+            onParrySuccessDirect?.Invoke();
+
+            TriggerGroggy();
+            CloseParryAttributionWindow();
+        }
+        _lastParryCount = newCount;
+    }
+
+    // ---- ê·¸ë¡œê¸° ----
+    void TriggerGroggy()
+    {
+        if (_groggyCR != null) return;
+        _groggyCR = StartCoroutine(CoGroggy());
     }
 
     IEnumerator CoGroggy()
     {
-        _groggy = true;
+        if (debugLog) Debug.Log("[Tubo] Enter GROGGY");
 
-        if (animator && !string.IsNullOrEmpty(groggyTrigger))
-            animator.SetTrigger(groggyTrigger);
+        SetAttacksEnabled(false);
 
-        if (bossHealth != null)
-            bossHealth.ApplyVulnerability(groggyDamageMul, groggyDuration);
-
-        float t = 0f;
-        while (t < groggyDuration)
+        if (animator)
         {
-            t += Time.deltaTime;
-            yield return null;
+            if (!string.IsNullOrEmpty(groggyBool)) animator.SetBool(groggyBool, true);
+            else if (!string.IsNullOrEmpty(enterGroggyTrigger)) animator.SetTrigger(enterGroggyTrigger);
         }
 
-        _groggy = false;
+        if (bossHealth) bossHealth.ApplyVulnerability(groggyDamageMultiplier, groggyDuration);
+
+        float t = 0f;
+        while (t < groggyDuration) { t += Time.deltaTime; yield return null; }
+
+        if (animator)
+        {
+            if (!string.IsNullOrEmpty(groggyBool)) animator.SetBool(groggyBool, false);
+            if (!string.IsNullOrEmpty(groggyRecoverTrigger)) animator.SetTrigger(groggyRecoverTrigger);
+        }
+
+        SetAttacksEnabled(true);
+        if (debugLog) Debug.Log("[Tubo] Exit GROGGY");
+        _groggyCR = null;
+    }
+
+    void SetAttacksEnabled(bool on)
+    {
+        _attacksEnabled = on;
+
+        if (disableDuringGroggy != null)
+        {
+            for (int i = 0; i < disableDuringGroggy.Length; i++)
+                if (disableDuringGroggy[i]) disableDuringGroggy[i].enabled = on;
+        }
+    }
+
+    // ===== Legacy Parry API (í˜¸í™˜)
+    [Header("Parry Compatibility")]
+    public bool groggyOnlyWhenAttacking = true;
+    public void OnParried() { HandleLegacyParried(); }
+    public void OnParried(Collider2D _) { HandleLegacyParried(); }
+    public void OnParried(GameObject _) { HandleLegacyParried(); }
+    public void OnParried(Transform _) { HandleLegacyParried(); }
+
+    void HandleLegacyParried()
+    {
+        if (groggyOnlyWhenAttacking && !_parryWatchActive) return;
+        TriggerGroggy();
     }
 }

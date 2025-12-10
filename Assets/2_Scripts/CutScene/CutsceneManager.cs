@@ -4,69 +4,80 @@ using UnityEngine.Playables;
 using TMPro;
 using System.Collections;
 using System.Collections.Generic;
-using UnityEngine.SceneManagement; // 씬 로딩을 위해 추가
+using UnityEngine.SceneManagement;
 
 public class CutsceneManager : MonoBehaviour
 {
-    // --- 인스펙터에서 할당할 UI 컴포넌트 ---
+    // --- 인스펙터 연결 ---
     [Header("UI & Component References")]
     public Image illustrationImage;
     public TMP_Text subtitleText;
     public PlayableDirector timelineDirector;
     public CanvasGroup cutsceneCanvasGroup;
 
-    [Tooltip("애니메이션 프리팹이 생성될 부모 Transform. Canvas 내의 Image 위치에 대응되는 자식 오브젝트를 할당하세요.")]
-    public Transform animationContainer; //  애니메이션 생성 위치 추가
+    [Tooltip("애니메이션 프리팹이 생성될 부모 Transform (Canvas 내부).")]
+    public Transform animationContainer;
 
-    // --- 자막 설정 (속도 조절 기능) ---
+    // --- 자막 ---
     [Header("Subtitle Settings")]
-    [Tooltip("자막이 한 글자씩 출력될 때의 딜레이 시간 (초). 값이 낮을수록 빠르게 출력됩니다.")]
+    [Tooltip("자막 타이핑 속도(초/글자). 0 이하면 즉시 출력.")]
     public float typingSpeedDelay = 0.05f;
 
-    // --- 인스펙터에서 할당할 데이터 ---
+    // --- 컷신 데이터 ---
     [Header("Cutscene Data")]
     public List<CutsceneFrame> cutsceneFrames;
 
-    private int currentFrameIndex = 0;
-    private bool isWaitingForInput = false;
+    // --- 씬 전환 옵션 ---
+    [Header("Scene Transition")]
+    [Tooltip("컷신이 끝나면 이동할 씬 이름. 비어있으면 현재 씬의 다음 빌드 인덱스를 시도.")]
+    public string nextSceneName = "MainMenuOrGameplay";
+    [Tooltip("nextSceneName이 로드 불가할 때, 빌드 인덱스 +1 로 폴백할지 여부.")]
+    public bool fallbackToNextBuildIndex = true;
+    [Tooltip("씬 전환을 비동기로 수행.")]
+    public bool loadAsync = true;
+    [Tooltip("씬 로드 모드 (대부분 Single).")]
+    public LoadSceneMode loadMode = LoadSceneMode.Single;
+
+    int currentFrameIndex = 0;
+    bool isWaitingForInput = false;
+    bool _isLoadingScene = false;
 
     void Start()
     {
         if (cutsceneFrames == null || cutsceneFrames.Count == 0) return;
 
-        illustrationImage.enabled = false;
-        subtitleText.text = "";
+        if (illustrationImage) illustrationImage.enabled = false;
+        if (subtitleText) subtitleText.text = "";
 
         StartCoroutine(StartCutsceneFlow());
     }
 
     void Update()
     {
-        // Space/ESC로 스킵 처리
+        // Space: 다음으로
         if (isWaitingForInput && Input.GetKeyDown(KeyCode.Space))
-        {
             isWaitingForInput = false;
-        }
 
+        // ESC: 전체 스킵
         if (Input.GetKeyDown(KeyCode.Escape))
         {
             StopAllCoroutines();
             Debug.Log("컷씬 전체 건너뛰기.");
-            LoadNextScene("MainMenuOrGameplay");
+            LoadNextScene("MainMenuOrGameplay");    // 기존 호출 보존
         }
     }
 
     IEnumerator StartCutsceneFlow()
     {
-        yield return FadeCanvas(cutsceneCanvasGroup, 0f, 1f, 1f);
+        if (cutsceneCanvasGroup) yield return FadeCanvas(cutsceneCanvasGroup, 0f, 1f, 1f);
 
         while (currentFrameIndex < cutsceneFrames.Count)
         {
-            CutsceneFrame currentFrame = cutsceneFrames[currentFrameIndex];
+            var currentFrame = cutsceneFrames[currentFrameIndex];
 
-            // 이전 프레임 클리어
-            illustrationImage.enabled = false;
-            subtitleText.text = "";
+            // 클리어
+            if (illustrationImage) illustrationImage.enabled = false;
+            if (subtitleText) subtitleText.text = "";
 
             switch (currentFrame.contentType)
             {
@@ -84,63 +95,55 @@ public class CutsceneManager : MonoBehaviour
             currentFrameIndex++;
         }
 
-        yield return FadeCanvas(cutsceneCanvasGroup, 1f, 0f, 1f);
-        LoadNextScene("MainMenuOrGameplay");
+        if (cutsceneCanvasGroup) yield return FadeCanvas(cutsceneCanvasGroup, 1f, 0f, 1f);
+        LoadNextScene("MainMenuOrGameplay");        // 기존 호출 보존(아래 메서드가 인스펙터 값/폴백 처리)
     }
 
     // --- 콘텐츠 핸들러 ---
 
     IEnumerator HandleStaticImage(CutsceneFrame frame)
     {
-        illustrationImage.sprite = frame.illustrationSprite;
-        illustrationImage.enabled = true;
-        yield return FadeImage(illustrationImage, 0f, 1f, 0.5f);
+        if (illustrationImage)
+        {
+            illustrationImage.sprite = frame.illustrationSprite;
+            illustrationImage.enabled = true;
+            yield return FadeImage(illustrationImage, 0f, 1f, 0.5f);
+        }
+
         yield return ShowSubtitleAndAwaitInput(frame);
-        yield return FadeImage(illustrationImage, 1f, 0f, 0.5f);
+
+        if (illustrationImage)
+            yield return FadeImage(illustrationImage, 1f, 0f, 0.5f);
     }
 
-    //  오류 해결: 애니메이션 프리팹 인스턴스화 및 길이 검색
     IEnumerator HandleSpriteAnimation(CutsceneFrame frame)
     {
         if (frame.animatedPrefab == null || animationContainer == null)
         {
-            Debug.LogError("Sprite Animation에 할당된 Prefab 또는 Animation Container가 없습니다.");
+            Debug.LogError("Sprite Animation 프리팹 또는 Animation Container 미지정.");
             yield break;
         }
 
-        // 1. 애니메이션 오브젝트 생성
         GameObject animInstance = Instantiate(frame.animatedPrefab, animationContainer);
-        // RectTransform을 사용하여 UI 위치를 맞춥니다.
-        RectTransform rt = animInstance.GetComponent<RectTransform>();
-        if (rt != null) rt.anchoredPosition = Vector2.zero;
+        var rt = animInstance.GetComponent<RectTransform>();
+        if (rt) rt.anchoredPosition = Vector2.zero;
 
-        Animator animator = animInstance.GetComponent<Animator>();
-
-        if (animator == null)
+        var animator = animInstance.GetComponent<Animator>();
+        if (!animator)
         {
-            Debug.LogError("할당된 프리팹에 Animator 컴포넌트가 없습니다.");
+            Debug.LogError("애니 프리팹에 Animator 없음.");
             Destroy(animInstance);
             yield break;
         }
 
-        // 2. 애니메이션 클립 길이 검색 (오류 해결 핵심)
-        //  주의: "Default_Clip_Name" 부분을 유니티 에디터에서 생성된 실제 클립 이름으로 반드시 변경하세요!
         float clipLength = FindClipLength(animator, "Cutscene_Idle");
+        if (clipLength == 0f) Debug.LogWarning("클립 길이 못찾음. minDuration만 적용.");
 
-        if (clipLength == 0f)
-        {
-            Debug.LogWarning("애니메이션 클립 길이를 찾을 수 없습니다. 최소 대기 시간만 적용됩니다.");
-            clipLength = 0f;
-        }
+        var subtitleRoutine = StartCoroutine(TypeSentence(frame.subtitleText));
 
-        // 3. 자막 타이핑 시작
-        Coroutine subtitleRoutine = StartCoroutine(TypeSentence(frame.subtitleText));
-
-        // 4. 대기 시간 계산 및 대기
-        float totalWaitTime = clipLength + frame.minDuration;
-        float startTime = Time.time;
-
-        while (Time.time < startTime + totalWaitTime)
+        float totalWait = clipLength + frame.minDuration;
+        float start = Time.time;
+        while (Time.time < start + totalWait)
         {
             if (isWaitingForInput && Input.GetKeyDown(KeyCode.Space))
             {
@@ -150,9 +153,8 @@ public class CutsceneManager : MonoBehaviour
             yield return null;
         }
 
-        // 5. 정리 및 제거
-        StopCoroutine(subtitleRoutine);
-        subtitleText.text = "";
+        if (subtitleRoutine != null) StopCoroutine(subtitleRoutine);
+        if (subtitleText) subtitleText.text = "";
         Destroy(animInstance);
     }
 
@@ -164,109 +166,131 @@ public class CutsceneManager : MonoBehaviour
         timelineDirector.Play();
 
         yield return TypeSentence(frame.subtitleText);
-
         yield return new WaitUntil(() => timelineDirector.state != PlayState.Playing);
 
-        float startTime = Time.time;
-        while (Time.time < startTime + frame.minDuration)
-        {
-            yield return null;
-        }
+        float start = Time.time;
+        while (Time.time < start + frame.minDuration) yield return null;
     }
 
-    // --- 유틸리티 함수 ---
+    // --- 유틸 ---
 
     IEnumerator ShowSubtitleAndAwaitInput(CutsceneFrame frame)
     {
         yield return TypeSentence(frame.subtitleText);
 
-        float startTime = Time.time;
-        while (Time.time < startTime + frame.minDuration)
-        {
-            yield return null;
-        }
+        float start = Time.time;
+        while (Time.time < start + frame.minDuration) yield return null;
 
         isWaitingForInput = true;
         yield return new WaitUntil(() => !isWaitingForInput);
 
-        subtitleText.text = "";
+        if (subtitleText) subtitleText.text = "";
     }
 
-    //  자막 속도 조절 기능 적용
     IEnumerator TypeSentence(string sentence)
     {
-        subtitleText.text = "";
+        if (!subtitleText) yield break;
 
-        if (typingSpeedDelay <= 0)
+        subtitleText.text = "";
+        if (typingSpeedDelay <= 0f)
         {
             subtitleText.text = sentence;
             yield break;
         }
 
-        foreach (char letter in sentence.ToCharArray())
+        foreach (char ch in sentence)
         {
-            subtitleText.text += letter;
+            subtitleText.text += ch;
             yield return new WaitForSeconds(typingSpeedDelay);
         }
-        yield return null;
     }
 
-    //  애니메이션 클립 길이 검색 헬퍼 함수
     float FindClipLength(Animator animator, string clipName)
     {
-        if (animator.runtimeAnimatorController == null) return 0f;
-
-        // Animator Controller의 모든 클립을 검색하여 길이를 찾습니다.
+        if (!animator || animator.runtimeAnimatorController == null) return 0f;
         foreach (var clip in animator.runtimeAnimatorController.animationClips)
-        {
-            if (clip.name == clipName)
-            {
-                return clip.length;
-            }
-        }
-        // 클립 이름을 찾지 못했을 때 경고
-        Debug.LogWarning($"클립 이름을 찾을 수 없습니다. 인스펙터의 프리팹을 만들 때 생성된 애니메이션 클립의 실제 이름을 사용하세요. (현재 검색 이름: '{clipName}')");
+            if (clip && clip.name == clipName) return clip.length;
+
+        Debug.LogWarning($"애니메이션 클립 '{clipName}'을 찾지 못했습니다. 프리팹의 실제 클립명을 확인하세요.");
         return 0f;
     }
 
-    //  누락된 FadeImage 함수 구현
-    IEnumerator FadeImage(Image image, float startAlpha, float endAlpha, float duration)
+    IEnumerator FadeImage(Image image, float a0, float a1, float dur)
     {
-        Color color = image.color;
-        float elapsed = 0f;
-        while (elapsed < duration)
+        if (!image) yield break;
+        Color c = image.color;
+        float t = 0f;
+        while (t < dur)
         {
-            color.a = Mathf.Lerp(startAlpha, endAlpha, elapsed / duration);
-            image.color = color;
-            elapsed += Time.deltaTime;
+            c.a = Mathf.Lerp(a0, a1, t / dur);
+            image.color = c;
+            t += Time.deltaTime;
             yield return null;
         }
-        color.a = endAlpha;
-        image.color = color;
+        c.a = a1; image.color = c;
     }
 
-    //  누락된 FadeCanvas 함수 구현
-    IEnumerator FadeCanvas(CanvasGroup canvasGroup, float startAlpha, float endAlpha, float duration)
+    IEnumerator FadeCanvas(CanvasGroup cg, float a0, float a1, float dur)
     {
-        float elapsed = 0f;
-        while (elapsed < duration)
+        if (!cg) yield break;
+        float t = 0f;
+        while (t < dur)
         {
-            canvasGroup.alpha = Mathf.Lerp(startAlpha, endAlpha, elapsed / duration);
-            elapsed += Time.deltaTime;
+            cg.alpha = Mathf.Lerp(a0, a1, t / dur);
+            t += Time.deltaTime;
             yield return null;
         }
-        canvasGroup.alpha = endAlpha;
+        cg.alpha = a1;
     }
 
-    void LoadNextScene(string sceneName)
+    // ===== 씬 전환 =====
+
+    // 기존 호출 보존용 오버로드
+    void LoadNextScene(string sceneNameFromCall)
     {
-        if (Application.CanStreamedLevelBeLoaded(sceneName))
+        if (_isLoadingScene) return;
+
+        // 1) 호출자가 준 값 우선, 비정상이면 인스펙터 값, 그것도 없으면 빌드 인덱스 폴백
+        string target = !string.IsNullOrEmpty(sceneNameFromCall) ? sceneNameFromCall : nextSceneName;
+
+        // 이름으로 가능하면 이름 우선
+        if (!string.IsNullOrEmpty(target) && Application.CanStreamedLevelBeLoaded(target))
         {
-            SceneManager.LoadScene(sceneName);
+            if (loadAsync) StartCoroutine(LoadSceneAsyncByName(target));
+            else SceneManager.LoadScene(target, loadMode);
+            return;
         }
-        else
+
+        // 이름이 비었거나 로드 불가 → 빌드 인덱스 +1 시도
+        if (fallbackToNextBuildIndex)
         {
-            Debug.Log($"씬 '{sceneName}'을(를) 로드하지 못했습니다. 다음 씬 이름을 확인해 주세요.");
+            int cur = SceneManager.GetActiveScene().buildIndex;
+            int next = cur + 1;
+            int count = SceneManager.sceneCountInBuildSettings;
+            if (next >= 0 && next < count)
+            {
+                if (loadAsync) StartCoroutine(LoadSceneAsyncByIndex(next));
+                else SceneManager.LoadScene(next, loadMode);
+                return;
+            }
         }
+
+        Debug.LogWarning($"씬 전환 실패. 이름 '{target}' 로드 불가, 빌드 인덱스 폴백도 사용 불가.");
+    }
+
+    IEnumerator LoadSceneAsyncByName(string sceneName)
+    {
+        _isLoadingScene = true;
+        var op = SceneManager.LoadSceneAsync(sceneName, loadMode);
+        op.allowSceneActivation = true;
+        while (!op.isDone) yield return null;
+    }
+
+    IEnumerator LoadSceneAsyncByIndex(int buildIndex)
+    {
+        _isLoadingScene = true;
+        var op = SceneManager.LoadSceneAsync(buildIndex, loadMode);
+        op.allowSceneActivation = true;
+        while (!op.isDone) yield return null;
     }
 }

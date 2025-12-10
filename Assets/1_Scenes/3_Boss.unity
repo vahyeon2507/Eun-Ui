@@ -2457,8 +2457,12 @@ MonoBehaviour:
     attackTrigger: Stabbing the regime
     useAnimEvent: 1
     activeTime: 1
-    hitboxes:
-    - {fileID: 0}
+    hitboxes: []
+    rightHitboxes:
+    - {fileID: 1658260127}
+    leftHitboxes:
+    - {fileID: 1658260127}
+    baseDamage: 3
     moveDistance: 0
     moveTime: 0
     moveCurve:
@@ -2480,6 +2484,33 @@ MonoBehaviour:
     activeTime: 1
     hitboxes:
     - {fileID: 0}
+    rightHitboxes: []
+    leftHitboxes: []
+    baseDamage: 1
+    moveDistance: 0
+    moveTime: 0
+    moveCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 0
+      m_PostInfinity: 0
+      m_RotationOrder: 4
+    spawnProjectileAuto: 0
+    projectilePrefab: {fileID: 1592831604784291918, guid: 96b958706f593104b9b38089e99df08c, type: 3}
+    projectileMuzzleRight: {fileID: 1431808263}
+    projectileMuzzleLeft: {fileID: 1783563548}
+    projectileMuzzle: {fileID: 0}
+    projectileMuzzleOffset: {x: 0, y: 0}
+    projAimAtPlayer: 1
+  - name: GagGyeog
+    attackTrigger: GagGyeog
+    useAnimEvent: 1
+    activeTime: 1
+    hitboxes:
+    - {fileID: 0}
+    rightHitboxes: []
+    leftHitboxes: []
+    baseDamage: 1
     moveDistance: 0
     moveTime: 0
     moveCurve:
@@ -2519,6 +2550,18 @@ MonoBehaviour:
       weight: 1
     attackTriggerOverride: 
     prepDirectionalBase: Ready_ChamGyeog
+    prepCrossFade: 0.05
+  - prepTrigger: Ready_GagGyeog
+    prepHoldTime: 0.75
+    weight: 1
+    useAnimEventEnd: 0
+    attack: 0
+    simpleIndex: 1
+    simpleChoices:
+    - simpleIndex: 2
+      weight: 1
+    attackTriggerOverride: 
+    prepDirectionalBase: Ready_GagGyeog
     prepCrossFade: 0.05
   attackPrepEndByAnimEvent: 0
   projectilePrefab: {fileID: 1592831604784291918, guid: 96b958706f593104b9b38089e99df08c, type: 3}
@@ -2639,6 +2682,9 @@ MonoBehaviour:
   maxHp: 175
   currentHp: 0
   damageTakenMultiplier: 1
+  strongParryDamageMultiplier: 2
+  strongParryGroggyDuration: 4
+  strongParryGroggyTrigger: StrongGroggy
   hpBar: {fileID: 1384591960}
   hpText: {fileID: 0}
   invulnTime: 0.6
@@ -3839,7 +3885,7 @@ BoxCollider2D:
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
-  m_Offset: {x: 5.029141, y: 0}
+  m_Offset: {x: 0.7538285, y: -0.5553243}
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0, y: 0}
@@ -3849,7 +3895,7 @@ BoxCollider2D:
     drawMode: 0
     adaptiveTiling: 0
   m_AutoTiling: 0
-  m_Size: {x: 7.825265, y: 1}
+  m_Size: {x: 1.2642317, y: 0.68609333}
   m_EdgeRadius: 0
 --- !u!4 &1658260128
 Transform:
@@ -3860,7 +3906,7 @@ Transform:
   m_GameObject: {fileID: 1658260126}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 1.03, z: 0}
+  m_LocalPosition: {x: 0, y: 1, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -4424,6 +4470,37 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!1 &1937378553
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1937378554}
+  m_Layer: 0
+  m_Name: GateSpawnPoint (1)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1937378554
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1937378553}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 8.91, y: -1.1, z: -0.09883204}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1946008996 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 7968383432235240551, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
@@ -4778,6 +4855,12 @@ MonoBehaviour:
   - baseName: ChamGyeog
     rightState: ChamGyeog_R
     leftState: ChamGyeog_L
+  - baseName: Ready_GagGyeog
+    rightState: Ready_GagGyeog_R
+    leftState: Ready_GagGyeog_L
+  - baseName: GagGyeog
+    rightState: GagGyeog_R
+    leftState: GagGyeog_L
   defaultCrossFadeSeconds: 0
   facingRight: 0
   mirrorXOnFlip: 0
@@ -5356,6 +5439,10 @@ PrefabInstance:
       propertyPath: talisman
       value: 
       objectReference: {fileID: 2058350870}
+    - target: {fileID: 1933522878216306082, guid: 8799dd3a3f717f04f99e84a8f3f5887a, type: 3}
+      propertyPath: flameZonePrefab
+      value: 
+      objectReference: {fileID: 8995567316182450347, guid: 9fe42d344c8c0124e944a7d8b7ccdb69, type: 3}
     - target: {fileID: 3788742346092778570, guid: 8799dd3a3f717f04f99e84a8f3f5887a, type: 3}
       propertyPath: m_LocalPosition.x
       value: 5.528366
@@ -5400,7 +5487,8 @@ PrefabInstance:
       propertyPath: m_Name
       value: TalismanSystems
       objectReference: {fileID: 0}
-    m_RemovedComponents: []
+    m_RemovedComponents:
+    - {fileID: 5804129085152706916, guid: 8799dd3a3f717f04f99e84a8f3f5887a, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -5416,10 +5504,6 @@ PrefabInstance:
     - target: {fileID: 422704032455422116, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
       propertyPath: m_Name
       value: 'Player '
-      objectReference: {fileID: 0}
-    - target: {fileID: 1158506147126392599, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
-      propertyPath: comboCheckExtraRadius
-      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 1407434714894907121, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
       propertyPath: redBar
@@ -5472,10 +5556,6 @@ PrefabInstance:
     - target: {fileID: 2186251996989526959, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6955621181004074726, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
-      propertyPath: moveDuration
-      value: 0.1
       objectReference: {fileID: 0}
     - target: {fileID: 8192336067740108139, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
       propertyPath: target
@@ -5581,3 +5661,4 @@ SceneRoots:
   - {fileID: 935758117}
   - {fileID: 813585840}
   - {fileID: 3602879266060290303}
+  - {fileID: 1937378554}

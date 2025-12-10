@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 3986746476097021133}
   - component: {fileID: 5403537791531497452}
   - component: {fileID: 3170224970284745902}
+  - component: {fileID: 1585779897552056220}
   - component: {fileID: 8682022972563843152}
   m_Layer: 0
   m_Name: strikeProjectilePrefab
@@ -111,6 +112,7 @@ MonoBehaviour:
   lifeTime: 0.9
   animator: {fileID: 3170224970284745902}
   playTrigger: Play
+  owner: {fileID: 0}
 --- !u!95 &3170224970284745902
 Animator:
   serializedVersion: 7
@@ -133,6 +135,28 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
+--- !u!114 &1585779897552056220
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9604906346711593}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7d2af80b1efe87246aa52c52bf44aab1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  owner: {fileID: 6300476374462289580, guid: 8efa3cea6efff7949933d0ba2ec2eea5, type: 3}
+  hitbox: {fileID: 8682022972563843152}
+  playerLayer:
+    serializedVersion: 2
+    m_Bits: 128
+  damage: 1
+  activeTime: 0.9
+  extraParryGrace: 0.9
+  spawnFxId: 
+  hitFxId: 
 --- !u!61 &8682022972563843152
 BoxCollider2D:
   m_ObjectHideFlags: 0

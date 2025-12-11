@@ -36,6 +36,9 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     Rigidbody2D rb;
     SpriteRenderer sr;
 
+    // === 무수 방패 연계용 ===
+    MusuShield _activeShield;
+
     void Awake()
     {
         currentHealth = maxHealth;
@@ -59,12 +62,23 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         if (parryBar == null)
             Debug.LogError("[PlayerHealth] 패링바가 설정되지 않았습니다! PlayerController.healthComponent에 PlayerHealth를 할당하고 parryBar에 Image를 연결하세요.");
     }
+    readonly System.Collections.Generic.List<MusuShield> _damageShields = new System.Collections.Generic.List<MusuShield>();
 
-    // ===== IDamageable =====
     // ===== IDamageable =====
     public void TakeDamage(int amount)
     {
         if (isInvulnerable) return;
+
+        // ★ 무수 적용
+        int finalDamage = ApplyDamageShields(amount);
+        Debug.Log($"[PlayerHealth] 피격 요청: {amount} -> 방패 적용 후: {finalDamage}");
+
+        if (finalDamage <= 0)
+        {
+            // 완전 방어라면 여기서 연출만 하고 종료해도 됨
+            GetComponentInChildren<SpriteFlash>()?.FlashOnce();
+            return;
+        }
 
         GetComponentInChildren<SpriteFlash>()?.FlashOnce();
 
@@ -72,9 +86,9 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         if (shaker == null) shaker = FindObjectOfType<PlayerHitShake>();
         shaker?.Shake();
 
-        Debug.Log($"[PlayerHealth] 피격! 체력: {currentHealth} -> {currentHealth - amount}");
+        Debug.Log($"[PlayerHealth] 최종 체력: {currentHealth} -> {currentHealth - finalDamage}");
 
-        currentHealth -= amount;
+        currentHealth -= finalDamage;
         if (currentHealth < 0) currentHealth = 0;
 
         if (redBar != null) StartCoroutine(AnimateRedBar());
@@ -87,6 +101,8 @@ public class PlayerHealth : MonoBehaviour, IDamageable
 
         if (currentHealth <= 0) Die();
     }
+
+
 
     /// <summary>
     /// '어떤 콜라이더에 맞았는지'를 함께 넘겨서,
@@ -101,9 +117,87 @@ public class PlayerHealth : MonoBehaviour, IDamageable
             return;
         }
 
-        TakeDamage(amount);
+        ApplyDamageInternal(amount, hitCollider);
     }
 
+    // === 무수 방패 연계용 공개 함수 ===
+    public void AttachDamageShield(MusuShield shield)
+    {
+        if (shield == null) return;
+        if (!_damageShields.Contains(shield))
+        {
+            _damageShields.Add(shield);
+            Debug.Log($"[PlayerHealth] Shield Attached: {shield.name} (총 {_damageShields.Count}개)");
+        }
+    }
+
+    public void DetachDamageShield(MusuShield shield)
+    {
+        if (shield == null) return;
+        if (_damageShields.Remove(shield))
+            Debug.Log($"[PlayerHealth] Shield Detached: {shield.name} (총 {_damageShields.Count}개)");
+    }
+
+
+    int ApplyDamageShields(int amount)
+    {
+        if (_damageShields.Count == 0)
+        {
+            // 여기가 찍힌다는 건 “애초에 방패가 등록이 안 됐다”는 뜻
+            Debug.Log("[PlayerHealth] 적용 가능한 쉴드가 없음");
+            return amount;
+        }
+
+        int result = amount;
+        for (int i = 0; i < _damageShields.Count; i++)
+        {
+            var s = _damageShields[i];
+            if (!s) continue;
+            if (!s.IsActive) continue; // 아직 활성화 이벤트 전이면 무시
+
+            int before = result;
+            result = s.ModifyIncomingDamage(result);
+            Debug.Log($"[PlayerHealth] Shield {s.name}: {before} -> {result}");
+        }
+        return result;
+    }
+    // 실제 데미지 처리 공통 함수
+    void ApplyDamageInternal(int amount, Collider2D hitCollider)
+    {
+        if (amount <= 0) return;
+        if (isInvulnerable) return;
+
+        int finalAmount = amount;
+
+        // 무수 방패가 켜져 있으면 여기서 감소 + 흡수량 누적
+        if (_activeShield != null && _activeShield.IsActive)
+        {
+            finalAmount = _activeShield.ModifyIncomingDamage(finalAmount);
+            finalAmount = Mathf.Max(0, finalAmount);
+        }
+
+        // 피격 연출 (대미지가 0이더라도 "맞았다"는 연출은 유지)
+        GetComponentInChildren<SpriteFlash>()?.FlashOnce();
+
+        var shaker = GetComponent<PlayerHitShake>();
+        if (shaker == null) shaker = FindObjectOfType<PlayerHitShake>();
+        shaker?.Shake();
+
+        Debug.Log($"[PlayerHealth] 피격! 체력: {currentHealth} -> {currentHealth - finalAmount}");
+
+        currentHealth -= finalAmount;
+        if (currentHealth < 0) currentHealth = 0;
+
+        if (redBar != null) StartCoroutine(AnimateRedBar());
+        if (yellowBar != null) StartCoroutine(UpdateYellowBar());
+
+        if (animator != null) animator.SetTrigger("Hurt");
+
+        StartCoroutine(HitFlash());
+        StartCoroutine(IFrameCoroutine());
+
+        if (currentHealth <= 0) Die();
+    }
 
     IEnumerator AnimateRedBar()
     {

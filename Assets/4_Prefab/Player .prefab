@@ -17,6 +17,7 @@ GameObject:
   - component: {fileID: 1768041895077863587}
   - component: {fileID: 647002003967274913}
   - component: {fileID: 1158506147126392599}
+  - component: {fileID: 3412635873696658617}
   - component: {fileID: 4155843384369479141}
   - component: {fileID: 8192336067740108139}
   - component: {fileID: 8293455664977284783}
@@ -53,6 +54,8 @@ Transform:
   - {fileID: 2116617793328469133}
   - {fileID: 7314717045431749316}
   - {fileID: 7007653951470226324}
+  - {fileID: 8251306861209429321}
+  - {fileID: 5418439481837705890}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!212 &5638934830954440806
@@ -497,6 +500,33 @@ MonoBehaviour:
         m_CallState: 2
   logEvents: 1
   current: 0
+--- !u!114 &3412635873696658617
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 422704032455422116}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 67eb6b5ba4e5d0a47863bb8bd55408e5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  playerController: {fileID: 1290639557195873711}
+  playerHealth: {fileID: 1407434714894907121}
+  skillsEnabled: 1
+  muguUnlocked: 1
+  muguKey: 49
+  muguPrefab: {fileID: 4921991632468241814, guid: 60bf7bdca41d482478ac1fc979349f60, type: 3}
+  muguSpawnRight: {fileID: 0}
+  muguSpawnLeft: {fileID: 0}
+  muguSpawnPoint: {fileID: 8251306861209429321}
+  muguCooldown: 4
+  musuUnlocked: 1
+  musuKey: 50
+  musuPrefab: {fileID: 7566826812281046998, guid: db35b2225f5bd4849a35085f32736f29, type: 3}
+  musuSpawnPoint: {fileID: 5418439481837705890}
+  musuCooldown: 8
 --- !u!114 &4155843384369479141
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1609,6 +1639,37 @@ PolygonCollider2D:
       - {x: 1.1877854, y: -0.10901695}
       - {x: 1.9510565, y: 0.40901712}
   m_UseDelaunayMesh: 0
+--- !u!1 &6206656831722078563
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8251306861209429321}
+  m_Layer: 7
+  m_Name: MuguspR
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &8251306861209429321
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6206656831722078563}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0.98, y: -0.76, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2186251996989526959}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &6484008296709990359
 GameObject:
   m_ObjectHideFlags: 0
@@ -1916,3 +1977,34 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
+--- !u!1 &8995070731423985017
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 5418439481837705890}
+  m_Layer: 7
+  m_Name: Muhusp
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &5418439481837705890
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8995070731423985017}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0.55, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2186251996989526959}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}

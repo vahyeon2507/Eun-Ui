@@ -31,6 +31,23 @@ public class BossDueoksiniController : MonoBehaviour
     public string chargeTrigger = "Charge";
     public string isChargingBool = "isCharging";
 
+    [Header("Charge ▸ Contact Damage")]
+    [Tooltip("돌진 중 본인 콜라이더에 플레이어가 닿았을 때 줄 대미지 (0 이하면 비활성화)")]
+    public int chargeContactDamage = 0;
+
+    [Tooltip("접촉 판정에 사용할 플레이어 레이어 마스크")]
+    public LayerMask chargePlayerLayer;
+
+    [Tooltip("접촉 판정에 사용할 콜라이더 (비워두면 이 오브젝트의 Collider2D 사용)")]
+    public Collider2D chargeDamageCollider;
+
+    [Header("Charge ▸ Cancel When Far")]
+    [Tooltip("돌진 중 플레이어와의 거리가 이 값보다 커지면 돌진을 조기 종료 (0 이하면 비활성화)")]
+    public float chargeCancelDistance = 0f;
+
+    [Tooltip("true면 2D 거리(Vector2.Distance), false면 X축 거리만 사용")]
+    public bool chargeCancelUse2DDistance = true;
+
     [Header("Face/Move")]
     public bool facePlayer = true;
 
@@ -215,6 +232,10 @@ public class BossDueoksiniController : MonoBehaviour
     SimpleAttack _playingSimpleAttack;
     bool _autoProjFiredThisAttack = false;
 
+    // Rage strong attack queue
+    bool _strongAttackQueued = false;   // 분노 가득 찼을 때 "강공격 1회 예약"
+    bool _useStrongThisCycle = false;   // 이번 공격 사이클에서 강공격을 쓸지 여부
+
     // ── AnimEvent-driven move state ──
     bool _animMoveActive = false;
     Vector3 _animMoveStartPos;
@@ -309,9 +330,15 @@ public class BossDueoksiniController : MonoBehaviour
 
             if (facePlayer) FaceTowardPlayer();
 
+            // 이번 공격 사이클에서 강공격 쓸지 결정
+            _useStrongThisCycle = _strongAttackQueued;
+
             var prep = PickPrep();
             yield return DoAttackPrep(prep);
             yield return DoAttack(prep);
+
+            // 한 사이클 종료 → 플래그만 리셋 (실제 게이지 소모는 강공격 때)
+            _useStrongThisCycle = false;
         }
     }
 
@@ -357,10 +384,18 @@ public class BossDueoksiniController : MonoBehaviour
             hitTree = hit.collider.GetComponent<TreeWall>() ?? hit.collider.GetComponentInParent<TreeWall>();
         }
 
-        // 이동
         float t = 0f;
         Vector3 p0 = transform.position;
         Vector3 p1 = new Vector3(targetX, p0.y, p0.z);
+
+        // 접촉 판정용 콜라이더
+        Collider2D damageCol = chargeDamageCollider;
+        if (!damageCol)
+            damageCol = GetComponent<Collider2D>();
+
+        bool didContactDamage = false;
+        bool earlyCanceled = false;
+
         while (t < chargeTime)
         {
             float a = Mathf.Clamp01(t / Mathf.Max(0.0001f, chargeTime));
@@ -369,16 +404,57 @@ public class BossDueoksiniController : MonoBehaviour
             pos.y = p0.y;
             transform.position = pos;
             t += Time.deltaTime;
+
+            // 1) 돌진 중 접촉 대미지 (한 번만)
+            if (!didContactDamage && chargeContactDamage > 0 && damageCol && chargePlayerLayer.value != 0)
+            {
+                Bounds b = damageCol.bounds;
+                Vector2 center = b.center;
+                Vector2 size = b.size;
+
+                Collider2D hitCol = Physics2D.OverlapBox(center, size, 0f, chargePlayerLayer);
+                if (hitCol != null)
+                {
+                    var dmg = hitCol.GetComponent<IDamageable>()
+                           ?? hitCol.GetComponentInParent<IDamageable>()
+                           ?? hitCol.GetComponentInChildren<IDamageable>();
+
+                    if (dmg is PlayerHealth ph)
+                        ph.TakeDamageFromHitbox(chargeContactDamage, hitCol);
+                    else if (dmg != null)
+                        dmg.TakeDamage(chargeContactDamage);
+
+                    didContactDamage = true;
+                }
+            }
+
+            // 2) 플레이어와 너무 멀어지면 돌진 조기 종료
+            if (chargeCancelDistance > 0f && player)
+            {
+                float dist = chargeCancelUse2DDistance
+                    ? Vector2.Distance(transform.position, player.position)
+                    : Mathf.Abs(player.position.x - transform.position.x);
+
+                if (dist > chargeCancelDistance)
+                {
+                    earlyCanceled = true;
+                    break;
+                }
+            }
+
             yield return null;
         }
-        transform.position = p1;
+
+        // 정상 종료면 목표 지점까지 이동
+        if (!earlyCanceled)
+            transform.position = p1;
 
         if (_anim && !string.IsNullOrEmpty(isChargingBool))
             _anim.SetBool(isChargingBool, false);
         IsChargingNow = false;
 
-        // TreeWall 충돌 처리
-        if (hitTree != null)
+        // TreeWall 충돌 처리 (조기 캔슬이 아닐 때만)
+        if (hitTree != null && !earlyCanceled)
         {
             if (breakTreeOnHit) hitTree.BreakAndDestroy();
             if (_health) _health.ApplyVulnerability(wallVulnMultiplier, wallStunDuration);
@@ -421,7 +497,8 @@ public class BossDueoksiniController : MonoBehaviour
         if (preps == null || preps.Count == 0)
             return new PrepOption();
 
-        bool wantStrongPrep = RageIsFull;
+        // 분노가 꽉 찼는지가 아니라, 이번 사이클에 강공격을 쓸 예정인지로 판단
+        bool wantStrongPrep = _useStrongThisCycle;
 
         // 강 Prep 존재 여부 확인
         bool hasStrongPrep = false;
@@ -441,12 +518,12 @@ public class BossDueoksiniController : MonoBehaviour
         {
             if (wantStrongPrep)
             {
-                // ★ 분노 풀 → 강 Prep만 사용
+                // ★ 이번 사이클 강공격 → 강 Prep만 사용
                 isCandidate = idx => preps[idx].isStrongPrep;
             }
             else
             {
-                // ★ 분노 미만 → 일반 Prep만 사용
+                // ★ 이번 사이클 일반공격 → 일반 Prep만 사용
                 isCandidate = idx => !preps[idx].isStrongPrep;
             }
         }
@@ -556,9 +633,11 @@ public class BossDueoksiniController : MonoBehaviour
                     var sa = simpleAttacks[idx];
                     bool isStrong = sa != null && sa.isStrongAttack;
 
-                    // 분노가 가득 찬 상태에서 강공격 심플어택을 뽑았다면 분노 소모
-                    if (isStrong && RageIsFull)
+                    // 이번 사이클이 강공격이고, 실제로 강 SimpleAttack이 선택됐으면 분노 소모
+                    if (isStrong && _useStrongThisCycle && _strongAttackQueued)
+                    {
                         ClearRage();
+                    }
 
                     yield return DoSimpleAttack(sa, opt.attackTriggerOverride);
                 }
@@ -578,7 +657,8 @@ public class BossDueoksiniController : MonoBehaviour
     {
         if (simpleAttacks == null || simpleAttacks.Count == 0) return -1;
 
-        bool wantStrongOnly = RageIsFull;
+        // 분노 상태가 아니라, 이번 사이클이 강공격 모드인지 기준
+        bool wantStrongOnly = _useStrongThisCycle;
 
         // 1) simpleChoices 우선 (강/일반 필터 적용)
         if (opt.simpleChoices != null && opt.simpleChoices.Count > 0)
@@ -645,7 +725,7 @@ public class BossDueoksiniController : MonoBehaviour
             _anim.SetTrigger(trig);
 
         if (sa.spawnProjectileAuto)
-            TryFireSimpleProjectile(sa);
+            TryFireSimpleProjectile(sa, true);   // 이건 공격당 1번만
 
         Coroutine moveCR = null;
 
@@ -696,12 +776,19 @@ public class BossDueoksiniController : MonoBehaviour
     }
 
     // ───────────────── Projectile (Simple) ─────────────────
-    void TryFireSimpleProjectile(SimpleAttack src)
+    // oncePerAttack = true 면 "이 공격 동안 딱 1번" 제한
+    void TryFireSimpleProjectile(SimpleAttack src, bool oncePerAttack = true)
     {
         var sa = src ?? _playingSimpleAttack;
         if (sa == null || !sa.projectilePrefab) return;
-        if (_autoProjFiredThisAttack) return;
 
+        if (oncePerAttack)
+        {
+            if (_autoProjFiredThisAttack) return;
+            _autoProjFiredThisAttack = true;
+        }
+
+        // 1) 발사지점
         Transform muzzle =
             (FacingRight
                 ? (sa.projectileMuzzleRight ? sa.projectileMuzzleRight : sa.projectileMuzzle)
@@ -719,6 +806,7 @@ public class BossDueoksiniController : MonoBehaviour
                        new Vector3(sa.projectileMuzzleOffset.x * sign, sa.projectileMuzzleOffset.y, 0f);
         }
 
+        // 2) 방향
         Vector2 dir = FacingRight ? Vector2.right : Vector2.left;
         if (sa.projAimAtPlayer && player)
         {
@@ -727,6 +815,7 @@ public class BossDueoksiniController : MonoBehaviour
         }
         bool dirRightForAnim = dir.x >= 0f;
 
+        // 3) 인스턴스 & 런치
         var go = Instantiate(sa.projectilePrefab, spawnPos, Quaternion.identity);
         var pr = go.GetComponent<SlashProjectile2D>();
         if (pr)
@@ -738,8 +827,6 @@ public class BossDueoksiniController : MonoBehaviour
             var rb = go.GetComponent<Rigidbody2D>();
             if (rb) rb.linearVelocity = dir * 6f;
         }
-
-        _autoProjFiredThisAttack = true;
     }
 
     IEnumerator CoAdvance(float distance, float time, AnimationCurve curve)
@@ -895,7 +982,11 @@ public class BossDueoksiniController : MonoBehaviour
 
     public void AnimEvent_SlamHitOn() { ToggleColliders(slamHitboxes, true); }
     public void AnimEvent_SlamHitOff() { ToggleColliders(slamHitboxes, false); }
-    public void AnimEvent_FireSimpleProjectile() { TryFireSimpleProjectile(_playingSimpleAttack); }
+    public void AnimEvent_FireSimpleProjectile()
+    {
+        // oncePerAttack = false → 이벤트 호출할 때마다 발사
+        TryFireSimpleProjectile(_playingSimpleAttack, false);
+    }
 
     // ★ AnimEvent 이동 시작/정지
     public void AnimEvent_MoveStart(float deltaX)
@@ -985,7 +1076,10 @@ public class BossDueoksiniController : MonoBehaviour
 
                 _damagedCache.Add(dmg);
 
+                // PlayerController를 최대한 확실히 찾기
                 var pc = col.GetComponentInParent<PlayerController>();
+                if (pc == null)
+                    pc = FindObjectOfType<PlayerController>();
 
                 if (isStrong)
                 {
@@ -993,6 +1087,7 @@ public class BossDueoksiniController : MonoBehaviour
                     if (pc != null)
                         consumed = pc.HandleStrongAttackHit(col);
 
+                    // 강패링 성공 → 대미지 / 분노 증가 모두 스킵
                     if (consumed) continue;
 
                     if (pc != null)
@@ -1060,6 +1155,12 @@ public class BossDueoksiniController : MonoBehaviour
         {
             OnRageSegmentFilled(s - 1);
         }
+
+        // 분노가 이번에 처음 가득 찼다면 강공격 1회 예약
+        if (!_strongAttackQueued && prev < rageMaxStacks && cur >= rageMaxStacks)
+        {
+            _strongAttackQueued = true;
+        }
     }
 
     void OnRageSegmentFilled(int segmentIndex)
@@ -1092,8 +1193,9 @@ public class BossDueoksiniController : MonoBehaviour
 
     void ClearRage()
     {
-        if (rageValue <= 0f) return;
+        // 분노 값 + 강공격 예약 모두 초기화
         rageValue = 0f;
+        _strongAttackQueued = false;
         UpdateRageUI();
     }
 
@@ -1109,6 +1211,12 @@ public class BossDueoksiniController : MonoBehaviour
 
         Gizmos.color = Color.magenta;
         Gizmos.DrawWireSphere(transform.position, Mathf.Abs(farDistanceThreshold));
+
+        if (chargeCancelDistance > 0f)
+        {
+            Gizmos.color = Color.red;
+            Gizmos.DrawWireSphere(transform.position, Mathf.Abs(chargeCancelDistance));
+        }
     }
 
     bool PlayDirectionalState(string baseName, float crossFade = 0f)

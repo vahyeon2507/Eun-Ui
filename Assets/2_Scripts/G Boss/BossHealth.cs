@@ -6,9 +6,13 @@ using UnityEngine.Events;
 public class BossHealth : MonoBehaviour, IDamageable
 {
     [Header("HP")]
-    public int maxHp = 20;
-    [SerializeField] private int currentHp = 0;
-    public int CurrentHp => currentHp;
+    public float maxHp = 20f;                 // ★ float
+    [SerializeField] private float currentHp = 0f; // ★ float
+
+    // 기존 코드 호환용: int로 노출
+    public int CurrentHp => Mathf.RoundToInt(currentHp);
+    // 필요하면 실수 체력 직접 보고 싶을 때
+    public float CurrentHpRaw => currentHp;
 
     [Header("Damage Modifiers")]
     [Range(0.1f, 10f)] public float damageTakenMultiplier = 1f; // 외부에서 일시 변경 가능
@@ -94,7 +98,7 @@ public class BossHealth : MonoBehaviour, IDamageable
 
     void Awake()
     {
-        if (currentHp <= 0) currentHp = maxHp;
+        if (currentHp <= 0f) currentHp = maxHp;
 
         rb = GetComponent<Rigidbody2D>();
         audioSource = GetComponent<AudioSource>();
@@ -102,8 +106,7 @@ public class BossHealth : MonoBehaviour, IDamageable
         if (!spriteRenderer) spriteRenderer = GetComponentInChildren<SpriteRenderer>();
         if (!animator) animator = GetComponent<Animator>();
 
-        if (hpBar) { hpBar.maxValue = maxHp; hpBar.value = currentHp; }
-        if (hpText) hpText.text = $"{currentHp} / {maxHp}";
+        UpdateUI(); // ★ UI 한 번에 업데이트
 
         if (!playerTransform)
         {
@@ -140,6 +143,18 @@ public class BossHealth : MonoBehaviour, IDamageable
         CacheSquashRestFromCurrent();
     }
 
+    void UpdateUI()
+    {
+        if (hpBar)
+        {
+            hpBar.maxValue = maxHp;
+            hpBar.value = currentHp;
+        }
+
+        if (hpText)
+            hpText.text = $"{currentHp:0.##} / {maxHp:0.##}";
+    }
+
     void OnEnable()
     {
         CacheSquashRestFromCurrent();
@@ -168,17 +183,23 @@ public class BossHealth : MonoBehaviour, IDamageable
         squashTarget.localScale = Vector3.Scale(_squashRestAbs, sign);
     }
 
+    // ===== IDamageable =====
     public void TakeDamage(int amount)
     {
-        if (amount <= 0) return;
-        if (currentHp <= 0) return;
+        TakeDamage((float)amount);
+    }
 
-        // ▼ 받뎀 배율 적용
-        amount = Mathf.CeilToInt(amount * Mathf.Max(0.1f, damageTakenMultiplier));
+    public void TakeDamage(float amount)
+    {
+        if (amount <= 0f) return;
+        if (currentHp <= 0f) return;
 
-        currentHp = Mathf.Clamp(currentHp - amount, 0, maxHp);
-        if (hpBar) hpBar.value = currentHp;
-        if (hpText) hpText.text = $"{currentHp} / {maxHp}";
+        // ▼ 받뎀 배율 적용 (이제 실수 그대로)
+        float mul = Mathf.Max(0.1f, damageTakenMultiplier);
+        float finalDamage = amount * mul;
+
+        currentHp = Mathf.Clamp(currentHp - finalDamage, 0f, maxHp);
+        UpdateUI();
 
         if (hitEffectPrefab)
         {
@@ -224,7 +245,7 @@ public class BossHealth : MonoBehaviour, IDamageable
         // 넉백/스태거
         StartCoroutine(HitReactionCoroutine());
 
-        if (currentHp <= 0) Die();
+        if (currentHp <= 0f) Die();
     }
 
     IEnumerator HitReactionCoroutine()
@@ -383,7 +404,7 @@ public class BossHealth : MonoBehaviour, IDamageable
     void Die()
     {
         GetComponent<BossDeathDust>()?.Play();
-        if (currentHp > 0) currentHp = 0;
+        if (currentHp > 0f) currentHp = 0f;
 
         BossKillTeleportDirector.SignalBossDied();
 
@@ -416,17 +437,25 @@ public class BossHealth : MonoBehaviour, IDamageable
 
     public void Heal(int amount)
     {
-        if (amount <= 0) return;
-        currentHp = Mathf.Clamp(currentHp + amount, 0, maxHp);
-        if (hpBar) hpBar.value = currentHp;
-        if (hpText) hpText.text = $"{currentHp} / {maxHp}";
+        Heal((float)amount);
+    }
+
+    public void Heal(float amount)
+    {
+        if (amount <= 0f) return;
+        currentHp = Mathf.Clamp(currentHp + amount, 0f, maxHp);
+        UpdateUI();
     }
 
     public void SetHp(int hp)
     {
-        currentHp = Mathf.Clamp(hp, 0, maxHp);
-        if (hpBar) hpBar.value = currentHp;
-        if (hpText) hpText.text = $"{currentHp} / {maxHp}";
+        SetHp((float)hp);
+    }
+
+    public void SetHp(float hp)
+    {
+        currentHp = Mathf.Clamp(hp, 0f, maxHp);
+        UpdateUI();
     }
 
     // (호환) 항상 false

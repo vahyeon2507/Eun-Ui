@@ -194,6 +194,7 @@ public class BulgasariAttackHooks : MonoBehaviour
     }
 
     // ★ 강공격 여부를 함께 받는 실제 실행 버전
+    // ★ 강공격 여부를 함께 받는 실제 실행 버전
     public void Perform(AttackDefinition2D def, bool isStrongAttack, Transform originOverride = null)
     {
         if (!def) return;
@@ -205,31 +206,47 @@ public class BulgasariAttackHooks : MonoBehaviour
         {
             if (!col) return;
 
-            // 1) 플레이어 우선 처리
+            // ───── 1) 플레이어 우선 처리 ─────
             var pc = col.GetComponent<PlayerController>() ??
                      col.GetComponentInParent<PlayerController>() ??
                      col.GetComponentInChildren<PlayerController>();
 
             if (pc != null)
             {
+                // ★ 플레이어 "본체" 히트박스만 허용
+                //    - 우선 PlayerController가 붙어있는 오브젝트의 Collider2D를 메인으로 사용
+                //    - 그게 있으면 그 콜라이더와 맞았을 때만 히트 인정
+                //    - 없다면, PlayerController가 직접 붙어있는 오브젝트에 맞은 경우만 인정
+                Collider2D mainBodyCol = pc.GetComponent<Collider2D>();
+                if (mainBodyCol != null)
+                {
+                    if (col != mainBodyCol)
+                        return; // 자식 콜라이더면 무시
+                }
+                else
+                {
+                    if (col.GetComponent<PlayerController>() == null)
+                        return; // 루트 말고 다른 자식에 맞은 거면 무시
+                }
+
                 int dmg = Mathf.Max(1, def.damage);
 
                 if (isStrongAttack)
                 {
-                    // ▼ 강공격: 먼저 강패링 존에 의한 강패링 시도
+                    // 강패링 존에게 먼저 물어보기
                     if (TalismanStrongParryZone.TryHandleStrongAttackHit(pc))
                     {
-                        // 강패링 성공 → 대미지 없음, 히트 소비
+                        // 강패링 성공 → 대미지/히트 완전 소모
                         return;
                     }
 
-                    // ▲ 강패링 실패 → 일반 패링으로는 막을 수 없음
+                    // 강패링 실패 → 일반 패링으로는 못 막음
                     DealStrongDamageToPlayer(pc, dmg);
                     return;
                 }
                 else
                 {
-                    // ▼ 일반 공격: 기존 패링 로직 유지
+                    // 일반 공격: 기존 패링 로직 유지
                     if (pc.IsParrying)
                     {
                         bool consumed = pc.ConsumeHitboxIfParrying(col);
@@ -241,10 +258,11 @@ public class BulgasariAttackHooks : MonoBehaviour
                 }
             }
 
-            // 2) 기타 IDamageable 대상 처리
+            // ───── 2) 그 외 IDamageable 대상 처리 (구조물 등) ─────
             var dmgTarget = col.GetComponent<IDamageable>() ??
                             col.GetComponentInParent<IDamageable>() ??
                             col.GetComponentInChildren<IDamageable>();
+
             if (dmgTarget != null)
             {
                 int dmg = Mathf.Max(1, def.damage);
@@ -252,6 +270,7 @@ public class BulgasariAttackHooks : MonoBehaviour
             }
         });
     }
+
 
     void DealStrongDamageToPlayer(PlayerController pc, int amount)
     {

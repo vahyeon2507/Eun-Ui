@@ -2524,6 +2524,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 1538400925}
     - target: {fileID: 5716592064512074557, guid: 61a9b15369fc17e49a0e497ec34f6a86, type: 3}
+      propertyPath: inputPresetDropdown
+      value: 
+      objectReference: {fileID: 1578299297}
+    - target: {fileID: 5716592064512074557, guid: 61a9b15369fc17e49a0e497ec34f6a86, type: 3}
       propertyPath: 'settingPanels.Array.data[0]'
       value: 
       objectReference: {fileID: 1538400933}
@@ -3616,6 +3620,17 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1569446067}
   m_CullTransparentMesh: 1
+--- !u!114 &1578299297 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 6892083094518623299, guid: d3d9ed282cdc5f4439d9ae3802944588, type: 3}
+  m_PrefabInstance: {fileID: 1538400924}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7b743370ac3e4ec2a1668f5455a8ef8a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &1616253084
 GameObject:
   m_ObjectHideFlags: 0

@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;   // ★ BossHealth HP 반사용
 using UnityEngine;
 using UnityEngine.UI;   // ★ 분노 게이지 UI용
 
@@ -98,6 +99,13 @@ public class BossDueoksiniController : MonoBehaviour
         [Header("Strong Attack")]
         [Tooltip("체크 시 이 SimpleAttack은 '분노 강공격'으로 취급된다.")]
         public bool isStrongAttack = false;
+
+        [Header("Phase Usage")]
+        [Tooltip("1페이즈에서 이 공격을 사용할지 여부")]
+        public bool allowInPhase1 = true;
+
+        [Tooltip("2페이즈에서 이 공격을 사용할지 여부")]
+        public bool allowInPhase2 = true;
 
         [Header("Move During Attack (optional)")]
         public float moveDistance = 0f;
@@ -203,6 +211,13 @@ public class BossDueoksiniController : MonoBehaviour
         [Header("Strong Prep")]
         [Tooltip("체크 시 이 Prep은 '분노 강공격'용 준비자세로 취급된다.")]
         public bool isStrongPrep = false;
+
+        [Header("Phase Usage")]
+        [Tooltip("1페이즈에서 이 Prep/공격 조합을 사용할지 여부")]
+        public bool allowInPhase1 = true;
+
+        [Tooltip("2페이즈에서 이 Prep/공격 조합을 사용할지 여부")]
+        public bool allowInPhase2 = true;
     }
 
     [Header("Prep & Attack")]
@@ -237,6 +252,31 @@ public class BossDueoksiniController : MonoBehaviour
     Animator _anim;
     Rigidbody2D _rb;
     BossHealth _health;
+
+    // ===== Phase 2 (HP-based) =====
+    [Header("Phase 2 (HP-based)")]
+    [Tooltip("2페이즈 사용 여부")]
+    public bool enablePhase2 = true;
+
+    [Tooltip("남은 체력 비율이 이 값 이하가 되면 2페이즈 진입 (0~1). 예: 0.5 = 50%")]
+    [Range(0f, 1f)]
+    public float phase2HpThresholdRatio = 0.5f;
+
+    [Tooltip("2페이즈 진입 시 보낼 애니메이터 트리거 (선택)")]
+    public string phase2EnterTrigger = "Phase2_Enter";
+
+    [Header("Phase 2 Anim Overrides")]
+    [Tooltip("2페이즈 전용 돌진 준비 state base name (DirectionalAnimPairSync 기준). 비우면 1페와 동일")]
+    public string chargePrepTriggerPhase2 = "Prep_Charge_P2";
+
+    [Tooltip("2페이즈 전용 돌진 state base name. 비우면 1페와 동일")]
+    public string chargeTriggerPhase2 = "Charge_P2";
+
+    bool _inPhase2 = false;       // 지금 2페인지 여부
+    bool _phase2Entered = false;  // 이미 2페 진입 처리 여부
+
+    float _phase2HpCheckTimer = 0f;
+    const float Phase2HpCheckInterval = 0.2f;
 
     int _lastPrepIndex = -1;
     bool _waitingPrepEvent = false;
@@ -309,6 +349,42 @@ public class BossDueoksiniController : MonoBehaviour
         UpdateRageUI(); // ★ 시작 시 분노 UI 초기화
     }
 
+#if UNITY_EDITOR
+    void OnValidate()
+    {
+        // SimpleAttack / PrepOption 페이즈 플래그 기본값 보정
+        if (simpleAttacks != null)
+        {
+            for (int i = 0; i < simpleAttacks.Count; i++)
+            {
+                var sa = simpleAttacks[i];
+                if (sa == null) continue;
+
+                if (!sa.allowInPhase1 && !sa.allowInPhase2)
+                {
+                    sa.allowInPhase1 = true;
+                    sa.allowInPhase2 = true;
+                }
+            }
+        }
+
+        if (preps != null)
+        {
+            for (int i = 0; i < preps.Count; i++)
+            {
+                var p = preps[i];
+                if (p == null) continue;
+
+                if (!p.allowInPhase1 && !p.allowInPhase2)
+                {
+                    p.allowInPhase1 = true;
+                    p.allowInPhase2 = true;
+                }
+            }
+        }
+    }
+#endif
+
     void OnEnable()
     {
         if (!_inRoutine)
@@ -318,6 +394,9 @@ public class BossDueoksiniController : MonoBehaviour
     void Update()
     {
         UpdateAnimEventMove();
+
+        // ★ 체력 기반 2페이즈 진입 체크
+        UpdatePhase2ByHealth(Time.deltaTime);
 
         // ★ 분노 자동 채우기 (6초당 1칸 분량)
         AddRageByTime(Time.deltaTime);
@@ -364,7 +443,16 @@ public class BossDueoksiniController : MonoBehaviour
     // ───────────────── Charge Prep ─────────────────
     IEnumerator DoChargePrep()
     {
-        if (_anim) PlayDirectionalState(chargePrepTrigger, 0f);
+        if (_anim)
+        {
+            string baseName = chargePrepTrigger;
+
+            // 2페이즈면 2페 전용 프렙 애니 사용(설정돼 있을 때만)
+            if (_inPhase2 && !string.IsNullOrEmpty(chargePrepTriggerPhase2))
+                baseName = chargePrepTriggerPhase2;
+
+            PlayDirectionalState(baseName, 0f);
+        }
 
         if (chargePrepEndByAnimEvent)
         {
@@ -383,7 +471,13 @@ public class BossDueoksiniController : MonoBehaviour
         IsChargingNow = true;
         if (_anim)
         {
-            PlayDirectionalState(chargeTrigger);
+            string baseName = chargeTrigger;
+
+            // 2페이즈면 2페 전용 돌진 애니 사용(설정돼 있을 때만)
+            if (_inPhase2 && !string.IsNullOrEmpty(chargeTriggerPhase2))
+                baseName = chargeTriggerPhase2;
+
+            PlayDirectionalState(baseName);
             if (!string.IsNullOrEmpty(isChargingBool))
                 _anim.SetBool(isChargingBool, true);
         }
@@ -587,6 +681,19 @@ public class BossDueoksiniController : MonoBehaviour
     }
 
     // ───────────────── Attack Prep & 선택 ─────────────────
+
+    bool PhaseAllows(SimpleAttack sa)
+    {
+        if (sa == null) return false;
+        return _inPhase2 ? sa.allowInPhase2 : sa.allowInPhase1;
+    }
+
+    bool PhaseAllows(PrepOption p)
+    {
+        if (p == null) return false;
+        return _inPhase2 ? p.allowInPhase2 : p.allowInPhase1;
+    }
+
     PrepOption PickPrep()
     {
         if (preps == null || preps.Count == 0)
@@ -595,11 +702,14 @@ public class BossDueoksiniController : MonoBehaviour
         // 분노가 꽉 찼는지가 아니라, 이번 사이클에 강공격을 쓸 예정인지로 판단
         bool wantStrongPrep = _useStrongThisCycle;
 
-        // 강 Prep 존재 여부 확인
+        // 강 Prep 존재 여부 확인 (현재 페이즈에서 사용 가능한 것만)
         bool hasStrongPrep = false;
         for (int i = 0; i < preps.Count; i++)
         {
-            if (preps[i] != null && preps[i].isStrongPrep)
+            var p = preps[i];
+            if (p == null) continue;
+            if (!PhaseAllows(p)) continue;
+            if (p.isStrongPrep)
             {
                 hasStrongPrep = true;
                 break;
@@ -613,19 +723,31 @@ public class BossDueoksiniController : MonoBehaviour
         {
             if (wantStrongPrep)
             {
-                // ★ 이번 사이클 강공격 → 강 Prep만 사용
-                isCandidate = idx => preps[idx].isStrongPrep;
+                // ★ 이번 사이클 강공격 → 강 Prep + 페이즈 허용
+                isCandidate = idx =>
+                {
+                    var p = preps[idx];
+                    return p != null && PhaseAllows(p) && p.isStrongPrep;
+                };
             }
             else
             {
-                // ★ 이번 사이클 일반공격 → 일반 Prep만 사용
-                isCandidate = idx => !preps[idx].isStrongPrep;
+                // ★ 이번 사이클 일반공격 → 일반 Prep + 페이즈 허용
+                isCandidate = idx =>
+                {
+                    var p = preps[idx];
+                    return p != null && PhaseAllows(p) && !p.isStrongPrep;
+                };
             }
         }
         else
         {
-            // 강 Prep이 하나도 없으면 기존 로직 유지
-            isCandidate = idx => true;
+            // 강 Prep이 하나도 없으면 페이즈 허용만 검사
+            isCandidate = idx =>
+            {
+                var p = preps[idx];
+                return p != null && PhaseAllows(p);
+            };
         }
 
         // 1차 후보 리스트: 직전 Prep은 제외
@@ -635,7 +757,8 @@ public class BossDueoksiniController : MonoBehaviour
             if (i == _lastPrepIndex) continue;
             if (!isCandidate(i)) continue;
 
-            float w = Mathf.Max(0f, preps[i].weight);
+            var p = preps[i];
+            float w = Mathf.Max(0f, p.weight);
             if (w <= 0f) continue;
 
             candidates.Add(i);
@@ -648,7 +771,8 @@ public class BossDueoksiniController : MonoBehaviour
             {
                 if (!isCandidate(i)) continue;
 
-                float w = Mathf.Max(0f, preps[i].weight);
+                var p = preps[i];
+                float w = Mathf.Max(0f, p.weight);
                 if (w <= 0f) continue;
 
                 candidates.Add(i);
@@ -755,17 +879,21 @@ public class BossDueoksiniController : MonoBehaviour
         // 분노 상태가 아니라, 이번 사이클이 강공격 모드인지 기준
         bool wantStrongOnly = _useStrongThisCycle;
 
-        // 1) simpleChoices 우선 (강/일반 필터 적용)
+        // 1) simpleChoices 우선 (강/일반 + 페이즈 필터 적용)
         if (opt.simpleChoices != null && opt.simpleChoices.Count > 0)
         {
             float total = 0f;
             foreach (var c in opt.simpleChoices)
             {
                 int idx = Mathf.Clamp(c.simpleIndex, 0, simpleAttacks.Count - 1);
-                bool isStrong = simpleAttacks[idx].isStrongAttack;
+                var sa = simpleAttacks[idx];
+                if (sa == null) continue;
+
+                bool isStrong = sa.isStrongAttack;
 
                 if (wantStrongOnly && !isStrong) continue;
                 if (!wantStrongOnly && isStrong) continue;
+                if (!PhaseAllows(sa)) continue;
 
                 float w = Mathf.Max(0f, c.weight);
                 if (w <= 0f) continue;
@@ -778,10 +906,14 @@ public class BossDueoksiniController : MonoBehaviour
                 foreach (var c in opt.simpleChoices)
                 {
                     int idx = Mathf.Clamp(c.simpleIndex, 0, simpleAttacks.Count - 1);
-                    bool isStrong = simpleAttacks[idx].isStrongAttack;
+                    var sa = simpleAttacks[idx];
+                    if (sa == null) continue;
+
+                    bool isStrong = sa.isStrongAttack;
 
                     if (wantStrongOnly && !isStrong) continue;
                     if (!wantStrongOnly && isStrong) continue;
+                    if (!PhaseAllows(sa)) continue;
 
                     float w = Mathf.Max(0f, c.weight);
                     if (w <= 0f) continue;
@@ -792,20 +924,30 @@ public class BossDueoksiniController : MonoBehaviour
             }
         }
 
-        // 2) 폴백: opt.simpleIndex 또는 첫 유효 강/일반 공격
+        // 2) 폴백: opt.simpleIndex 또는 첫 유효 강/일반 + 페이즈 공격
         int fallback = Mathf.Clamp(opt.simpleIndex, 0, simpleAttacks.Count - 1);
-        bool fallbackStrong = simpleAttacks[fallback].isStrongAttack;
+        var fbSa = simpleAttacks[fallback];
+        bool fallbackValid = fbSa != null && PhaseAllows(fbSa);
+        bool fallbackStrong = fallbackValid && fbSa.isStrongAttack;
 
-        if (wantStrongOnly && fallbackStrong) return fallback;
-        if (!wantStrongOnly && !fallbackStrong) return fallback;
+        if (fallbackValid)
+        {
+            if (wantStrongOnly && fallbackStrong) return fallback;
+            if (!wantStrongOnly && !fallbackStrong) return fallback;
+        }
 
         for (int i = 0; i < simpleAttacks.Count; i++)
         {
-            bool isStrong = simpleAttacks[i].isStrongAttack;
+            var sa = simpleAttacks[i];
+            if (sa == null) continue;
+            if (!PhaseAllows(sa)) continue;
+
+            bool isStrong = sa.isStrongAttack;
             if (wantStrongOnly && isStrong) return i;
             if (!wantStrongOnly && !isStrong) return i;
         }
 
+        // 페이즈 필터를 통과하는 게 하나도 없으면, 그냥 폴백이라도 사용
         return fallback;
     }
 
@@ -1197,41 +1339,23 @@ public class BossDueoksiniController : MonoBehaviour
                     if (pc != null)
                     {
                         // 강패링 존에게 "이 강공격 히트, 패링으로 씹을 수 있냐?" 물어보기
-                        // 조건:
-                        // - 강패링 존 ActiveZone != null
-                        // - 플레이어가 존 안에 있음
-                        // - 플레이어가 현재 Parry 중
-                        // → 모두 만족 시: OnStrongParrySuccess 실행 + true 반환
                         consumed = TalismanStrongParryZone.TryHandleStrongAttackHit(pc);
                     }
 
-                    // 강패링이 '성공'한 경우:
-                    //  - 이 히트는 완전히 소모
-                    //  - 실제 대미지 없음
-                    //  - 분노 게이지도 채우지 않음
+                    // 강패링 '성공' → 히트 소모, 대미지/분노 없음
                     if (consumed)
                     {
-                        // 필요하면 디버그 찍어서 확인 가능
-                        // Debug.Log("[BossDueoksini] 강패링으로 강공격이 씹혔습니다.");
                         continue;
                     }
 
-                    // 여기까지 왔다는 건:
-                    //  - 강패링 존이 없거나
-                    //  - 플레이어가 존 밖이거나
-                    //  - 플레이어가 패링 중이 아니거나
-                    //  - 혹은 그냥 강패링 타이밍이 아닌 경우
-                    // → 정상적으로 강공격 대미지 적용
-
+                    // 강패링 실패 → 강공격 대미지 적용
                     if (pc != null)
                     {
-                        // PlayerController가 있다면 강공격용 대미지 함수 사용
                         pc.TakeStrongDamage(amount);
                         AddRage(1f);   // 실제로 맞았으니 분노 +1칸
                     }
                     else
                     {
-                        // 혹시 PlayerController가 없고, IDamageable만 있는 경우 폴백
                         if (dmg is PlayerHealth phStrong)
                             phStrong.TakeDamageFromHitbox(amount, col);
                         else
@@ -1337,6 +1461,80 @@ public class BossDueoksiniController : MonoBehaviour
         rageValue = 0f;
         _strongAttackQueued = false;
         UpdateRageUI();
+    }
+
+    // ===== Phase 2 HP 체크 =====
+    void UpdatePhase2ByHealth(float deltaTime)
+    {
+        if (!enablePhase2) return;
+        if (_phase2Entered) return;
+        if (_health == null) return;
+        if (phase2HpThresholdRatio <= 0f) return;
+
+        _phase2HpCheckTimer += deltaTime;
+        if (_phase2HpCheckTimer < Phase2HpCheckInterval) return;
+        _phase2HpCheckTimer = 0f;
+
+        // BossHealth 내부 값 반사로 읽기
+        float cur = TryGetFloatMember(_health,
+            "CurrentHp", "currentHp", "CurrentHP", "currentHP",
+            "hp", "HP", "cur", "current");
+
+        float max = TryGetFloatMember(_health,
+            "MaxHp", "maxHp", "MaxHP", "maxHP",
+            "maxHealth", "MaxHealth", "HPMax");
+
+        if (float.IsNaN(cur) || float.IsNaN(max) || max <= 0f) return;
+
+        float ratio = cur / max;
+        if (ratio <= phase2HpThresholdRatio)
+        {
+            EnterPhase2();
+        }
+    }
+
+    void EnterPhase2()
+    {
+        if (_phase2Entered) return;
+        _phase2Entered = true;
+        _inPhase2 = true;
+
+        if (_anim && !string.IsNullOrEmpty(phase2EnterTrigger))
+            _anim.SetTrigger(phase2EnterTrigger);
+    }
+
+    float TryGetFloatMember(object obj, params string[] names)
+    {
+        if (obj == null) return float.NaN;
+        var t = obj.GetType();
+
+        foreach (var n in names)
+        {
+            var pi = t.GetProperty(n, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            if (pi != null &&
+                (pi.PropertyType == typeof(float) ||
+                 pi.PropertyType == typeof(double) ||
+                 pi.PropertyType == typeof(int)))
+            {
+                var v = pi.GetValue(obj);
+                if (v is float f) return f;
+                if (v is double d) return (float)d;
+                if (v is int i) return i;
+            }
+
+            var fi = t.GetField(n, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            if (fi != null &&
+                (fi.FieldType == typeof(float) ||
+                 fi.FieldType == typeof(double) ||
+                 fi.FieldType == typeof(int)))
+            {
+                var v = fi.GetValue(obj);
+                if (v is float f2) return f2;
+                if (v is double d2) return (float)d2;
+                if (v is int i2) return i2;
+            }
+        }
+        return float.NaN;
     }
 
     // ===== Gizmos / Animator helper =====

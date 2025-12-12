@@ -1332,8 +1332,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cc81ec6757b47cf41bc4ecca7e0dd5d2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  inventory: {fileID: 0}
-  potion: {fileID: 0}
 --- !u!4 &591181295
 Transform:
   m_ObjectHideFlags: 0
@@ -2379,6 +2377,17 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: -20, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &765448105 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 6892083094518623299, guid: d3d9ed282cdc5f4439d9ae3802944588, type: 3}
+  m_PrefabInstance: {fileID: 1538400924}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7b743370ac3e4ec2a1668f5455a8ef8a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &813585838
 GameObject:
   m_ObjectHideFlags: 0
@@ -2597,6 +2606,10 @@ PrefabInstance:
       propertyPath: resolutionDropdown
       value: 
       objectReference: {fileID: 1538400925}
+    - target: {fileID: 5716592064512074557, guid: 61a9b15369fc17e49a0e497ec34f6a86, type: 3}
+      propertyPath: inputPresetDropdown
+      value: 
+      objectReference: {fileID: 765448105}
     - target: {fileID: 5716592064512074557, guid: 61a9b15369fc17e49a0e497ec34f6a86, type: 3}
       propertyPath: 'settingPanels.Array.data[0]'
       value: 
@@ -4392,8 +4405,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "Ctal \uD0A4 \uD639\uC740 C \uD0A4\uB97C \uB20C\uB7EC \uC801\uC758 \uACF5\uACA9\uC744
-    \uD328\uB9C1\uD558\uC138\uC694!"
+  m_text: "C \uD0A4\uB97C \uB20C\uB7EC \n\uC801\uC758 \uACF5\uACA9\uC744 \uD328\uB9C1\uD558\uC138\uC694!"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 3934ac5a637d77c4888c95fba2b4382f, type: 2}
   m_sharedMaterial: {fileID: 3467314870711841817, guid: 3934ac5a637d77c4888c95fba2b4382f, type: 2}

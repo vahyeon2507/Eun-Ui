@@ -170,7 +170,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e96f2a59bf29edd488883dbf46713579, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  damage: 1
+  damage: 5
   startSpeed: 2
   fastSpeed: 1000
   accelDelay: 0.25
@@ -205,6 +205,3 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
-  debugCollision: 1
-  debugHitColor: {r: 1, g: 0, b: 0, a: 1}
-  debugHitMarkerRadius: 0.18

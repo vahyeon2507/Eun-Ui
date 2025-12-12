@@ -3324,10 +3324,6 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 8256360091964706764, guid: d55e216562993954fb5d67f32891e8f5, type: 3}
-      propertyPath: m_SortingOrder
-      value: 9999
-      objectReference: {fileID: 0}
     - target: {fileID: 8752271970534069111, guid: d55e216562993954fb5d67f32891e8f5, type: 3}
       propertyPath: m_Name
       value: GameOverCanvas
@@ -4246,10 +4242,6 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 238531823}
     - target: {fileID: 5716592064512074557, guid: 61a9b15369fc17e49a0e497ec34f6a86, type: 3}
-      propertyPath: fullscreenToggle
-      value: 
-      objectReference: {fileID: 0}
-    - target: {fileID: 5716592064512074557, guid: 61a9b15369fc17e49a0e497ec34f6a86, type: 3}
       propertyPath: settingsAnimator
       value: 
       objectReference: {fileID: 773021375}
@@ -4321,66 +4313,6 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 6770310172751190244, guid: b8a8541c4eb86d94ea74e0ccfdb901fc, type: 3}
-      propertyPath: dim
-      value: 
-      objectReference: {fileID: 667382411}
-    - target: {fileID: 6770310172751190244, guid: b8a8541c4eb86d94ea74e0ccfdb901fc, type: 3}
-      propertyPath: menuPanel
-      value: 
-      objectReference: {fileID: 1918019737}
-    - target: {fileID: 6770310172751190244, guid: b8a8541c4eb86d94ea74e0ccfdb901fc, type: 3}
-      propertyPath: quitButton
-      value: 
-      objectReference: {fileID: 1189223604}
-    - target: {fileID: 6770310172751190244, guid: b8a8541c4eb86d94ea74e0ccfdb901fc, type: 3}
-      propertyPath: soundSlider
-      value: 
-      objectReference: {fileID: 2062145616}
-    - target: {fileID: 6770310172751190244, guid: b8a8541c4eb86d94ea74e0ccfdb901fc, type: 3}
-      propertyPath: menuAnimator
-      value: 
-      objectReference: {fileID: 1918019738}
-    - target: {fileID: 6770310172751190244, guid: b8a8541c4eb86d94ea74e0ccfdb901fc, type: 3}
-      propertyPath: restartButton
-      value: 
-      objectReference: {fileID: 1538902517}
-    - target: {fileID: 6770310172751190244, guid: b8a8541c4eb86d94ea74e0ccfdb901fc, type: 3}
-      propertyPath: settingsPanel
-      value: 
-      objectReference: {fileID: 773021373}
-    - target: {fileID: 6770310172751190244, guid: b8a8541c4eb86d94ea74e0ccfdb901fc, type: 3}
-      propertyPath: continueButton
-      value: 
-      objectReference: {fileID: 1930701002}
-    - target: {fileID: 6770310172751190244, guid: b8a8541c4eb86d94ea74e0ccfdb901fc, type: 3}
-      propertyPath: settingsButton
-      value: 
-      objectReference: {fileID: 238531823}
-    - target: {fileID: 6770310172751190244, guid: b8a8541c4eb86d94ea74e0ccfdb901fc, type: 3}
-      propertyPath: settingsAnimator
-      value: 
-      objectReference: {fileID: 773021375}
-    - target: {fileID: 6770310172751190244, guid: b8a8541c4eb86d94ea74e0ccfdb901fc, type: 3}
-      propertyPath: resolutionDropdown
-      value: 
-      objectReference: {fileID: 1307246636}
-    - target: {fileID: 6770310172751190244, guid: b8a8541c4eb86d94ea74e0ccfdb901fc, type: 3}
-      propertyPath: 'settingPanels.Array.data[0]'
-      value: 
-      objectReference: {fileID: 1963879337}
-    - target: {fileID: 6770310172751190244, guid: b8a8541c4eb86d94ea74e0ccfdb901fc, type: 3}
-      propertyPath: 'settingPanels.Array.data[1]'
-      value: 
-      objectReference: {fileID: 1765869353}
-    - target: {fileID: 6770310172751190244, guid: b8a8541c4eb86d94ea74e0ccfdb901fc, type: 3}
-      propertyPath: 'settingPanels.Array.data[2]'
-      value: 
-      objectReference: {fileID: 1574864765}
-    - target: {fileID: 6770310172751190244, guid: b8a8541c4eb86d94ea74e0ccfdb901fc, type: 3}
-      propertyPath: 'settingPanels.Array.data[3]'
-      value: 
-      objectReference: {fileID: 312290277}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

@@ -655,7 +655,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 128
   chargeDamageCollider: {fileID: 5404495860844912352}
-  chargeCancelDistance: 2
+  chargeCancelDistance: 3
   chargeCancelUse2DDistance: 0
   facePlayer: 1
   chargePrepTrigger: Prep_Charge
@@ -678,6 +678,8 @@ MonoBehaviour:
     - {fileID: 4233735501475139734}
     baseDamage: 10
     isStrongAttack: 0
+    allowInPhase1: 1
+    allowInPhase2: 1
     moveDistance: 0
     moveTime: 0
     moveCurve:
@@ -705,6 +707,8 @@ MonoBehaviour:
     leftHitboxes: []
     baseDamage: 1
     isStrongAttack: 0
+    allowInPhase1: 1
+    allowInPhase2: 1
     moveDistance: 0
     moveTime: 0
     moveCurve:
@@ -734,6 +738,8 @@ MonoBehaviour:
     - {fileID: 2892706544801481196}
     baseDamage: 10
     isStrongAttack: 0
+    allowInPhase1: 1
+    allowInPhase2: 1
     moveDistance: 0
     moveTime: 0
     moveCurve:
@@ -763,6 +769,8 @@ MonoBehaviour:
     - {fileID: 2892706544801481196}
     baseDamage: 20
     isStrongAttack: 1
+    allowInPhase1: 1
+    allowInPhase2: 1
     moveDistance: 0
     moveTime: 0
     moveCurve:
@@ -792,6 +800,8 @@ MonoBehaviour:
     - {fileID: 2892706544801481196}
     baseDamage: 1
     isStrongAttack: 1
+    allowInPhase1: 1
+    allowInPhase2: 1
     moveDistance: 0
     moveTime: 0
     moveCurve:
@@ -821,6 +831,8 @@ MonoBehaviour:
     - {fileID: 4233735501475139734}
     baseDamage: 20
     isStrongAttack: 1
+    allowInPhase1: 1
+    allowInPhase2: 1
     moveDistance: 0
     moveTime: 0
     moveCurve:
@@ -850,6 +862,9 @@ MonoBehaviour:
   - {fileID: 0}
   rageSegmentFxTrigger: Play
   rageValue: 0
+  jumpContactHitbox: {fileID: 2732007364925454234}
+  jumpContactDamage: 10
+  jumpContactHitInterval: 0.2
   preps:
   - prepTrigger: Ready_Kwon Geuk
     prepHoldTime: 0.75
@@ -864,6 +879,8 @@ MonoBehaviour:
     prepDirectionalBase: Ready_Kwon Geuk
     prepCrossFade: 0.05
     isStrongPrep: 0
+    allowInPhase1: 1
+    allowInPhase2: 1
   - prepTrigger: Ready_ChamGyeog
     prepHoldTime: 0.75
     weight: 1
@@ -877,6 +894,8 @@ MonoBehaviour:
     prepDirectionalBase: Ready_ChamGyeog
     prepCrossFade: 0.05
     isStrongPrep: 0
+    allowInPhase1: 1
+    allowInPhase2: 1
   - prepTrigger: Ready_GagGyeog
     prepHoldTime: 0.75
     weight: 1
@@ -890,6 +909,8 @@ MonoBehaviour:
     prepDirectionalBase: Ready_GagGyeog
     prepCrossFade: 0.05
     isStrongPrep: 0
+    allowInPhase1: 1
+    allowInPhase2: 1
   - prepTrigger: PUP_Ready_GagGyeog
     prepHoldTime: 0.75
     weight: 1
@@ -903,6 +924,8 @@ MonoBehaviour:
     prepDirectionalBase: PUP_Ready_GagGyeog
     prepCrossFade: 0.05
     isStrongPrep: 1
+    allowInPhase1: 1
+    allowInPhase2: 1
   - prepTrigger: PUP_Ready_ChamGyeog
     prepHoldTime: 0.75
     weight: 1
@@ -916,6 +939,8 @@ MonoBehaviour:
     prepDirectionalBase: PUP_Ready_ChamGyeog
     prepCrossFade: 0.05
     isStrongPrep: 1
+    allowInPhase1: 1
+    allowInPhase2: 1
   - prepTrigger: PUP_Ready_Kwon Geuk
     prepHoldTime: 0.75
     weight: 1
@@ -929,6 +954,8 @@ MonoBehaviour:
     prepDirectionalBase: PUP_Ready_Kwon Geuk
     prepCrossFade: 0.05
     isStrongPrep: 1
+    allowInPhase1: 1
+    allowInPhase2: 1
   attackPrepEndByAnimEvent: 0
   projectilePrefab: {fileID: 1592831604784291918, guid: 96b958706f593104b9b38089e99df08c, type: 3}
   projectileMuzzles: []
@@ -943,6 +970,11 @@ MonoBehaviour:
   wallStunDuration: 1.2
   wallVulnMultiplier: 2
   breakTreeOnHit: 1
+  enablePhase2: 1
+  phase2HpThresholdRatio: 0.5
+  phase2EnterTrigger: Phase2_Enter
+  chargePrepTriggerPhase2: Prep_Charge_P2
+  chargeTriggerPhase2: Charge_P2
 --- !u!114 &3904976020177866494
 MonoBehaviour:
   m_ObjectHideFlags: 0

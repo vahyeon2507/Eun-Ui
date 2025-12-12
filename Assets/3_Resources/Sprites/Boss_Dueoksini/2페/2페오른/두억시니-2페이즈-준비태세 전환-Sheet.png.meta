@@ -138,10 +138,10 @@ TextureImporter:
         \uC804\uD658-Sheet_0"
       rect:
         serializedVersion: 2
-        x: 121
-        y: 149
-        width: 61
-        height: 123
+        x: 0
+        y: 150
+        width: 220
+        height: 150
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -161,10 +161,10 @@ TextureImporter:
         \uC804\uD658-Sheet_1"
       rect:
         serializedVersion: 2
-        x: 322
-        y: 149
-        width: 91
-        height: 90
+        x: 220
+        y: 150
+        width: 220
+        height: 150
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -184,10 +184,10 @@ TextureImporter:
         \uC804\uD658-Sheet_2"
       rect:
         serializedVersion: 2
-        x: 542
-        y: 149
-        width: 91
-        height: 90
+        x: 440
+        y: 150
+        width: 220
+        height: 150
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -207,10 +207,10 @@ TextureImporter:
         \uC804\uD658-Sheet_3"
       rect:
         serializedVersion: 2
-        x: 102
+        x: 0
         y: 0
-        width: 91
-        height: 89
+        width: 220
+        height: 150
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -230,10 +230,10 @@ TextureImporter:
         \uC804\uD658-Sheet_4"
       rect:
         serializedVersion: 2
-        x: 322
+        x: 220
         y: 0
-        width: 91
-        height: 89
+        width: 220
+        height: 150
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -253,10 +253,10 @@ TextureImporter:
         \uC804\uD658-Sheet_5"
       rect:
         serializedVersion: 2
-        x: 542
+        x: 440
         y: 0
-        width: 67
-        height: 71
+        width: 220
+        height: 150
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -275,7 +275,7 @@ TextureImporter:
     customData: 
     physicsShape: []
     bones: []
-    spriteID: 
+    spriteID: 8953ef65bd5fd324c90e662671323d21
     internalID: 0
     vertices: []
     indices: 

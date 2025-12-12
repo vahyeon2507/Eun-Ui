@@ -52,6 +52,24 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     [Header("Input")]
     [Tooltip("기본공격 추가 키(마우스 좌클릭과 병렬)")]
     public KeyCode extraAttackKey = KeyCode.X;
+    public enum InputPreset
+    {
+        Preset1,
+        Preset2
+    }
+
+    [Serializable]
+    public struct PlayerInputConfig
+    {
+        public KeyCode LeftMove;
+        public KeyCode RightMove;
+        public KeyCode JumpKey;
+        public KeyCode AttackKey;
+        public KeyCode ParryKey;
+        public KeyCode DashKey;
+        public bool UseMouseAttack;
+    }
+
 
     // 스윙/패링 중복 방지 플래그
     bool _attackHitFiredThisSwing = false;
@@ -235,12 +253,40 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
         // 기존 스페셜 로직 그대로 사용
         StartCoroutine(TriggerParrySpecial());
     }
+    public InputPreset inputPreset = InputPreset.Preset1;
+    public PlayerInputConfig inputConfig;
 
+    public void ApplyInputPreset(InputPreset preset)
+    {
+        switch (preset)
+        {
+            case InputPreset.Preset1:
+                inputConfig.LeftMove = KeyCode.LeftArrow;
+                inputConfig.RightMove = KeyCode.RightArrow;
+                inputConfig.JumpKey = KeyCode.Space;
+                inputConfig.AttackKey = KeyCode.X;
+                inputConfig.ParryKey = KeyCode.C;
+                inputConfig.DashKey = KeyCode.LeftShift;
+                inputConfig.UseMouseAttack = false;
+                break;
+            case InputPreset.Preset2:
+                inputConfig.LeftMove = KeyCode.A;
+                inputConfig.RightMove = KeyCode.D;
+                inputConfig.JumpKey = KeyCode.Space;
+                inputConfig.AttackKey = KeyCode.Mouse0; // 마우스 좌클릭
+                inputConfig.ParryKey = KeyCode.LeftControl;
+                inputConfig.DashKey = KeyCode.LeftShift;
+                inputConfig.UseMouseAttack = true;
+                break;
+        }
+    }
 
     void Start()
     {
         rb = GetComponent<Rigidbody2D>();
         animator = GetComponent<Animator>();
+
+        ApplyInputPreset(inputPreset);
 
         if (!groundCheck) Debug.LogWarning("[PlayerController] groundCheck not assigned!");
 
@@ -282,8 +328,13 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     void HandleInputs()
     {
         // 기본 공격 입력(좌클릭 또는 extraAttackKey)
-        bool attackPressed = (Input.GetMouseButtonDown(0) || Input.GetKeyDown(extraAttackKey)) && Allow(PlayerAction.Attack);
-        if (attackPressed)
+        bool attackPressed = false;
+        if (inputConfig.UseMouseAttack)
+            attackPressed = Input.GetMouseButtonDown(0);
+        else
+            attackPressed = Input.GetKeyDown(inputConfig.AttackKey);
+
+        if (attackPressed && Allow(PlayerAction.Attack))
         {
             lastAttackButtonTime = Time.time;
             if (isAttacking)
@@ -297,7 +348,7 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
         }
 
         // 대쉬
-        if (Input.GetKeyDown(KeyCode.LeftShift) || Input.GetKeyDown(KeyCode.RightShift))
+        if (Input.GetKeyDown(inputConfig.DashKey))
         {
             if (canDash && !isDashing && !isParrying && !isAttacking && attackLockTimer <= 0f)
             {
@@ -308,21 +359,17 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
         }
 
         // 패링
-        if ((Input.GetKeyDown(KeyCode.C) || Input.GetKeyDown(KeyCode.LeftControl)) && Allow(PlayerAction.Parry))
+        if (Input.GetKeyDown(inputConfig.ParryKey) && Allow(PlayerAction.Parry))
         {
             if (canParry && !isParrying)
             {
-                // 지상 여부: groundedRememberCounter(코요테타임)으로 판단
                 bool groundedForAction = groundedRememberCounter > 0f;
-
                 if (groundedForAction)
                 {
-                    // ★ 지상에서는 어떤 애니메이션 중이든 즉시 패링으로 전환
                     InterruptToParryImmediately();
                 }
                 else
                 {
-                    // ★ 공중에서는 기존 제한 유지
                     if (!isDashing && attackLockTimer <= 0f)
                     {
                         if (AudioManager.Instance != null)
@@ -334,7 +381,7 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
         }
 
         // 점프
-        if (Input.GetButtonDown("Jump"))
+        if (Input.GetKeyDown(inputConfig.JumpKey))
         {
             bool grounded = groundCheck
                 ? Physics2D.OverlapCircle(groundCheck.position, groundCheckRadius, groundLayer)
@@ -359,7 +406,10 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
         bool locked = attackLockTimer > 0f || isParrying;
         if (isDashing) locked = true;
 
-        float moveInput = locked ? 0f : Input.GetAxisRaw("Horizontal");
+        float moveInput = 0f;
+        if (Input.GetKey(inputConfig.LeftMove)) moveInput -= 1f;
+        if (Input.GetKey(inputConfig.RightMove)) moveInput += 1f;
+
 
         Vector2 vel = rb.linearVelocity;
         vel.x = moveInput * moveSpeed;

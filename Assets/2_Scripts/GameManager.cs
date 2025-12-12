@@ -10,7 +10,7 @@ public class GameManager : MonoBehaviour
     [SerializeField] private Button restartButton;
     [SerializeField] private Button continueButton;
     [SerializeField] private Button quitButton;
-    [SerializeField] private Button settingsButton;
+    [SerializeField] private Button keysettingsButton;
 
     [Header("설정 메뉴 UI")]
     [SerializeField] private GameObject settingsPanel;
@@ -27,7 +27,10 @@ public class GameManager : MonoBehaviour
     [SerializeField] private Slider sfxSlider;        // SFX (저장만)
     [SerializeField] private TMP_Dropdown resolutionDropdown;
     [SerializeField] private Toggle fullscreenToggle;
+    [SerializeField] private Button settingsButton;
+    [SerializeField] private TMP_Dropdown inputPresetDropdown;
 
+    private PlayerController playerController;
     private bool isMenuOpen = false;
 
     // 지원 해상도 목록
@@ -47,10 +50,12 @@ public class GameManager : MonoBehaviour
 
     void Start()
     {
+        playerController = Object.FindFirstObjectByType<PlayerController>();
         InitializeUI();
         SetupButtonListeners();
         InitializeSettings();
         LoadSettings();
+        InitializeInputPresetDropdown();
     }
 
     // ---------- 초기화 ----------
@@ -122,6 +127,37 @@ public class GameManager : MonoBehaviour
 
         // 기본 마스터 볼륨(폴백)
         AudioListener.volume = soundSlider ? soundSlider.value : 1f;
+    }
+    void InitializeInputPresetDropdown()
+    {
+        if (inputPresetDropdown == null) return;
+
+        inputPresetDropdown.ClearOptions();
+        var options = new System.Collections.Generic.List<string> { "프리셋 1 (←/→, X, C, LShif)", "프리셋 2 (tA/D, Space, 마우스, LCtrl, LShift)" };
+        inputPresetDropdown.AddOptions(options);
+
+        // 저장된 값 불러오기(없으면 0)
+        int savedPreset = PlayerPrefs.GetInt("InputPresetIndex", 0);
+        inputPresetDropdown.value = savedPreset;
+
+        inputPresetDropdown.onValueChanged.AddListener(OnInputPresetChanged);
+
+        // 시작 시 적용
+        ApplyInputPresetToPlayer(savedPreset);
+    }
+    void OnInputPresetChanged(int index)
+    {
+        ApplyInputPresetToPlayer(index);
+        PlayerPrefs.SetInt("InputPresetIndex", index);
+        PlayerPrefs.Save();
+    }
+
+    void ApplyInputPresetToPlayer(int index)
+    {
+        if (playerController == null) return;
+        var preset = (PlayerController.InputPreset)index;
+        playerController.inputPreset = preset;
+        playerController.ApplyInputPreset(preset);
     }
 
     void LoadSettings()

@@ -46,7 +46,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   talisman: {fileID: 0}
   strongParryZonePrefab: {fileID: 5879631835722291054, guid: 66524f762c974fc4986b5725c178b455, type: 3}
-  strongParryOffset: {x: 0, y: 0}
+  strongParryOffset: {x: 0, y: -0.1}
   treeWallPrefab: {fileID: 277150481103781896, guid: b4c7fd2868dbec14fb9f20f4fe2ac66d, type: 3}
   treeWallOffset: {x: 0, y: 0}
   flameZonePrefab: {fileID: 8995567316182450347, guid: 9fe42d344c8c0124e944a7d8b7ccdb69, type: 3}

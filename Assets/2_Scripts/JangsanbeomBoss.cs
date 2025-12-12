@@ -43,6 +43,15 @@ public class JangsanbeomBoss : MonoBehaviour
 
         [Header("Phase2: Fake → Real")]
         public bool Phase2_FakeDealsDamage = true;
+
+        // ───────── 쿨타임 설정 ─────────
+        [Header("Cooldown (랜덤 후보)")]
+        [Tooltip("이 공격이 끝난 뒤 다시 사용할 때까지의 쿨타임 후보들(초). 비워두면 쿨타임 없음.")]
+        public float[] randomCooldownOptions = new float[0];
+
+        // 내부: 다음에 사용 가능한 시각(Time.time 기준)
+        [NonSerialized]
+        public float nextUsableTime = 0f;
     }
 
     // ====== Dash Attack ======
@@ -72,7 +81,7 @@ public class JangsanbeomBoss : MonoBehaviour
     [Range(0f, 1f)] public float Phase2HealthThreshold = 0.66f;
 
     [Header("Damage Gates")]
-    public bool requirePlayerTag = false;           // (현재 로직은 태그 미사용)
+    public bool requirePlayerTag = false;           // (현재 로직은 태그 옵션)
     public bool blockOutgoingDamageWhileInvuln = false;
     public bool debugDamage = false;
 
@@ -86,11 +95,13 @@ public class JangsanbeomBoss : MonoBehaviour
     public bool lockMovementInPhase2 = true;
 
     [Header("Player detection (no hitbox prefab)")]
-    [Tooltip("현재 히트는 OverlapBoxAll(마스크 없이)로 처리함. 이 필드는 사용하지 않음.")]
+    [Tooltip("현재 히트는 OverlapBoxAll(마스크 없이)로 처리함. 이 필드는 참고용입니다.")]
     public LayerMask playerLayer;  // 참고용
     public string playerTag = "Player";
 
     // ====== Flip ======
+    //  ... (중략 없이 계속) ...
+
     [Header("Visual & Flip")]
     public Transform graphicsRoot;     // 애니메이션 루트(권장)
     public BoxCollider2D flipTrigger;  // 스프라이트와 겹칠 때 기준선으로 사용 (뒤로 약간 물려 배치)
@@ -175,6 +186,10 @@ public class JangsanbeomBoss : MonoBehaviour
     readonly List<PolygonCollider2D> _polyColliders = new();
     readonly List<Vector2[][]> _originalPolyPaths = new();
     Vector3 _lastPosition;
+
+    // 공격 선택용 임시 버퍼 / 히트 캐시
+    readonly List<int> _tmpReadyAttackIndices = new();
+    readonly HashSet<PlayerController> _hitPlayers = new();
 
     // phase state
     bool _inPhase2 = false;
@@ -634,6 +649,50 @@ public class JangsanbeomBoss : MonoBehaviour
         return flipTrigger.bounds.center.x;
     }
 
+    // ====== Attack Cooldown Helpers ======
+    bool IsAttackReady(AttackData atk)
+    {
+        if (atk == null) return false;
+
+        // 쿨타임 후보가 없으면 항상 사용 가능
+        if (atk.randomCooldownOptions == null || atk.randomCooldownOptions.Length == 0)
+            return true;
+
+        return Time.time >= atk.nextUsableTime;
+    }
+
+    void RollAttackCooldown(AttackData atk)
+    {
+        if (atk == null) return;
+
+        if (atk.randomCooldownOptions == null || atk.randomCooldownOptions.Length == 0)
+        {
+            atk.nextUsableTime = Time.time;
+            return;
+        }
+
+        float cd = atk.randomCooldownOptions[UnityEngine.Random.Range(0, atk.randomCooldownOptions.Length)];
+        if (cd < 0f) cd = 0f;
+        atk.nextUsableTime = Time.time + cd;
+    }
+
+    int PickRandomReadyAttackIndex(List<AttackData> pool)
+    {
+        if (pool == null || pool.Count == 0) return -1;
+
+        _tmpReadyAttackIndices.Clear();
+        for (int i = 0; i < pool.Count; i++)
+        {
+            if (IsAttackReady(pool[i]))
+                _tmpReadyAttackIndices.Add(i);
+        }
+
+        if (_tmpReadyAttackIndices.Count == 0) return -1;
+
+        int r = UnityEngine.Random.Range(0, _tmpReadyAttackIndices.Count);
+        return _tmpReadyAttackIndices[r];
+    }
+
     // ====== AI / Attacks ======
     IEnumerator AIBehavior()
     {
@@ -655,9 +714,13 @@ public class JangsanbeomBoss : MonoBehaviour
                             _bossBGMStarted = true;
                         }
                     }
-                    
+
                     if (UnityEngine.Random.Range(0, 100) < 60)
-                        StartAttackByIndex(0, pool);
+                    {
+                        int idx = PickRandomReadyAttackIndex(pool);
+                        if (idx >= 0)
+                            StartAttackByIndex(idx, pool);
+                    }
                 }
             }
             yield return new WaitForSeconds(UnityEngine.Random.Range(0.6f, 1.5f));
@@ -683,9 +746,19 @@ public class JangsanbeomBoss : MonoBehaviour
     {
         if (busy) return;
         pool ??= BuildCurrentAttackPool();
+
         AttackData atk = null;
-        if (pool != null && index >= 0 && index < pool.Count) atk = pool[index];
-        if (atk == null) atk = new AttackData();
+        if (pool != null && index >= 0 && index < pool.Count)
+            atk = pool[index];
+
+        if (atk == null) return;
+
+        // 쿨타임 체크
+        if (!IsAttackReady(atk)) return;
+
+        // 이번 사용에 대해 쿨타임 예약
+        RollAttackCooldown(atk);
+
         StartCoroutine(ClawRoutine_Generic(atk));
     }
 
@@ -739,54 +812,90 @@ public class JangsanbeomBoss : MonoBehaviour
         var pool = BuildCurrentAttackPool(); if (pool.Count > 0) { var a = pool[0]; bool dmg = _inPhase2 ? a.Phase2_FakeDealsDamage : false; PerformAttackOnce(a, dmg); }
     }
 
-    // ====== 공통 히트 처리(마스크/태그 의존 X) ======
+    // ====== 공통 히트 처리(플레이어 본체 콜라이더만) ======
     void PerformAttackOnce(AttackData atk, bool applyDamage)
     {
         if (!applyDamage) return;
-        if (_invulnerable) return; // 변신/무적 중엔 공격 무시(원하면 제거)
+        if (_invulnerable) return;
+        if (atk == null) return;
 
         // 보스 공격 사운드 재생
         if (AudioManager.Instance != null)
             AudioManager.Instance.PlayBossAttack();
 
-        if (playerLayer == 0) { Debug.LogWarning("[Boss] playerLayer not set."); return; }
-
         Vector2 center = GetAttackWorldPos(atk);
         float worldAngle = atk.Angle * VisualSign();
 
-        // 마스크 없이 전부 겹침 검사
         var hits = Physics2D.OverlapBoxAll(center, atk.Size, worldAngle);
+        if (hits == null || hits.Length == 0) return;
 
-        var seen = new HashSet<Collider2D>();
+        _hitPlayers.Clear();
+
         foreach (var col in hits)
         {
-            if (!col || seen.Contains(col)) continue;
-            seen.Add(col);
+            if (!col) continue;
 
-            // 플레이어 컴포넌트가 있어야만 대미지
-            var pc = col.GetComponent<PlayerController>() ??
-                     col.GetComponentInParent<PlayerController>() ??
-                     col.GetComponentInChildren<PlayerController>();
+            // 플레이어 컨트롤러 찾기 (루트 기준)
+            var pc = col.GetComponentInParent<PlayerController>();
             if (pc == null) continue;
 
-            if (pc.IsParrying && TryAskPlayerToConsumeParry(pc, atk.Damage)) continue;
+            if (requirePlayerTag && !pc.CompareTag(playerTag)) continue;
 
-            var dmg = col.GetComponent<IDamageable>() ??
-                      col.GetComponentInParent<IDamageable>() ??
-                      col.GetComponentInChildren<IDamageable>();
-            if (dmg != null) { dmg.TakeDamage(atk.Damage); continue; }
+            // 플레이어 "본체" 콜라이더: PlayerController와 같은 오브젝트의 Collider2D
+            Collider2D mainBodyCol = pc.GetComponent<Collider2D>();
 
-            var pHealth = col.GetComponent<PlayerHealth>() ??
-                          col.GetComponentInParent<PlayerHealth>() ??
-                          col.GetComponentInChildren<PlayerHealth>();
-            if (pHealth != null) { pHealth.TakeDamage(atk.Damage); continue; }
-
-            var mb = col.GetComponent<MonoBehaviour>() ?? col.GetComponentInParent<MonoBehaviour>();
-            if (mb != null)
+            if (mainBodyCol != null)
             {
-                MethodInfo mi = mb.GetType().GetMethod("TakeDamage", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                if (mi != null) mi.Invoke(mb, new object[] { atk.Damage });
+                // 루트에 콜라이더가 있다면, 그 콜라이더가 맞은 경우만 인정
+                if (col != mainBodyCol) continue;
             }
+            else
+            {
+                // 루트에 콜라이더가 없다면, PlayerController가 붙어있는 오브젝트가 직접 맞은 경우만 인정
+                if (col.GetComponent<PlayerController>() == null) continue;
+            }
+
+            // 이미 이 플레이어는 처리했다면 스킵(중복 타격 방지)
+            if (_hitPlayers.Contains(pc)) continue;
+
+            // 패링 중이면 플레이어에게 "이 히트 소비할래?" 물어보기
+            if (pc.IsParrying && TryAskPlayerToConsumeParry(pc, atk.Damage))
+            {
+                _hitPlayers.Add(pc);
+                continue;
+            }
+
+            // 실제 대미지 적용
+            var pHealth = pc.GetComponent<PlayerHealth>() ??
+                          pc.GetComponentInParent<PlayerHealth>();
+
+            var dmg = (IDamageable)(pc.GetComponent<IDamageable>() ??
+                                    pc.GetComponentInParent<IDamageable>());
+
+            if (pHealth != null)
+            {
+                pHealth.TakeDamage(atk.Damage);
+            }
+            else if (dmg != null)
+            {
+                dmg.TakeDamage(atk.Damage);
+            }
+            else
+            {
+                // 레거시 폴백: 루트에서 TakeDamage(int) 있으면 호출
+                var mb = pc.GetComponent<MonoBehaviour>() ??
+                         pc.GetComponentInParent<MonoBehaviour>();
+                if (mb != null)
+                {
+                    MethodInfo mi = mb.GetType().GetMethod(
+                        "TakeDamage",
+                        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                    if (mi != null)
+                        mi.Invoke(mb, new object[] { atk.Damage });
+                }
+            }
+
+            _hitPlayers.Add(pc);
         }
     }
 

@@ -439,7 +439,7 @@ MonoBehaviour:
     illustrationSprite: {fileID: -2591576141689626136, guid: 0ba362e5c2fa5dd428d65cc854115a3f, type: 3}
     animatedPrefab: {fileID: 0}
     timelineClip: {fileID: 0}
-  nextSceneName: 0_Boss
+  nextSceneName: Cut
   fallbackToNextBuildIndex: 1
   loadAsync: 1
   loadMode: 0

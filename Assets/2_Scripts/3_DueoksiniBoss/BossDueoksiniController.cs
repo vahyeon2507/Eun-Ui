@@ -41,8 +41,8 @@ public class BossDueoksiniController : MonoBehaviour
     [Tooltip("접촉 판정에 사용할 콜라이더 (비워두면 이 오브젝트의 Collider2D 사용)")]
     public Collider2D chargeDamageCollider;
 
-    [Header("Charge ▸ Cancel When Far")]
-    [Tooltip("돌진 중 플레이어와의 거리가 이 값보다 커지면 돌진을 조기 종료 (0 이하면 비활성화)")]
+    [Header("Charge ▸ Cancel When Far (RELATIVE)")]
+    [Tooltip("돌진 시작 시 거리보다 이 값만큼 더 멀어지면 돌진을 조기 종료 (0 이하면 비활성화)")]
     public float chargeCancelDistance = 0f;
 
     [Tooltip("true면 2D 거리(Vector2.Distance), false면 X축 거리만 사용")]
@@ -160,6 +160,20 @@ public class BossDueoksiniController : MonoBehaviour
     [Tooltip("현재 분노 값 (0 ~ rageMaxStacks, 소수 포함)")]
     public float rageValue = 0f;
 
+
+    // ===== Jump Contact Damage =====
+    [Header("Jump Contact Damage")]
+    [Tooltip("점프 중 플레이어와 닿았을 때 대미지를 줄 히트박스 (보스 몸 콜라이더나 전용 히트박스)")]
+    public Collider2D jumpContactHitbox;
+
+    [Tooltip("점프 중 접촉 시 줄 대미지")]
+    public int jumpContactDamage = 1;
+
+    [Tooltip("같은 점프에서 연속 히트 간 최소 간격(초)")]
+    public float jumpContactHitInterval = 0.2f;
+
+    float _jumpContactHitTimer = 0f;
+
     int RageStacks => Mathf.FloorToInt(rageValue);      // 0,1,2,3...
     bool RageIsFull => RageStacks >= rageMaxStacks;
 
@@ -243,6 +257,9 @@ public class BossDueoksiniController : MonoBehaviour
     float _animMoveElapsed = 0f;
     float _animMoveDuration = 0.2f;
 
+    // Charge cancel용 시작 거리
+    float _chargeStartDistanceToPlayer = 0f;
+
     // ─────────────────────────────────────────────
     // 외부 스턴
     // ─────────────────────────────────────────────
@@ -320,11 +337,13 @@ public class BossDueoksiniController : MonoBehaviour
             bool far = IsPlayerFar(farDistanceThreshold);
             if (far)
             {
+                // 멀면 점프 어택
                 yield return DoJumpAttack();
                 continue;
             }
             else
             {
+                // 가까우면 돌진
                 yield return DoCharge();
             }
 
@@ -388,6 +407,18 @@ public class BossDueoksiniController : MonoBehaviour
         Vector3 p0 = transform.position;
         Vector3 p1 = new Vector3(targetX, p0.y, p0.z);
 
+        // 돌진 시작 시 거리 기록 (상대 거리 기준 캔슬용)
+        if (chargeCancelDistance > 0f && player)
+        {
+            _chargeStartDistanceToPlayer = chargeCancelUse2DDistance
+                ? Vector2.Distance(p0, player.position)
+                : Mathf.Abs(player.position.x - p0.x);
+        }
+        else
+        {
+            _chargeStartDistanceToPlayer = 0f;
+        }
+
         // 접촉 판정용 콜라이더
         Collider2D damageCol = chargeDamageCollider;
         if (!damageCol)
@@ -428,14 +459,14 @@ public class BossDueoksiniController : MonoBehaviour
                 }
             }
 
-            // 2) 플레이어와 너무 멀어지면 돌진 조기 종료
-            if (chargeCancelDistance > 0f && player)
+            // 2) 플레이어와 너무 멀어지면 (시작 거리 + 추가 거리) 기준으로 돌진 조기 종료
+            if (chargeCancelDistance > 0f && player && _chargeStartDistanceToPlayer > 0f)
             {
                 float dist = chargeCancelUse2DDistance
                     ? Vector2.Distance(transform.position, player.position)
                     : Mathf.Abs(player.position.x - transform.position.x);
 
-                if (dist > chargeCancelDistance)
+                if (dist > _chargeStartDistanceToPlayer + chargeCancelDistance)
                 {
                     earlyCanceled = true;
                     break;
@@ -475,6 +506,8 @@ public class BossDueoksiniController : MonoBehaviour
         if (facePlayer) FaceTowardPlayer();
 
         float t = 0f;
+        _jumpContactHitTimer = 0f;   // 점프 시작 시 쿨 초기화
+
         while (t < jumpDuration)
         {
             float a = Mathf.Clamp01(t / Mathf.Max(0.0001f, jumpDuration));
@@ -482,13 +515,75 @@ public class BossDueoksiniController : MonoBehaviour
             float x = Mathf.Lerp(start.x, end.x, a);
             float y = start.y + yOffset;
             transform.position = new Vector3(x, y, start.z);
+
+            // ★ 점프 중 접촉 대미지 처리
+            if (jumpContactHitbox && jumpContactDamage > 0)
+            {
+                if (_jumpContactHitTimer > 0f)
+                    _jumpContactHitTimer -= Time.deltaTime;
+
+                if (_jumpContactHitTimer <= 0f)
+                {
+                    bool hit = TryContactDamage(jumpContactHitbox, jumpContactDamage);
+                    if (hit)
+                    {
+                        // 누군가 맞았으면, 일정 시간 동안은 또 안 맞게 쿨타임
+                        _jumpContactHitTimer = jumpContactHitInterval;
+                    }
+                }
+            }
+
             t += Time.deltaTime;
             yield return null;
         }
+
         transform.position = new Vector3(end.x, start.y, start.z);
 
         if (jumpEndsWithSlam)
             yield return DoSlamOnce();
+    }
+
+    bool TryContactDamage(Collider2D contactHitbox, int damage)
+    {
+        if (!contactHitbox || damage <= 0)
+            return false;
+
+        // 플레이어 감지용 필터 (트리거 포함)
+        var filter = new ContactFilter2D
+        {
+            useLayerMask = false,
+            useTriggers = true
+        };
+
+        _hitOverlapBuffer.Clear();
+        int count = contactHitbox.Overlap(filter, _hitOverlapBuffer);
+
+        bool hitSomeone = false;
+
+        for (int i = 0; i < count; i++)
+        {
+            var col = _hitOverlapBuffer[i];
+            if (!col) continue;
+            if (!col.CompareTag("Player")) continue;
+
+            var dmg = col.GetComponent<IDamageable>()
+                     ?? col.GetComponentInParent<IDamageable>()
+                     ?? col.GetComponentInChildren<IDamageable>();
+            if (dmg == null) continue;
+
+            // PlayerHealth가 있으면 히트박스 버전으로 처리
+            if (dmg is PlayerHealth ph)
+                ph.TakeDamageFromHitbox(damage, col);
+            else
+                dmg.TakeDamage(damage);
+
+            // 접촉으로라도 맞췄으면 분노 1칸
+            AddRage(1f);
+
+            hitSomeone = true;
+        }
+
+        return hitSomeone;
     }
 
     // ───────────────── Attack Prep & 선택 ─────────────────
@@ -1040,22 +1135,27 @@ public class BossDueoksiniController : MonoBehaviour
 
     void ApplySimpleDamage(int amount)
     {
+        // 0) 방어 코드: 대미지가 0 이하거나, 현재 진행 중인 SimpleAttack이 없으면 바로 중단
         if (amount <= 0) return;
         if (_playingSimpleAttack == null) return;
 
+        // 1) 현재 공격(애니메이션)에 연결된 히트박스 리스트 가져오기
         var hbList = GetSimpleHitboxList(_playingSimpleAttack);
         if (hbList == null || hbList.Count == 0) return;
 
         bool isStrong = _playingSimpleAttack.isStrongAttack;
 
+        // 2) Overlap용 필터 (레이어마스크는 여기서 안 씀, 트리거는 포함)
         var filter = new ContactFilter2D
         {
             useLayerMask = false,
             useTriggers = true
         };
 
+        // 이번 공격에서 이미 맞은 IDamageable은 다시 맞지 않게 캐시 초기화
         _damagedCache.Clear();
 
+        // 3) 각 히트박스마다 Overlap 검사
         for (int i = 0; i < hbList.Count; i++)
         {
             var hb = hbList[i];
@@ -1063,40 +1163,75 @@ public class BossDueoksiniController : MonoBehaviour
 
             _hitOverlapBuffer.Clear();
             int count = hb.Overlap(filter, _hitOverlapBuffer);
+
+            // 4) 히트박스에 겹친 콜라이더들 순회
             for (int j = 0; j < count; j++)
             {
                 var col = _hitOverlapBuffer[j];
                 if (!col) continue;
+
+                // 플레이어 태그 아니면 관심 없음
                 if (!col.CompareTag("Player")) continue;
 
+                // 4-1) IDamageable 찾기 (PlayerHealth 포함)
                 var dmg = col.GetComponent<IDamageable>()
                         ?? col.GetComponentInParent<IDamageable>()
                         ?? col.GetComponentInChildren<IDamageable>();
-                if (dmg == null || _damagedCache.Contains(dmg)) continue;
 
+                if (dmg == null) continue;
+
+                // 4-2) 같은 대상에게 중복 대미지 방지
+                if (_damagedCache.Contains(dmg)) continue;
                 _damagedCache.Add(dmg);
 
-                // PlayerController를 최대한 확실히 찾기
+                // 4-3) PlayerController 찾기 (강패링/강공격 처리에 필요)
                 var pc = col.GetComponentInParent<PlayerController>();
-                if (pc == null)
-                    pc = FindObjectOfType<PlayerController>();
 
+                // ─────────────────────────────────────────────
+                // ★ 강공격 처리 분기
+                // ─────────────────────────────────────────────
                 if (isStrong)
                 {
                     bool consumed = false;
-                    if (pc != null)
-                        consumed = pc.HandleStrongAttackHit(col);
-
-                    // 강패링 성공 → 대미지 / 분노 증가 모두 스킵
-                    if (consumed) continue;
 
                     if (pc != null)
                     {
+                        // 강패링 존에게 "이 강공격 히트, 패링으로 씹을 수 있냐?" 물어보기
+                        // 조건:
+                        // - 강패링 존 ActiveZone != null
+                        // - 플레이어가 존 안에 있음
+                        // - 플레이어가 현재 Parry 중
+                        // → 모두 만족 시: OnStrongParrySuccess 실행 + true 반환
+                        consumed = TalismanStrongParryZone.TryHandleStrongAttackHit(pc);
+                    }
+
+                    // 강패링이 '성공'한 경우:
+                    //  - 이 히트는 완전히 소모
+                    //  - 실제 대미지 없음
+                    //  - 분노 게이지도 채우지 않음
+                    if (consumed)
+                    {
+                        // 필요하면 디버그 찍어서 확인 가능
+                        // Debug.Log("[BossDueoksini] 강패링으로 강공격이 씹혔습니다.");
+                        continue;
+                    }
+
+                    // 여기까지 왔다는 건:
+                    //  - 강패링 존이 없거나
+                    //  - 플레이어가 존 밖이거나
+                    //  - 플레이어가 패링 중이 아니거나
+                    //  - 혹은 그냥 강패링 타이밍이 아닌 경우
+                    // → 정상적으로 강공격 대미지 적용
+
+                    if (pc != null)
+                    {
+                        // PlayerController가 있다면 강공격용 대미지 함수 사용
                         pc.TakeStrongDamage(amount);
                         AddRage(1f);   // 실제로 맞았으니 분노 +1칸
                     }
                     else
                     {
+                        // 혹시 PlayerController가 없고, IDamageable만 있는 경우 폴백
                         if (dmg is PlayerHealth phStrong)
                             phStrong.TakeDamageFromHitbox(amount, col);
                         else
@@ -1105,8 +1240,12 @@ public class BossDueoksiniController : MonoBehaviour
                         AddRage(1f);
                     }
                 }
+                // ─────────────────────────────────────────────
+                // ★ 일반 공격 처리 분기
+                // ─────────────────────────────────────────────
                 else
                 {
+                    // 일반 공격은 기존대로 PlayerHealth 있으면 Hitbox 버전 사용
                     if (dmg is PlayerHealth ph)
                         ph.TakeDamageFromHitbox(amount, col);
                     else
@@ -1117,6 +1256,7 @@ public class BossDueoksiniController : MonoBehaviour
             }
         }
     }
+
 
     // ===== 분노 게이지 처리 (fill 방식) =====
 

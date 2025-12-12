@@ -6120,6 +6120,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 8995567316182450347, guid: 9fe42d344c8c0124e944a7d8b7ccdb69, type: 3}
     - target: {fileID: 1933522878216306082, guid: 8799dd3a3f717f04f99e84a8f3f5887a, type: 3}
+      propertyPath: strongParryOffset.y
+      value: -0.2
+      objectReference: {fileID: 0}
+    - target: {fileID: 1933522878216306082, guid: 8799dd3a3f717f04f99e84a8f3f5887a, type: 3}
       propertyPath: strongParryZonePrefab
       value: 
       objectReference: {fileID: 5879631835722291054, guid: 287a157bf3a74d043b03d2b0d904f691, type: 3}

@@ -29,7 +29,7 @@ Transform:
   m_GameObject: {fileID: 5879631835722291054}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -3.5227783, y: -0.79279816, z: -0.03832728}
+  m_LocalPosition: {x: -3.5227783, y: -2.371, z: -0.03832728}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -79,15 +79,15 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 3
-  m_Sprite: {fileID: 0}
+  m_Sprite: {fileID: 3288163131657781411, guid: a2130e60c5414804f9517f39a2435209, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
-  m_Size: {x: 2.6666667, y: 2.6666667}
+  m_Size: {x: 12.9, y: 2.8}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
-  m_WasSpriteAssigned: 0
+  m_WasSpriteAssigned: 1
   m_MaskInteraction: 0
   m_SpriteSortPoint: 0
 --- !u!95 &566443344700036875
@@ -130,8 +130,8 @@ MonoBehaviour:
   vulnerabilityDuration: 3
   baseLifeTime: 0.5
   maxLifeTime: 10
-  minScaleMultiplier: 0.2
-  playerCheckRadius: 2
+  minScaleMultiplier: 1
+  playerCheckRadius: 3
   playerLayer:
     serializedVersion: 2
     m_Bits: 128
@@ -169,15 +169,15 @@ BoxCollider2D:
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
-  m_Offset: {x: 0, y: 0}
+  m_Offset: {x: -0.01407754, y: 0}
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.5}
-    oldSize: {x: 1.29, y: 0.28}
-    newSize: {x: 2.6666667, y: 2.6666667}
+    oldSize: {x: 6.45, y: 1.4}
+    newSize: {x: 12.9, y: 2.8}
     adaptiveTilingThreshold: 0.5
     drawMode: 0
     adaptiveTiling: 0
   m_AutoTiling: 0
-  m_Size: {x: 5, y: 5}
+  m_Size: {x: 6.266973, y: 5}
   m_EdgeRadius: 0

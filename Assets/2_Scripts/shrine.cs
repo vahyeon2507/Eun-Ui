@@ -28,6 +28,10 @@ public class sh : MonoBehaviour
     [Tooltip("F키를 누르면 자동으로 열릴 패널들 (최대 2개)")]
     public GameObject[] defaultPanels = new GameObject[2];
     
+    [Header("강화 상점 연동")]
+    [Tooltip("강화 상점 스크립트 (자동으로 찾거나 수동 지정)")]
+    public UpgradeShop upgradeShop;
+    
     [Header("일시정지 설정")]
     [Tooltip("UI가 열릴 때 게임을 일시정지합니다")]
     public bool pauseGameOnOpen = true;
@@ -88,6 +92,12 @@ public class sh : MonoBehaviour
             // 시작 시 오브젝트 숨기기
             objectToShow.SetActive(false);
             wasObjectVisible = false;
+        }
+        
+        // 강화 상점 자동 찾기
+        if (upgradeShop == null)
+        {
+            upgradeShop = FindObjectOfType<UpgradeShop>();
         }
         
         // UI 캔버스 초기화
@@ -189,8 +199,11 @@ public class sh : MonoBehaviour
                 animator.Show();
                 isUIOpen = true;
                 
-                // 기본 패널들 열기
-                OpenDefaultPanels();
+                // 강화 상점 열기
+                if (upgradeShop != null)
+                {
+                    upgradeShop.OpenShop();
+                }
                 return;
             }
         }
@@ -199,8 +212,11 @@ public class sh : MonoBehaviour
         uiCanvas.SetActive(true);
         isUIOpen = true;
         
-        // 기본 패널들 열기
-        OpenDefaultPanels();
+        // 강화 상점 열기
+        if (upgradeShop != null)
+        {
+            upgradeShop.OpenShop();
+        }
     }
     
     // 기본 패널들 열기
@@ -260,6 +276,12 @@ public class sh : MonoBehaviour
         // UIAnimator가 없거나 사용하지 않는 경우
         uiCanvas.SetActive(false);
         isUIOpen = false;
+        
+        // 강화 상점 닫기
+        if (upgradeShop != null)
+        {
+            upgradeShop.CloseShop();
+        }
         
         // 게임 재개
         ResumeGame();

@@ -19,6 +19,9 @@ public class EnemyHealth : MonoBehaviour, IDamageable
     public GameObject hitEffect;
     public GameObject deathEffect;
 
+    [Header("재화 드롭")]
+    public CurrencyDropper currencyDropper;
+
     private bool isDead = false;
 
     void Start()
@@ -93,6 +96,26 @@ public class EnemyHealth : MonoBehaviour, IDamageable
         // Rigidbody 비활성화
         Rigidbody2D rb = GetComponent<Rigidbody2D>();
         if (rb != null) rb.simulated = false;
+
+        // 재화 드롭
+        if (currencyDropper != null)
+        {
+            currencyDropper.DropCurrency();
+            Debug.Log("[EnemyHealth] 재화 드롭 시도 (currencyDropper 참조)");
+        }
+        else
+        {
+            CurrencyDropper dropper = GetComponent<CurrencyDropper>();
+            if (dropper != null)
+            {
+                dropper.DropCurrency();
+                Debug.Log("[EnemyHealth] 재화 드롭 시도 (GetComponent)");
+            }
+            else
+            {
+                Debug.LogWarning("[EnemyHealth] CurrencyDropper를 찾을 수 없습니다! 잡몹에 CurrencyDropper 컴포넌트를 추가하세요.");
+            }
+        }
 
         // 오브젝트 제거 (애니메이션 완료 후)
         Destroy(gameObject, 1f);

@@ -36,6 +36,10 @@ public class BossHealth : MonoBehaviour, IDamageable
     public UnityEvent onDamaged;
     public UnityEvent onDied;
 
+    [Header("재화 드롭")]
+    public CurrencyDropper currencyDropper;
+    public int bossCurrencyAmount = 50;
+
     // 내부
     private bool isInvulnerable = false;
     // private bool isStaggered = false; // 사용하지 않는 변수 - 주석 처리
@@ -245,6 +249,20 @@ public class BossHealth : MonoBehaviour, IDamageable
 
         // 릿지바디 비활성
         if (rb != null) rb.simulated = false;
+
+        // 재화 드롭
+        if (currencyDropper != null)
+        {
+            currencyDropper.DropCurrency(bossCurrencyAmount);
+        }
+        else
+        {
+            CurrencyDropper dropper = GetComponent<CurrencyDropper>();
+            if (dropper != null)
+            {
+                dropper.DropCurrency(bossCurrencyAmount);
+            }
+        }
 
         // 제거 (애니메이션 길이에 따라 시간 조정)
         Destroy(gameObject, 1.2f);

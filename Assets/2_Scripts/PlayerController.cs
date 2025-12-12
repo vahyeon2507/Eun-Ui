@@ -86,8 +86,10 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     public float inputBufferWindow = 0.45f;
 
     [Header("Combo (3 steps)")]
+    public int[] baseComboDamages = new int[3] { 1, 1, 2 };
     public int[] comboDamages = new int[3] { 1, 1, 2 };
     public float[] comboLockDurations = new float[3] { 0.25f, 0.3f, 0.4f };
+    bool isBaseComboDamagesInitialized = false;
 
     [Header("Animator parameter names (must match)")]
     public string animAttack1 = "Attack1";
@@ -118,7 +120,9 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
     public LayerMask parrySpecialEnemyMaskOverride;
 
     [Tooltip("패링 스페셜 공격의 대미지(인스펙터 조절)")]
+    public int baseParrySpecialDamage = 3;
     public int parrySpecialDamage = 3;
+    bool isBaseParrySpecialDamageInitialized = false;
 
     [Header("Ground Check / Stability")]
     public float groundCheckRadius = 0.14f;
@@ -218,12 +222,65 @@ public class PlayerController : MonoBehaviour, IDamageable, IParryStreakProvider
             parryDebugStyle.normal.textColor = Color.white;
         }
 
+        if (!isBaseComboDamagesInitialized)
+        {
+            if (baseComboDamages == null || baseComboDamages.Length != comboDamages.Length)
+            {
+                baseComboDamages = new int[comboDamages.Length];
+            }
+            for (int i = 0; i < comboDamages.Length; i++)
+            {
+                baseComboDamages[i] = comboDamages[i];
+            }
+            isBaseComboDamagesInitialized = true;
+        }
+
+        if (!isBaseParrySpecialDamageInitialized)
+        {
+            baseParrySpecialDamage = parrySpecialDamage;
+            isBaseParrySpecialDamageInitialized = true;
+        }
+
+        ApplyUpgradeBonus();
+
         // ===== PATCH: healthComponent 자동 연결(누락 보호) =====
         if (healthComponent == null)
         {
             var hp = HP;
             if (hp != null) healthComponent = hp;
             else Debug.LogWarning("[PlayerController] healthComponent가 비어 있고 PlayerHealth도 찾지 못했습니다.");
+        }
+    }
+
+    public void ApplyUpgradeBonus()
+    {
+        if (baseComboDamages == null || baseComboDamages.Length != comboDamages.Length)
+        {
+            baseComboDamages = new int[comboDamages.Length];
+            for (int i = 0; i < comboDamages.Length; i++)
+            {
+                baseComboDamages[i] = comboDamages[i];
+            }
+        }
+
+        if (GameDataManager.Instance != null)
+        {
+            int upgradeLevel = GameDataManager.Instance.GetUpgradeLevel();
+            
+            for (int i = 0; i < comboDamages.Length && i < baseComboDamages.Length; i++)
+            {
+                comboDamages[i] = baseComboDamages[i] + upgradeLevel;
+            }
+            
+            parrySpecialDamage = baseParrySpecialDamage + upgradeLevel;
+        }
+        else
+        {
+            if (baseComboDamages != null && baseComboDamages.Length == comboDamages.Length)
+            {
+                baseComboDamages.CopyTo(comboDamages, 0);
+            }
+            parrySpecialDamage = baseParrySpecialDamage;
         }
     }
 

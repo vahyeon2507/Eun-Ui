@@ -9,10 +9,12 @@ public class GameData
     public int totalScore = 0;
     public int totalDeaths = 0;
     public float totalPlayTime = 0f;
-    public bool[] levelCompleted = new bool[10]; // 최대 10개 레벨
+    public bool[] levelCompleted = new bool[10];
     public int[] levelBestScore = new int[10];
     public float[] levelBestTime = new float[10];
     public bool tutorialCompleted = false;
+    public int currency = 0;
+    public int upgradeLevel = 0;
     public DateTime lastSaveTime;
 }
 
@@ -209,7 +211,45 @@ public class GameDataManager : MonoBehaviour
         return gameData.tutorialCompleted;
     }
 
-    // 게임 데이터 초기화
+    public void AddCurrency(int amount)
+    {
+        gameData.currency += amount;
+        SaveGameData();
+    }
+
+    public int GetCurrency()
+    {
+        return gameData.currency;
+    }
+
+    public void SetCurrency(int amount)
+    {
+        gameData.currency = Mathf.Max(0, amount);
+        SaveGameData();
+    }
+
+    public bool SpendCurrency(int amount)
+    {
+        if (gameData.currency >= amount)
+        {
+            gameData.currency -= amount;
+            SaveGameData();
+            return true;
+        }
+        return false;
+    }
+
+    public int GetUpgradeLevel()
+    {
+        return gameData.upgradeLevel;
+    }
+
+    public void SetUpgradeLevel(int level)
+    {
+        gameData.upgradeLevel = Mathf.Clamp(level, 0, 10);
+        SaveGameData();
+    }
+
     public void ResetGameData()
     {
         gameData = new GameData();

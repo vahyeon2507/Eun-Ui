@@ -5,6 +5,7 @@ using UnityEngine.UI;
 public class PlayerHealth : MonoBehaviour, IDamageable
 {
     [Header("HP")]
+    public int baseMaxHealth = 5;
     public int maxHealth = 5;
     public int currentHealth;
 
@@ -31,14 +32,33 @@ public class PlayerHealth : MonoBehaviour, IDamageable
 
     Rigidbody2D rb;
     SpriteRenderer sr;
+    bool isBaseMaxHealthInitialized = false;
 
     void Awake()
     {
+        if (!isBaseMaxHealthInitialized)
+        {
+            baseMaxHealth = maxHealth;
+            isBaseMaxHealthInitialized = true;
+        }
+        ApplyUpgradeBonus();
         currentHealth = maxHealth;
         rb = GetComponent<Rigidbody2D>();
         sr = GetComponent<SpriteRenderer>();
         if (animator == null) animator = GetComponent<Animator>();
-        // 체력바 초기화는 Start에서
+    }
+
+    public void ApplyUpgradeBonus()
+    {
+        if (GameDataManager.Instance != null)
+        {
+            int upgradeLevel = GameDataManager.Instance.GetUpgradeLevel();
+            maxHealth = baseMaxHealth + upgradeLevel;
+        }
+        else
+        {
+            maxHealth = baseMaxHealth;
+        }
     }
 
     void Start()

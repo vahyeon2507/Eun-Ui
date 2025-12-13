@@ -138,6 +138,15 @@ MonoBehaviour:
   - baseName: tusin_dal
     rightState: tusin_dal_R
     leftState: tusin_dal_L
+  - baseName: PUP_gi
+    rightState: PUP_gi_R
+    leftState: PUP_gi_L
+  - baseName: PUP_Ready_Nanshin
+    rightState: PUP_Ready_Nanshin_R
+    leftState: PUP_Ready_Nanshin_L
+  - baseName: NanshinSL
+    rightState: NanshinSL_R
+    leftState: NanshinSL_L
   defaultCrossFadeSeconds: 0
   facingRight: 0
   mirrorXOnFlip: 0
@@ -234,6 +243,84 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
+--- !u!1 &1450488675922414758
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 4211632966690383466}
+  - component: {fileID: 7675783418044128659}
+  m_Layer: 6
+  m_Name: Stabbing the regime_R (2)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &4211632966690383466
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1450488675922414758}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 1, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1938704301982359953}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!61 &7675783418044128659
+BoxCollider2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1450488675922414758}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Density: 1
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_ForceSendLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ForceReceiveLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ContactCaptureLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_CallbackLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_IsTrigger: 1
+  m_UsedByEffector: 0
+  m_CompositeOperation: 0
+  m_CompositeOrder: 0
+  m_Offset: {x: 4.3101745, y: -1.6304799}
+  m_SpriteTilingProperty:
+    border: {x: 0, y: 0, z: 0, w: 0}
+    pivot: {x: 0, y: 0}
+    oldSize: {x: 0, y: 0}
+    newSize: {x: 0, y: 0}
+    adaptiveTilingThreshold: 0
+    drawMode: 0
+    adaptiveTiling: 0
+  m_AutoTiling: 0
+  m_Size: {x: 11.348792, y: 1.0921896}
+  m_EdgeRadius: 0
 --- !u!1 &3719943062559372574
 GameObject:
   m_ObjectHideFlags: 0
@@ -660,7 +747,7 @@ BoxCollider2D:
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
-  m_Offset: {x: 1.8226838, y: -1.1944261}
+  m_Offset: {x: 2.357862, y: -1.1944261}
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0, y: 0}
@@ -670,7 +757,85 @@ BoxCollider2D:
     drawMode: 0
     adaptiveTiling: 0
   m_AutoTiling: 0
-  m_Size: {x: 6.373811, y: 1.9642973}
+  m_Size: {x: 7.444167, y: 1.9642973}
+  m_EdgeRadius: 0
+--- !u!1 &7694805337950867306
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 7238454678954149685}
+  - component: {fileID: 6070532512919643354}
+  m_Layer: 6
+  m_Name: Stabbing the regime_L (2)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &7238454678954149685
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7694805337950867306}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 1, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1938704301982359953}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!61 &6070532512919643354
+BoxCollider2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7694805337950867306}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Density: 1
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_ForceSendLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ForceReceiveLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ContactCaptureLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_CallbackLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_IsTrigger: 1
+  m_UsedByEffector: 0
+  m_CompositeOperation: 0
+  m_CompositeOrder: 0
+  m_Offset: {x: -4.584568, y: -1.6270636}
+  m_SpriteTilingProperty:
+    border: {x: 0, y: 0, z: 0, w: 0}
+    pivot: {x: 0, y: 0}
+    oldSize: {x: 0, y: 0}
+    newSize: {x: 0, y: 0}
+    adaptiveTilingThreshold: 0
+    drawMode: 0
+    adaptiveTiling: 0
+  m_AutoTiling: 0
+  m_Size: {x: 11.11763, y: 1.0977032}
   m_EdgeRadius: 0
 --- !u!1 &8764437512476846879
 GameObject:
@@ -718,6 +883,8 @@ Transform:
   - {fileID: 7804653725202724957}
   - {fileID: 984486119003666640}
   - {fileID: 1446403239787682152}
+  - {fileID: 4211632966690383466}
+  - {fileID: 7238454678954149685}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &698503511037121924
@@ -952,9 +1119,9 @@ MonoBehaviour:
     hitboxes:
     - {fileID: 0}
     rightHitboxes:
-    - {fileID: 1077481960458410392}
+    - {fileID: 0}
     leftHitboxes:
-    - {fileID: 4233735501475139734}
+    - {fileID: 0}
     baseDamage: 15
     isStrongAttack: 0
     allowInPhase1: 0
@@ -986,7 +1153,7 @@ MonoBehaviour:
     - {fileID: 8798760019008533715}
     leftHitboxes:
     - {fileID: 2892706544801481196}
-    baseDamage: 15
+    baseDamage: 20
     isStrongAttack: 0
     allowInPhase1: 0
     allowInPhase2: 1
@@ -1004,6 +1171,68 @@ MonoBehaviour:
     projectilePrefab: {fileID: 1592831604784291918, guid: 96b958706f593104b9b38089e99df08c, type: 3}
     projectileMuzzleRight: {fileID: 1666981896284588833}
     projectileMuzzleLeft: {fileID: 7804653725202724957}
+    projectileMuzzle: {fileID: 0}
+    projectileMuzzleOffset: {x: 0, y: 0}
+    projAimAtPlayer: 1
+  - name: PUP_gi
+    attackTrigger: PUP_gi
+    useAnimEvent: 1
+    activeTime: 1
+    hitboxes:
+    - {fileID: 0}
+    rightHitboxes:
+    - {fileID: 7675783418044128659}
+    leftHitboxes:
+    - {fileID: 6070532512919643354}
+    baseDamage: 20
+    isStrongAttack: 1
+    allowInPhase1: 0
+    allowInPhase2: 1
+    moveDistance: 0
+    moveTime: 0
+    moveCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 0
+      m_PostInfinity: 0
+      m_RotationOrder: 4
+    useAnimEventMove: 0
+    animEventMoveDuration: 0.2
+    spawnProjectileAuto: 0
+    projectilePrefab: {fileID: 1592831604784291918, guid: 96b958706f593104b9b38089e99df08c, type: 3}
+    projectileMuzzleRight: {fileID: 0}
+    projectileMuzzleLeft: {fileID: 0}
+    projectileMuzzle: {fileID: 0}
+    projectileMuzzleOffset: {x: 0, y: 0}
+    projAimAtPlayer: 1
+  - name: NanshinSL
+    attackTrigger: NanshinSL
+    useAnimEvent: 1
+    activeTime: 1
+    hitboxes:
+    - {fileID: 0}
+    rightHitboxes:
+    - {fileID: 7675783418044128659}
+    leftHitboxes:
+    - {fileID: 6070532512919643354}
+    baseDamage: 20
+    isStrongAttack: 0
+    allowInPhase1: 0
+    allowInPhase2: 1
+    moveDistance: 0
+    moveTime: 0
+    moveCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 0
+      m_PostInfinity: 0
+      m_RotationOrder: 4
+    useAnimEventMove: 0
+    animEventMoveDuration: 0.2
+    spawnProjectileAuto: 0
+    projectilePrefab: {fileID: 1592831604784291918, guid: 96b958706f593104b9b38089e99df08c, type: 3}
+    projectileMuzzleRight: {fileID: 0}
+    projectileMuzzleLeft: {fileID: 0}
     projectileMuzzle: {fileID: 0}
     projectileMuzzleOffset: {x: 0, y: 0}
     projAimAtPlayer: 1
@@ -1122,6 +1351,8 @@ MonoBehaviour:
     simpleChoices:
     - simpleIndex: 6
       weight: 1
+    - simpleIndex: 9
+      weight: 1
     attackTriggerOverride: 
     prepDirectionalBase: Ready_Nanshin
     prepCrossFade: 0.05
@@ -1141,6 +1372,21 @@ MonoBehaviour:
     prepDirectionalBase: Ready_tusin
     prepCrossFade: 0.05
     isStrongPrep: 0
+    allowInPhase1: 0
+    allowInPhase2: 1
+  - prepTrigger: PUP_Ready_Nanshin
+    prepHoldTime: 0.75
+    weight: 1
+    useAnimEventEnd: 0
+    attack: 0
+    simpleIndex: 1
+    simpleChoices:
+    - simpleIndex: 8
+      weight: 1
+    attackTriggerOverride: 
+    prepDirectionalBase: PUP_Ready_Nanshin
+    prepCrossFade: 0.05
+    isStrongPrep: 1
     allowInPhase1: 0
     allowInPhase2: 1
   attackPrepEndByAnimEvent: 0
@@ -1464,7 +1710,7 @@ BoxCollider2D:
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
-  m_Offset: {x: -1.4441264, y: -1.1940963}
+  m_Offset: {x: -2.5350077, y: -1.1940963}
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0, y: 0}
@@ -1474,7 +1720,7 @@ BoxCollider2D:
     drawMode: 0
     adaptiveTiling: 0
   m_AutoTiling: 0
-  m_Size: {x: 4.8367486, y: 1.9636378}
+  m_Size: {x: 7.0185113, y: 1.9636378}
   m_EdgeRadius: 0
 --- !u!1 &8973674608824569408
 GameObject:

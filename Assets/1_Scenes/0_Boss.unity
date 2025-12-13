@@ -788,12 +788,12 @@ MonoBehaviour:
   videoPlayer: {fileID: 1634207026}
   descriptionText: {fileID: 224060078}
   slides:
-  - image: {fileID: 0}
-    videoClip: {fileID: 32900000, guid: 300c957f945ba334482ee2b3b8631ade, type: 3}
-    description: "\uC544 \uC934\uC934\uC774\uC57C~"
-  - image: {fileID: 0}
-    videoClip: {fileID: 32900000, guid: 300c957f945ba334482ee2b3b8631ade, type: 3}
-    description: "\uC544\uC774\uACE0\uB09C"
+  - image: {fileID: -5306035761783077452, guid: e34748d8028e0ad42be77875f741fb3a, type: 3}
+    videoClip: {fileID: 0}
+    description: "\uC801\uC758 \uACF5\uACA9\uC744 \uD328\uB9C1\uD558\uBA74 \uD398\uB9C1
+      \uAC8C\uC774\uC9C0\uAC00 \uCD5C\uB300 4\uD68C \uCDA9\uC804\uB429\uB2C8\uB2E4.\n\uD328\uB9C1
+      \uAC8C\uC774\uC9C0\uAC00 \uBAA8\uB450 \uCDA9\uC804\uB418\uBA74 \uAC15\uB825\uD55C
+      \uACF5\uACA9\uC744 \uC0AC\uC6A9\uD569\uB2C8\uB2E4."
   nextKey: 275
   prevKey: 276
   allowSpaceAsNext: 1
@@ -4996,7 +4996,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1290639557195873711, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
       propertyPath: showParryDebugUI
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1407434714894907121, guid: de18b5352b7e5a648a5ccf3880b855be, type: 3}
       propertyPath: redBar
